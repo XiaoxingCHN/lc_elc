@@ -1,0 +1,20 @@
+{
+  "file": "clients/android/releases/1.1.2+5/LC_ELC-Android-1.1.2+5-candidate.apk",
+  "bytes": 74777513,
+  "sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+  "version": "1.1.2+5",
+  "source_manifest": "maintenance/registry/source-client-picker-fix-20261019.json",
+  "source_tree_sha256": "f61a4733881ac4b8572b570ad3cf28781c750df7e85d32b20e440ca7fce29e2e",
+  "validation": "published to Android stable by explicit user authorization; manifest signature/old-client acceptance/authenticated full HTTP download verified; physical installation still unverified",
+  "source_commit": "66ced7bd82d48616a34c1335f26464d6f928e1e7",
+  "signing_certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+  "update_signing_key_id": "release-20261019",
+  "channel": "stable",
+  "release_id": "android-1.1.2-build5-20261019",
+  "release_sequence": 1,
+  "source_manifest_sha256": "0b38dd1d471fea30f36d1f743450eaa60085d012e4677a95f28e4fcd5c3d1979",
+  "archived_source_manifest": "clients/android/releases/1.1.2+5/SOURCE_MANIFEST.json",
+  "environment": "WSL Ubuntu22.04/Flutter3.47.7/JDK17/SDK36/existing signing identity",
+  "build_evidence": "maintenance/audit/receipt-picker-fix-20261019.json",
+  "physical_upgrade": "not verified"
+}

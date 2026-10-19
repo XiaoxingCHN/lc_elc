@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -213,6 +214,10 @@ class _UpdateSheetState extends ConsumerState<UpdateSheet> {
       await ref
           .read(updatePlatformProvider)
           .install(file, c.release!, file.parent);
+    } on PlatformException catch (error) {
+      if (mounted) {
+        setState(() => _error = describeUpdateInstallError(error));
+      }
     } catch (_) {
       if (mounted) setState(() => _error = '安装未开始，请检查安装权限或重新下载完整包。');
     } finally {
@@ -335,4 +340,12 @@ class _UpdateSheetState extends ConsumerState<UpdateSheet> {
       ),
     );
   }
+}
+
+String describeUpdateInstallError(PlatformException error) {
+  final message = error.message?.trim();
+  if (message == null || message.isEmpty) {
+    return '系统安装未完成（${error.code}），原版本保留，请重试。';
+  }
+  return '$message（${error.code}）';
 }

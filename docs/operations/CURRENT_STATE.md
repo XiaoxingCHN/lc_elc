@@ -1,5 +1,9 @@
 # 当前状态与已知限制
 
+最新：Android1.1.2+5已按用户明确要求发布到stable，旧1.1.1+4验签/版本判断、LAN清单200和真实认证完整下载/哈希/403/匿名303检查通过。用户手机反馈未知来源已允许但旧安装入口仍失败；当前开发修复1.1.3+6，原生路径9项、Flutter275通过5跳过、分析无错误警告。手机唯一根因尚无原生日志，不把路径测试当作实体安装通过。后续见[安装修复交接](../../maintenance/handoffs/2026-10-19-android-install-fix.md)和[build5发布交接](../../maintenance/handoffs/2026-10-19-android-stable.md)。
+
+以下为此前交接时点：
+
 当前客户端开发候选 **1.1.2+5** 修复器件选择白屏、补齐弹层自定义入口、明确更新接口状态；测试/构建与未验收项见[修复交接](../../maintenance/handoffs/2026-10-19-receipt-picker-fix.md)。生产 **lab_workflow19.0.1.2.0已上线**，服务active、登录200，Android/Windows/Linux manifest均204。bag1/quant2/move1/operation1/catalog695217/location16/pending0/trace1及数量/预留总量0前后一致；完整备份核验和权限证据见[部署交接](../../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。本轮未发布stable包。以下1.1.1+4段落为上一开发时点。
 
 归档基线：2026-10-19。当前说明优先于local/archive中的旧README。计数是相应证据的时点快照，不是永久业务要求。

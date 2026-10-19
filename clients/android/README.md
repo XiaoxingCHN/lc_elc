@@ -1,3 +1,5 @@
+最新：1.1.2+5已发布Android stable，完整包/签名/HTTP下载核验通过，见[发布交接](../../maintenance/handoffs/2026-10-19-android-stable.md)。用户已允许未知来源但旧安装入口失败，当前1.1.3+6安装修复见[交接](../../maintenance/handoffs/2026-10-19-android-install-fix.md)。以下1.0.1描述保留原发布背景。
+
 # Android客户端
 
 当前成品releases/1.0.1/LC_ELC-Android-1.0.1.apk（1.0.1+2，73690852字节）。这是最终重签版本，不能替换为_analysis的中间APK。源码../app；applicationId仍是com.example.lab_inventory_client。

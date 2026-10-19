@@ -72,6 +72,21 @@
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
       "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
       "maintained_source_manifest": "maintenance/registry/source-server-baseline.json"
+    },
+    {
+      "id": "client-android-1.1.2-build5-stable",
+      "path": "clients/android/releases/1.1.2+5/LC_ELC-Android-1.1.2+5-candidate.apk",
+      "bytes": 74777513,
+      "sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+      "version": "1.1.2+5",
+      "component": "client",
+      "platform": "android",
+      "channel": "stable",
+      "source_manifest": "maintenance/registry/source-client-picker-fix-20261019.json",
+      "source_commit": "66ced7bd82d48616a34c1335f26464d6f928e1e7",
+      "artifact_manifest": "maintenance/registry/artifact-client-android-1.1.2-build5.json",
+      "provenance": "Built before source commit; all 163 frozen files match commit and build copies; exact APK unchanged. Original source manifest bytes archived with artifact.",
+      "acceptance": "Published on explicit user request; full HTTP package/hash and access verified. Physical Android installation unverified."
     }
   ]
 }

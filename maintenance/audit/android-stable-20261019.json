@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-19",
+  "published_at": "2026-10-19T21:39:03.535763+08:00",
+  "status": "published_verified",
+  "authorization": "User explicitly requested publishing Android1.1.2+5 to the existing update channel.",
+  "platform": "android",
+  "arch": "universal",
+  "channel": "stable",
+  "version": "1.1.2+5",
+  "release_id": "android-1.1.2-build5-20261019",
+  "release_sequence": 1,
+  "source_commit": "66ced7bd82d48616a34c1335f26464d6f928e1e7",
+  "source_manifest": "maintenance/registry/source-client-picker-fix-20261019.json",
+  "source_tree_sha256": "f61a4733881ac4b8572b570ad3cf28781c750df7e85d32b20e440ca7fce29e2e",
+  "source_manifest_sha256": "0b38dd1d471fea30f36d1f743450eaa60085d012e4677a95f28e4fcd5c3d1979",
+  "source_files_match": 163,
+  "artifact_manifest": "maintenance/registry/artifact-client-android-1.1.2-build5.json",
+  "package_sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+  "package_bytes": 74777513,
+  "signing_certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+  "update_key_id": "release-20261019",
+  "production": {
+    "release_root": "/opt/odoo/.local/share/Odoo/lab-client-updates",
+    "pointer": "android/universal/stable.json",
+    "previous_pointer": null,
+    "activated_atomically": true,
+    "package_verified_before_pointer": true,
+    "manifest_file_sha256": "1c9e119b0ccd7125cd3120b992ecff7d7355137b5853b3646ce2de40b91815ed",
+    "service": "active",
+    "service_restarted": false,
+    "database_inventory_writes": false,
+    "private_signing_key_uploaded": false
+  },
+  "validation": {
+    "local_publisher": {
+      "command": "python tools/client_release.py publish --private <ignored signing key> --key-id release-20261019 --root <local store> --package <frozen APK> --metadata <metadata>",
+      "exit_code": 0
+    },
+    "old_client_compatibility": {
+      "command": "dart --packages=clients/app/.dart_tool/package_config.json <compat.dart> <local/served envelope>",
+      "actual_old_source": "local/build/client-windows-20261019T174544742/source/lib/updates/update_manifest.dart",
+      "old_version": "1.1.1+4",
+      "checks": 2,
+      "exit_code": 0,
+      "signature_valid": true,
+      "build4_accepts_build5": true,
+      "build5_not_reoffered": true
+    },
+    "lan": {
+      "http": {
+        "android": 200,
+        "windows": 204,
+        "linux": 204,
+        "anonymous_asset": 303
+      },
+      "signature_verified": true,
+      "release_id": "android-1.1.2-build5-20261019",
+      "package_sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+      "manifest_sha256": "275b92464c39549fed27c27edbfd8016d36853d83fb913c5c04a91d0794dfe00",
+      "matches_local_envelope": true
+    },
+    "authenticated_http_full_download": {
+      "status": 200,
+      "bytes": 74777513,
+      "sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+      "content_length": 74777513,
+      "origin": "production loopback, actual HTTP controller and session guard"
+    },
+    "unauthorized_authenticated_download": {
+      "status": 403
+    },
+    "temporary_session_cleanup": {
+      "created": 2,
+      "removed": 2,
+      "cookies_or_tokens_logged": false,
+      "transaction": "READ ONLY, rolled back"
+    },
+    "artifact_hash": {
+      "exit_code": 0,
+      "source_manifest_exact_archived_copy_verified": true
+    }
+  },
+  "build_and_test_evidence": "maintenance/audit/receipt-picker-fix-20261019.json",
+  "not_verified": [
+    "Physical Android system installation confirmation and post-upgrade use",
+    "Metered network behavior on physical device",
+    "Other-platform upgrade/rollback"
+  ],
+  "not_published": [
+    "Windows",
+    "Linux"
+  ],
+  "notes": [
+    "Initial activation failed before writes because system Python3.10 lacks hashlib.file_digest; fixed local temporary activation helper to stream SHA256, then activation exit0.",
+    "HTTP serializes envelope JSON with different whitespace; envelope equality and Ed25519 payload signature match archived compact manifest.",
+    "Source manifest hash refers to exact archived SOURCE_MANIFEST.json bytes; Git may normalize textual line endings.",
+    "Only local source commit created; GitHub not pushed."
+  ],
+  "log_sha256": {
+    "local/build/android-stable-20261019/compat.log": "9667d306947be7b259421cb038f9f42083a850ae8bec58f794ed9f3a57ce7b4a",
+    "local/build/android-stable-20261019/lan-verification.json": "f66c196b5469da8bc0bffa4d3edad39f7eb19b9966ce6f1a2d6cc2e5045513eb"
+  }
+}

@@ -2,7 +2,7 @@
 
 这个仓库是后续人工和AI共同维护的唯一入口，归档基线日期为 **2026-10-19**。当前业务版本：客户端 **1.0.1+2**，EDA插件 **3.0.3**；Odoo三个模块分别独立版本管理。
 
-生产更新接口 **lab_workflow 19.0.1.2.0 已上线**，三端检查HTTP204（尚未发布stable），库存/袋计数不变，见[部署交接](maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。
+生产更新接口 **lab_workflow 19.0.1.2.0 已上线**；Android **1.1.2+5已发布stable**，清单200、完整包下载/哈希核验通过，Windows/Linux仍204。用户反馈旧安装入口已授权仍失败，正在准备[1.1.3+6安装入口修复](maintenance/handoffs/2026-10-19-android-install-fix.md)，见[部署交接](maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。
 
 最新客户端候选 **1.1.2+5** 修复[器件选择白屏和更新状态](maintenance/handoffs/2026-10-19-receipt-picker-fix.md)。此前客户端 **1.1.1+4** 三端候选新增[启动检查与下载更新](docs/development/CLIENT_UPDATE_IMPLEMENTATION.md)，服务端开发候选 **19.0.1.2.0**；该开发阶段未发布stable或部署新接口，彼时生产为 **lab_workflow 19.0.1.1.0**，完整备份与候选未验收项见[当前交接](maintenance/HANDOFF_CURRENT.md)。
 
