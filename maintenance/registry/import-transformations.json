@@ -19,9 +19,28 @@
       "before_sha256": "19adfebf7fd134867c856629a0037e20e78ed702fd3474e7f569d4f1ba8c6b93",
       "after_sha256": "68086d6da6acfc97aecba8b40d33362e2c0dbdd77cfc6785662713e04ea64ade",
       "reason": "Default project path shared_source -> app for new repository layout; callers can explicitly pass -Project/-PubCache."
+    },
+    {
+      "path": "clients/app/android/.gitignore",
+      "before_sha256": "c9af75dbc2c8aa867476a09426c80b178c4aeed8b9393ae48503eedfa3273d71",
+      "after_sha256": "2d9f2abf4fd67199569d5c52b654028de407bd1209a6f846ad731afcda3e47a4",
+      "reason": "Keep Gradle wrapper jar/gradlew scripts tracked; Flutter template previously ignored them, causing clean-clone source manifest failures.",
+      "original_preserved_at": "local/archive/source-import-before-format/clients/app/android/.gitignore"
     }
   ],
   "rules": "Original workspace untouched. Current artifact source import was verified before formatting; imported artifact bytes remain immutable.",
   "unified_diff": "--- import/clients/app/lib/providers/products_provider.dart\n+++ maintained/clients/app/lib/providers/products_provider.dart\n@@ -6,7 +6,7 @@\n /// Products list provider - fetches all products from Odoo\n final productsProvider = FutureProvider<List<Product>>((ref) async {\n   final auth = ref.watch(authProvider);\n-  \n+\n   if (!auth.isAuthenticated) {\n     throw Exception('Not authenticated');\n   }\n@@ -58,7 +58,7 @@\n /// Single product detail provider\n final productDetailProvider = FutureProvider.family<Product, int>((ref, productId) async {\n   final auth = ref.watch(authProvider);\n-  \n+\n   if (!auth.isAuthenticated) {\n     throw Exception('Not authenticated');\n   }\n--- import/server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml\n+++ maintained/server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml\n@@ -390,4 +390,3 @@\n   </t>\n \n </templates>\n-\n",
-  "patch_local_path": "local/archive/source-import-before-format/TRANSFORM.patch"
+  "patch_local_path": "local/archive/source-import-before-format/TRANSFORM.patch",
+  "generated_file_relocations": [
+    {
+      "from": "clients/app/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
+      "to": "local/archive/source-import-generated/clients/app/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
+      "reason": "Flutter-generated registrar or IDE state, regenerated; not maintained source"
+    },
+    {
+      "from": "clients/app/android/lab_inventory_client_android.iml",
+      "to": "local/archive/source-import-generated/clients/app/android/lab_inventory_client_android.iml",
+      "reason": "Flutter-generated registrar or IDE state, regenerated; not maintained source"
+    }
+  ]
 }

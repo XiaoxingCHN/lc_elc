@@ -1,0 +1,11 @@
+{
+  "clone_source_commit": "5cfc9e22af7b66eda3537b6b3da7eec4f250c784",
+  "results": [
+    {
+      "check": "source-check",
+      "exit_code": 1
+    }
+  ],
+  "payloads_present": false,
+  "production_access": false
+}

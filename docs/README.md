@@ -3,6 +3,7 @@
 - [真实架构](architecture/OVERVIEW.md)
 - [当前业务需求](requirements/SCOPE.md)
 - [当前版本和已知限制](operations/CURRENT_STATE.md)
+- [新机器准备](development/BOOTSTRAP.md)
 - [人机开发流程](development/WORKFLOW.md)
 - [客户端](development/CLIENT.md)与[Odoo开发](development/SERVER.md)
 - [API维护](development/API.md)

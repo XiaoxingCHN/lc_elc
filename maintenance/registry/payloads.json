@@ -244,9 +244,9 @@
       "acquisition": {
         "method": "ubuntu-runtime-closure",
         "commands": [
-          "See dependencies/linux-runtime/apt_packages.list",
-          "On Ubuntu22.04 prepare/download the listed packages in an isolated output directory; retain Package indexes and SHA256SUMS",
-          "python dependencies/linux-runtime/verify_deb_closure.py --help"
+          "On WSL/Linux run: python3 dependencies/linux-runtime/verify_deb_closure.py (fixed relative out/debs; it does not implement --help)",
+          "For the current release runtime set use clients/linux/releases/1.0.1/LC_ELC-Linux-1.0.1/deps and its install.sh after reviewing the install scope on the target Linux machine.",
+          "To prepare a NEW set on a networked Ubuntu22.04 preparation machine, resolve dependencies/linux-runtime/apt_packages.list into a NEW download directory; keep versions, Package metadata and SHA256SUMS. Do not overwrite the existing validated set."
         ]
       },
       "original_manifest": "dependencies/linux-runtime/out/SHA256SUMS",

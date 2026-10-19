@@ -21,8 +21,9 @@ def main():
  if a.platform=='windows' and os.name!='nt':p.error('Windows native build must run on Windows')
  if a.platform=='linux' and platform.system()!='Linux':p.error('Linux native build must run on Linux/WSL; see clients/linux/README.md')
  if not flutter.is_file():p.error('Flutter missing; restore dependencies first, see dependencies/README.md')
+ if host=='linux' and not a.flutter and (ROOT/'dependencies/sdk/linux/EXPANDED_ON_WINDOWS_INCOMPLETE.txt').exists():p.error('Restore the preserved Linux SDK tar or WSL tool archive onto a Linux filesystem and pass --flutter explicitly; the Windows-expanded Linux SDK is not a complete runtime.')
  stamp=datetime.datetime.now().strftime('%Y%m%dT%H%M%S%f');work=ROOT/'local/build'/('client-'+a.platform+'-'+stamp);work.mkdir(parents=True)
- src=work/'source';shutil.copytree(ROOT/'clients/app',src,ignore=shutil.ignore_patterns('.dart_tool','build','ephemeral','.gradle','.cxx','.idea','local.properties','.flutter-plugins-dependencies'))
+ src=work/'source';shutil.copytree(ROOT/'clients/app',src,ignore=shutil.ignore_patterns('.dart_tool','build','ephemeral','.gradle','.cxx','.idea','local.properties','.flutter-plugins-dependencies','*.iml','GeneratedPluginRegistrant.java'))
  env=os.environ.copy();env['PUB_CACHE']=str(cache);env['CMAKE_BUILD_PARALLEL_LEVEL']='2';env['FLUTTER_SUPPRESS_ANALYTICS']='true';env['GRADLE_OPTS']='-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false';env['GRADLE_USER_HOME']=str(ROOT/'dependencies/gradle-cache');env['PATH']=str(flutter.parent)+os.pathsep+env.get('PATH','')
  if a.platform=='android':
   sdk=Path(a.android_sdk) if a.android_sdk else ROOT/'dependencies/android/sdk';jdk=Path(a.jdk) if a.jdk else ROOT/'dependencies/android/java'

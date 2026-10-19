@@ -19,7 +19,7 @@ python tools/fetch_payload.py --id flutter-windows --verify
 - 恢复到新目录：`powershell -File dependencies/restore_client_tools.ps1 -TargetRoot <新工具目录> -AndroidProject clients/app -Verify`。脚本处理cmdline-tools/latest、build-tools内部android-16目录和JDK层级；默认不修改全局PATH。随后给build_client.py传--flutter、--android-sdk和--jdk。
 - pub-cache-windows/linux来自pubspec.lock解析：在联网恢复机设置新的PUB_CACHE后从clients/app运行flutter pub get --enforce-lockfile，离线重放用保留缓存加--offline。原生Pdfium不由pubget保证齐全。
 - gradle-cache来自Gradle9.3.1 wrapper与Maven解析；wrapperURL在clients/app/android/gradle/wrapper/gradle-wrapper.properties。联网构建填充独立GRADLE_USER_HOME，再保留以供离线；代理gradle.properties不分发。
-- VC运行库windows/VC_redist.x64.exe有精确URL/hash；C++编译工具MSVC **未在旧离线包提供**。官方[VS安装步骤](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170)选择C++桌面开发、v143和Windows SDK。原D:/VS2026便携布局不是跨机安装方法。
+- VC运行库windows/vc_redist.x64.exe有精确URL/hash；C++编译工具MSVC **未在旧离线包提供**。官方[VS安装步骤](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170)选择C++桌面开发、v143和Windows SDK。原D:/VS2026便携布局不是跨机安装方法。
 
 ## 2. Ubuntu/Odoo/采集器
 
@@ -71,3 +71,7 @@ python tools/repo_check.py --verify-payloads
 ## 本次补齐的实际WSL工具载荷
 
 `dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz`已从现有WSL只读导出，4436412077字节，SHA256 `7d9c152d1a58dd04e319b173459f40bce13cb38d47dc06a34657b8e5aea475b1`。包括原Linux Android JDK/SDK/Flutter和缓存、Linux sysroot/Pdfium/适配bin，具体源路径见registry/wsl-toolchain.json。用`python tools/fetch_payload.py --id wsl-build-tools --verify`核验，然后在新私有WSL目录解包并按CLIENT.md传入路径。该文件可随普通离线payload导出，排除了签名私钥和代理配置。
+
+## Linux SDK链接注意事项
+
+原F盘展开LinuxSDK含一处Windows无法直接读取的Linux符号链接。本次保留其完整原始tar.xz和实际WSL工具tar，不把有缺项的Windows展开副本当正式Linux运行时。Linux/WSL请将原始SDK归档解包到Linux文件系统，并给build_client.py显式传--flutter；marker会阻止误用默认展开副本。源码组件没有靠这条SDK测试夹具链接运行。

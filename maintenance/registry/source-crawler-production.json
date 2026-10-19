@@ -1,0 +1,51 @@
+{
+  "timezone": "Asia/Shanghai",
+  "units": [
+    {
+      "name": "lcsc-catalog-import.service",
+      "enabled": "static"
+    },
+    {
+      "name": "lcsc-crawler-stop.service",
+      "enabled": "static"
+    },
+    {
+      "name": "lcsc-crawler.service",
+      "enabled": "disabled"
+    },
+    {
+      "name": "odoo.service",
+      "enabled": "enabled"
+    },
+    {
+      "name": "lcsc-crawler-stop.timer",
+      "enabled": "enabled"
+    },
+    {
+      "name": "lcsc-crawler.timer",
+      "enabled": "enabled"
+    }
+  ],
+  "files": [
+    {
+      "path": "/opt/lcsc-crawler/app/lcsc_catalog_archive.py",
+      "name": "lcsc_catalog_archive.py",
+      "sha256": "f61a2ec3fa22010f870f7afb9a52825f6aff554047f583617165ed7d01a71521"
+    },
+    {
+      "path": "/opt/lcsc-crawler/app/lcsc_electronics_filter.json",
+      "name": "lcsc_electronics_filter.json",
+      "sha256": "fade1b6aead414c4f9d3d6ac1bf777afeadb633c9ddf5e303dbdf5fd8844f8bd"
+    },
+    {
+      "path": "/opt/lcsc-crawler/app/requirements.txt",
+      "name": "requirements.txt",
+      "sha256": "0d0d2938e5443f318fc97363f42cffe3309df1b718cc2bf713263a68cb7bbee5"
+    },
+    {
+      "path": "/opt/lcsc-crawler/app/snapshot_catalog.py",
+      "name": "snapshot_catalog.py",
+      "sha256": "4ef681a50aa670eb003d5afcef9406c61fd2553235956b81b54a9568f0660a9d"
+    }
+  ]
+}

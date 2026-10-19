@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Keep the Gradle bootstrap in the maintained source repository.
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar

@@ -33,8 +33,10 @@ def main():
  def check(name,condition,details=None):
   (passed if condition else errors).append({'check':name,**({'details':details} if details is not None else {})})
  components=json.loads((ROOT/'maintenance/registry/components.json').read_text(encoding='utf-8'))
- for c in components['components']:check('component-source:'+c['id'],all((ROOT/x).exists() for x in c['required_files']))
  files=git_files(a.staged_only)
+ for c in components['components']:
+  check('component-source:'+c['id'],all((ROOT/x).exists() for x in c['required_files']))
+  check('component-tracked:'+c['id'],all(x in files for x in c['required_files']))
  for name in files:
   pth=ROOT/name;parts=Path(name).parts
   forbidden=(name.startswith('local/') or name.startswith('data/') and name!='data/README.md' or 'releases' in parts and name!='releases/README.md' or 'node_modules' in parts or pth.suffix.lower() in ['.keystore','.jks','.pem','.key','.sqlite3','.apk','.eext','.whl','.deb','.exe','.dll'])

@@ -15,7 +15,7 @@ class FrozenSourceTests(unittest.TestCase):
  def test_freeze_preserves_generated_models_but_excludes_build_cache(self):
   m=load('release')
   with tempfile.TemporaryDirectory() as temp:
-   m.ROOT=Path(temp);base=m.ROOT/'clients/app';(base/'lib').mkdir(parents=True);(base/'build').mkdir();(base/'lib/model.g.dart').write_text('model\n');(base/'build/temp.dart').write_text('cache')
+   m.ROOT=Path(temp);base=m.ROOT/'clients/app';(base/'lib').mkdir(parents=True);(base/'build').mkdir();(base/'lib/model.g.dart').write_text('model\n');(base/'build/temp.dart').write_text('cache');(base/'editor.iml').write_text('IDE');(base/'lib/GeneratedPluginRegistrant.java').write_text('generated')
    result=m.snapshot('client');self.assertEqual(list(result['files']),['clients/app/lib/model.g.dart'])
  def test_freeze_is_portable_across_crlf_checkout(self):
   m=load('release')

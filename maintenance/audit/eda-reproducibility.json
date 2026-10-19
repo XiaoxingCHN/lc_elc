@@ -1,0 +1,14 @@
+[
+  {
+    "file": "lab-inventory-odoo_v3.0.3.eext",
+    "rebuilt_sha256": "69665cbf3fac0732db7f6b01188014ac773dbc3d43e12062e8ffd039016998ef",
+    "shipped_sha256": "69665cbf3fac0732db7f6b01188014ac773dbc3d43e12062e8ffd039016998ef",
+    "same_bytes": true
+  },
+  {
+    "file": "lab-inventory-odoo_v3.0.3-bundle.zip",
+    "rebuilt_sha256": "5b48babfe8cb365c30588f79bb6e1c549769899ee95d75dabde4a6328cbf784b",
+    "shipped_sha256": "5b48babfe8cb365c30588f79bb6e1c549769899ee95d75dabde4a6328cbf784b",
+    "same_bytes": true
+  }
+]

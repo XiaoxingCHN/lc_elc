@@ -13,7 +13,7 @@ def snapshot(component):
  result={};raw={}
  for r in SOURCE[component]:
   for p in sorted((ROOT/r).rglob('*')):
-   if not p.is_file() or any(x in SKIP for x in p.relative_to(ROOT).parts) or p.name in ['local.properties','.flutter-plugins-dependencies'] or p.suffix in ['.pyc','.log']:continue
+   if not p.is_file() or any(x in SKIP for x in p.relative_to(ROOT).parts) or p.name in ['local.properties','.flutter-plugins-dependencies','GeneratedPluginRegistrant.java'] or p.suffix in ['.pyc','.log','.iml']:continue
    name=p.relative_to(ROOT).as_posix();raw[name]=digest(p);b=p.read_bytes()
    try:
     b.decode('utf-8');b=b.replace(b'\r\n',b'\n') if b'\x00' not in b else b

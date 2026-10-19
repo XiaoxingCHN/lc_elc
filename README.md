@@ -40,6 +40,8 @@ services/           采集/同步编排、生产service/timer快照
 
 英文目录、中文正文。`local/`、数据、成品和离线大文件均不提交Git；**只克隆Git不能立即拥有离线SDK和安装包**，按依赖登记下载或用离线载荷包恢复。项目源码中的字体、许可证、Gradle wrapper jar等必要小型运行资产保留。
 
+归档结果与限制见[验收交接报告](docs/operations/ARCHIVE_REPORT.md)。
+
 ## 首次核对
 
 在仓库根目录运行（Python3.10以上）：

@@ -1,0 +1,168 @@
+# Top-level packages whose FULL APT dependency closure is downloaded.
+#
+# Target: Ubuntu 22.04 (jammy) amd64, Odoo 19, Python 3.10, PostgreSQL 14.
+#
+# Syntax
+#   pkg            required: downloaded, and a download failure aborts the run
+#   !pkg           optional: attempted, failure is recorded but not fatal
+#   # ...          comment
+#
+# The closure is computed with `apt-cache depends --recurse`, which reads
+# package METADATA and therefore does not depend on what happens to be
+# installed on the prep machine. `apt-get download` likewise fetches the .deb
+# regardless of installed state. That is what makes this bundle complete even
+# when prepared on a machine that already has most of the packages.
+
+# ---------------------------------------------------------------------------
+# Python 3.10 runtime and build support
+# ---------------------------------------------------------------------------
+python3
+python3-dev
+python3-venv
+python3-pip
+python3-setuptools
+python3-wheel
+libpython3.10-dev
+
+# ---------------------------------------------------------------------------
+# PostgreSQL 14 (Odoo's database)
+# ---------------------------------------------------------------------------
+postgresql-14
+postgresql-client-14
+postgresql-contrib-14
+libpq-dev
+libpq5
+
+# ---------------------------------------------------------------------------
+# Build toolchain.
+# Only needed offline if a CPython extension has no manylinux wheel and pip has
+# to compile it from sdist. Shipping it removes that failure mode.
+# ---------------------------------------------------------------------------
+build-essential
+gcc
+g++
+
+# ---------------------------------------------------------------------------
+# C headers for Odoo's known C-extension dependencies.
+#   lxml          -> libxml2-dev libxslt1-dev
+#   psycopg2      -> libpq-dev            (already above)
+#   Pillow        -> libjpeg-dev zlib1g-dev libfreetype6-dev liblcms2-dev
+#                    libopenjp2-7-dev libwebp-dev libtiff5-dev
+#   python-ldap   -> libldap-dev libsasl2-dev
+#   cffi/cryptography -> libssl-dev libffi-dev
+#
+# GOTCHA: on jammy `libldap2-dev` is a TRANSITIONAL package that ships only
+# documentation (7 KB, no headers). `libldap-dev` is the real one. Listing the
+# transitional name silently yields "lber.h: No such file or directory" much
+# later, when something tries to compile python-ldap.
+# ---------------------------------------------------------------------------
+libxml2-dev
+libxslt1-dev
+libjpeg-dev
+zlib1g-dev
+libfreetype6-dev
+liblcms2-dev
+libopenjp2-7-dev
+libwebp-dev
+libtiff5-dev
+libldap-dev
+libsasl2-dev
+libssl-dev
+libffi-dev
+
+# ---------------------------------------------------------------------------
+# Odoo 19's C-extension dependencies, taken from APT instead of pip.
+#
+# The header of out/odoo/odoo-requirements.txt states it explicitly:
+#   "The officially supported versions of the following packages are their
+#    python3-* equivalent distributed in Ubuntu 24.04 and Debian 12"
+# and every one of these is pinned with a "(Jammy)" comment matching jammy's
+# python3-* version exactly (e.g. gevent==21.8.0 == python3-gevent 21.8.0-1).
+#
+# This is not a workaround, it is the supported path, and it is also what makes
+# the offline target work without a compiler: gevent 21.8.0 has no cp310 wheel
+# and its sdist no longer builds under modern Cython, so pip alone cannot
+# provide it.
+# ---------------------------------------------------------------------------
+python3-gevent
+python3-greenlet
+python3-lxml
+python3-psycopg2
+python3-cbor2
+python3-cryptography
+python3-markupsafe
+python3-pil
+python3-psutil
+python3-ldap
+python3-libsass
+python3-reportlab
+python3-rjsmin
+python3-magic
+python3-jinja2
+python3-dateutil
+python3-tz
+python3-requests
+python3-urllib3
+python3-chardet
+python3-idna
+python3-babel
+python3-docutils
+python3-zeep
+python3-openpyxl
+python3-xlrd
+python3-xlwt
+python3-xlsxwriter
+python3-vobject
+python3-werkzeug
+python3-passlib
+python3-polib
+python3-decorator
+python3-serial
+python3-usb
+python3-qrcode
+python3-stdnum
+python3-num2words
+python3-ofxparse
+python3-freezegun
+python3-openssl
+python3-pypdf2
+python3-asn1crypto
+python3-geoip2
+
+# NOTE on Debian/Ubuntu package naming — these do NOT match the PyPI name:
+#   pytz      -> python3-tz
+#   pyserial  -> python3-serial
+#   pyOpenSSL -> python3-openssl
+# apt reports all unresolvable names at once, so a single wrong name fails the
+# whole run with "E: Unable to locate package ...".
+
+# ---------------------------------------------------------------------------
+# Report rendering (wkhtmltopdf).
+# OPTIONAL: without it Odoo runs fine except for PDF report printing.
+# jammy's universe repo does carry a wkhtmltopdf source package; if the binary
+# is not resolvable the preparer falls back to the upstream release .deb.
+# ---------------------------------------------------------------------------
+!wkhtmltopdf
+!xfonts-75dpi
+!xfonts-base
+libxrender1
+libxext6
+libfontconfig1
+
+# ---------------------------------------------------------------------------
+# Assets. Odoo's web asset pipeline may need node; kept separate and optional
+# because it adds a large closure.
+# ---------------------------------------------------------------------------
+!nodejs
+!npm
+
+# ---------------------------------------------------------------------------
+# Prep-machine tooling that is ALSO useful on the target:
+#   git          -> clone the Odoo source
+#   dpkg-dev     -> dpkg-scanpackages, used to generate the local repo index
+#   ca-certificates -> TLS for clone/pip/apt
+# ---------------------------------------------------------------------------
+git
+dpkg-dev
+ca-certificates
+xz-utils

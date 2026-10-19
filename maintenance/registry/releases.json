@@ -10,7 +10,8 @@
       "component": "client",
       "source_manifest": "maintenance/registry/source-client-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-client-archive-final.json"
     },
     {
       "id": "client-android",
@@ -21,7 +22,8 @@
       "component": "client",
       "source_manifest": "maintenance/registry/source-client-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-client-archive-final.json"
     },
     {
       "id": "client-linux",
@@ -32,7 +34,8 @@
       "component": "client",
       "source_manifest": "maintenance/registry/source-client-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-client-archive-final.json"
     },
     {
       "id": "eda-eext",
@@ -43,7 +46,8 @@
       "component": "eda",
       "source_manifest": "maintenance/registry/source-eda-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-eda-baseline.json"
     },
     {
       "id": "eda-bundle",
@@ -54,7 +58,8 @@
       "component": "eda",
       "source_manifest": "maintenance/registry/source-eda-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-eda-baseline.json"
     },
     {
       "id": "odoo-addons",
@@ -65,7 +70,8 @@
       "component": "server",
       "source_manifest": "maintenance/registry/source-server-baseline.json",
       "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
+      "maintained_source_manifest": "maintenance/registry/source-server-baseline.json"
     }
   ]
 }

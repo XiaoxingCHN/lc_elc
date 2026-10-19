@@ -10,7 +10,10 @@
         "clients/app/pubspec.yaml",
         "clients/app/pubspec.lock",
         "clients/app/lib/main.dart",
-        "clients/app/test/services/login_memory_store_test.dart"
+        "clients/app/test/services/login_memory_store_test.dart",
+        "clients/app/android/gradlew",
+        "clients/app/android/gradlew.bat",
+        "clients/app/android/gradle/wrapper/gradle-wrapper.jar"
       ],
       "guide": "docs/development/CLIENT.md",
       "published_platforms": [

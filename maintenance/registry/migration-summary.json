@@ -1,0 +1,93 @@
+{
+  "source_root": "F:\\lc_elc_workspace",
+  "source_entries_seen": 178157,
+  "migrated_source_entries": 138285,
+  "decisions": {
+    "historical-intermediate-preserved-original-only": {
+      "entries": 1521,
+      "bytes": 618811964
+    },
+    "migrated:current-release": {
+      "entries": 269,
+      "bytes": 588748841
+    },
+    "migrated:current-source": {
+      "entries": 335,
+      "bytes": 113271521
+    },
+    "migrated:historical-data": {
+      "entries": 203,
+      "bytes": 7595831209
+    },
+    "migrated:historical-data-alias": {
+      "entries": 1,
+      "bytes": 3547037696
+    },
+    "migrated:historical-document": {
+      "entries": 27,
+      "bytes": 1224299
+    },
+    "migrated:historical-evidence": {
+      "entries": 24,
+      "bytes": 608740
+    },
+    "migrated:historical-guidance": {
+      "entries": 5,
+      "bytes": 22670
+    },
+    "migrated:history": {
+      "entries": 172,
+      "bytes": 626855960
+    },
+    "migrated:history-generated-state": {
+      "entries": 2,
+      "bytes": 3928
+    },
+    "migrated:history-release": {
+      "entries": 46,
+      "bytes": 10510134460
+    },
+    "migrated:history-tool": {
+      "entries": 54,
+      "bytes": 20274572
+    },
+    "migrated:local-historical-data": {
+      "entries": 3,
+      "bytes": 3550019080
+    },
+    "migrated:offline-dependency": {
+      "entries": 137143,
+      "bytes": 17497727674
+    },
+    "migrated:private-signing-material": {
+      "entries": 1,
+      "bytes": 2618
+    },
+    "noncanonical-analysis-or-oneoff-fixture-preserved-original-only": {
+      "entries": 1796,
+      "bytes": 241617881
+    },
+    "recreatable-or-private-runtime-state-preserved-original-only": {
+      "entries": 35992,
+      "bytes": 3502278514
+    },
+    "session-or-browser-state-preserved-original-only": {
+      "entries": 6,
+      "bytes": 62026
+    },
+    "temporary-toolchain-state-preserved-original-only": {
+      "entries": 30,
+      "bytes": 342422901
+    },
+    "unreleased-candidate-preserved-original-only": {
+      "entries": 527,
+      "bytes": 919937749
+    }
+  },
+  "full_local_disposition": "local/manifests/original-disposition.json",
+  "full_local_disposition_sha256": "5d1dd6b7c1de3cbbb5ae335c7ca9293a37592a02666999c63113419dbf104874",
+  "copy_map": "local/manifests/migration-files.json",
+  "copy_map_sha256": "2efb7448ddb1e7bfb5b1512d3c65b36ba7dd86f543c504b0643fdc7a9c31df79",
+  "original_files_deleted": 0,
+  "note": "Current source/artifacts/dependencies/data and selected history copied; unreviewed sessions, caches, one-off candidates remain in the untouched original workspace. Linux SDK original archives/WSL tools retain the unreadable expanded link."
+}
