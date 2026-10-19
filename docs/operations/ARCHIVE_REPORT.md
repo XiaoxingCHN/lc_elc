@@ -20,7 +20,7 @@
 - 新维护工具8项通过（包括越界/覆盖保护、凭据输出边界、源冻结、当前指针切换不覆盖历史）。
 - 正式Shell脚本19个bash -n通过；没有执行部署脚本。
 - 关键载荷/成品/数据库完整性检查60项通过，无错误；警告明确指向尚未构建的完整生产cp312 wheelhouse。
-- 初次空目录Git克隆揭示Flutter模板忽略Gradle启动文件的问题，已记录并修正；最终空目录克隆结果另见maintenance/audit/git-clone-check.json，不将失败记录冒充通过。
+- 初次空目录Git克隆揭示Flutter模板忽略Gradle启动文件的问题，已记录并修正；修正后重新克隆到另一个空目录，源码检查、8项维护测试、路由一致性、构建dry-run四项均exit0；Gradle脚本Git模式为100755。结果见maintenance/audit/git-clone-check.json，初次失败也保留原因。
 
 ## 后续维护入口
 

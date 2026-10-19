@@ -1,11 +1,26 @@
 {
-  "clone_source_commit": "5cfc9e22af7b66eda3537b6b3da7eec4f250c784",
+  "result": "PASS",
+  "clone_source_commit": "f96ea9b9b1a999c32915bca08d1d2a82b706a7e7",
   "results": [
     {
       "check": "source-check",
-      "exit_code": 1
+      "exit_code": 0
+    },
+    {
+      "check": "maintenance-tests",
+      "exit_code": 0
+    },
+    {
+      "check": "route-registry",
+      "exit_code": 0
+    },
+    {
+      "check": "build-plan",
+      "exit_code": 0
     }
   ],
   "payloads_present": false,
-  "production_access": false
+  "production_access": false,
+  "prior_failed_clone": "5cfc9e22 baseline missed template-ignored Gradle bootstrap and included generated IDE/registrar in source manifest; fixed and re-cloned from a fresh directory",
+  "gradle_git_mode": "100755 9d82f78915133e1c35a6ea51252590fb38efac2f 0\tclients/app/android/gradlew"
 }
