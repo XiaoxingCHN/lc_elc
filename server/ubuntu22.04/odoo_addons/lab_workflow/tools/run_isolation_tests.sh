@@ -17,18 +17,24 @@ set -uo pipefail
 
 RUNTIME="${LABWF_RUNTIME:-/var/tmp/lc-elc-clean-apt-20261014-082927-594/rootfs}"
 WITH_HTTP=0
+SKIP_PROCESS_CONCURRENCY=0
 KEEP=0
 REAL_CATALOG=""
 STUB_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-http) WITH_HTTP=1; shift ;;
+    --skip-process-concurrency) SKIP_PROCESS_CONCURRENCY=1; shift ;;
     --keep) KEEP=1; shift ;;
     --real-catalog) REAL_CATALOG="$2"; shift 2 ;;
     --stub) STUB_OVERRIDE="$2"; shift 2 ;;
     *) echo "未知参数：$1"; exit 2 ;;
   esac
 done
+
+if [[ "$SKIP_PROCESS_CONCURRENCY" == "1" && "$WITH_HTTP" != "1" ]]; then
+  echo "--skip-process-concurrency 必须配合 --with-http，不能省略全部并发验收"; exit 2
+fi
 
 [[ -f "$RUNTIME/opt/odoo/odoo-bin" ]] || { echo "找不到只读运行时：$RUNTIME"; exit 2; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,6 +55,7 @@ fi
 HOST_OUT="$(mktemp -d /var/tmp/labwf_out.XXXXXX)"
 chmod 755 "$HOST_OUT"
 export LABWF_RUNTIME="$RUNTIME" LABWF_WITH_HTTP="$WITH_HTTP"
+export LABWF_SKIP_PROCESS_CONCURRENCY="$SKIP_PROCESS_CONCURRENCY"
 export LABWF_OUT="$HOST_OUT" LABWF_STUB="$STUB" LABWF_REAL_CATALOG="$REAL_CATALOG"
 export LABWF_ADDON_DIR="$ADDON_DIR" LABWF_INNER="$INNER"
 

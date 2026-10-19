@@ -151,8 +151,68 @@
     {
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "pending_list",
+      "line": 30,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "pending_create",
+      "line": 35,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "pending_update",
+      "line": 40,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "pending_resolve",
+      "line": 45,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "pending_confirm",
+      "line": 50,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_bootstrap",
-      "line": 34,
+      "line": 61,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -164,7 +224,7 @@
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_locations",
-      "line": 42,
+      "line": 69,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -176,30 +236,6 @@
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_location_create",
-      "line": 51,
-      "registration": {
-        "type": "jsonrpc",
-        "auth": "user",
-        "methods": "dynamic; inspect source",
-        "csrf": false
-      }
-    },
-    {
-      "path": "dynamic-route",
-      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
-      "handler": "lab_resolve_code",
-      "line": 66,
-      "registration": {
-        "type": "jsonrpc",
-        "auth": "user",
-        "methods": "dynamic; inspect source",
-        "csrf": false
-      }
-    },
-    {
-      "path": "dynamic-route",
-      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
-      "handler": "lab_receipt",
       "line": 78,
       "registration": {
         "type": "jsonrpc",
@@ -211,31 +247,31 @@
     {
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_resolve_code",
+      "line": 93,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_receipt",
+      "line": 105,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_issue",
-      "line": 90,
-      "registration": {
-        "type": "jsonrpc",
-        "auth": "user",
-        "methods": "dynamic; inspect source",
-        "csrf": false
-      }
-    },
-    {
-      "path": "dynamic-route",
-      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
-      "handler": "lab_return",
-      "line": 102,
-      "registration": {
-        "type": "jsonrpc",
-        "auth": "user",
-        "methods": "dynamic; inspect source",
-        "csrf": false
-      }
-    },
-    {
-      "path": "dynamic-route",
-      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
-      "handler": "lab_issues",
       "line": 117,
       "registration": {
         "type": "jsonrpc",
@@ -247,8 +283,32 @@
     {
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_return",
+      "line": 129,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_issues",
+      "line": 144,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_history",
-      "line": 134,
+      "line": 161,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -260,7 +320,7 @@
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_legacy_stock",
-      "line": 151,
+      "line": 178,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -272,7 +332,7 @@
       "path": "dynamic-route",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
       "handler": "lab_adopt_stock",
-      "line": 163,
+      "line": 190,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",

@@ -670,6 +670,50 @@ def test_upgrade_passthrough_custom_unit():
     check('备份桩失败使升级非零退出', rc != 0, 'rc=%s' % rc)
 
 
+def test_upgrade_preserves_source_outside_addons():
+    print('\n== 升级保留源码不得被 Odoo 当模块扫描 ==')
+    d = tmpdir()
+    mods = ['lab_inventory', 'lab_catalog', 'lab_workflow']
+    addons = pathlib.Path(_make_addons(d / 'addons', mods))
+    incoming = pathlib.Path(_make_addons(d / 'incoming', mods))
+    for mod in mods:
+        (addons / mod / 'generation').write_text('old')
+        (incoming / mod / 'generation').write_text('new')
+    backup = d / 'backups' / 'point'; backup.mkdir(parents=True)
+    conf = make_config(d / 'odoo.conf', str(addons), str(d / 'data'))
+    stub = d / 'backup_stub.py'
+    stub.write_text('print(%r)\n' % ('  目录    ' + str(backup)))
+    fake = d / 'odoo-bin'
+    fake.write_text('import pathlib,re\n'
+                    'root=pathlib.Path(%r)\n'
+                    'assert all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",p.name) '
+                    'for p in root.iterdir() if (p/"__manifest__.py").exists())\n'
+                    % str(addons))
+    rc, out = run_upgrade(['--no-service', '--config', conf, '--addons', str(addons),
+                           '--code-dir', str(incoming)],
+                          {'LC_BACKUP_SCRIPT': str(stub), 'LC_ODOO_BIN': str(fake)})
+    check('模块扫描桩与升级完成', rc == 0, out[-1200:])
+    check('addons根只含当前三模块', {p.name for p in addons.iterdir()} == set(mods))
+    check('完整旧源码位于配套备份之外层扫描范围', all(
+        (backup / 'module-source-before-upgrade' / mod / 'generation').read_text() == 'old'
+        for mod in mods))
+    check('当前模块已换为新源码', all(
+        (addons / mod / 'generation').read_text() == 'new' for mod in mods))
+    parsed = conf_mod.load(conf)
+    for label, location in [('当前addons', addons), ('另一个扫描根', d / 'other-addons')]:
+        location.mkdir(exist_ok=True)
+        local = dict(parsed, addons_path=str(addons) + ',' + str(d / 'other-addons'))
+        error, _ = capture(conf_mod.prepare_code_backup, local, addons, location)
+        check('拒绝备份落入' + label, isinstance(error, OpsError), repr(error))
+    error, _ = capture(conf_mod.prepare_code_backup, parsed, addons, backup)
+    check('已有源码备份拒绝覆盖', isinstance(error, OpsError), repr(error))
+    escaped = d / 'escaped'; escaped.mkdir()
+    symlink_backup = d / 'symlink-backup'; symlink_backup.mkdir()
+    (symlink_backup / 'module-source-before-upgrade').symlink_to(escaped, target_is_directory=True)
+    error, _ = capture(conf_mod.prepare_code_backup, parsed, addons, symlink_backup)
+    check('拒绝符号链接越过备份根', isinstance(error, OpsError), repr(error))
+
+
 def test_is_active_deactivating():
     print('\n== T17 deactivating/activating 不得当作已停机（缺陷 1）==')
     d = tmpdir()
@@ -854,6 +898,7 @@ def main():
         test_upgrade_preflight_all_three,
         test_upgrade_passthrough_no_service,
         test_upgrade_passthrough_custom_unit,
+        test_upgrade_preserves_source_outside_addons,
         test_run_psql_uses_stdin,
         test_all_exceptions_nonzero_exit,
     ):

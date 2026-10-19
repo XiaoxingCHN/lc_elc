@@ -90,6 +90,26 @@ def validate_service_unit(unit):
     return unit
 
 
+def prepare_code_backup(conf, addons, backup_dir):
+    """保留旧模块于配套备份内，不能让 Odoo 扫描到旧模块目录。"""
+    backup = pathlib.Path(backup_dir)
+    if not backup.is_absolute():
+        raise OpsError('代码备份目录必须是绝对路径')
+    backup = backup.resolve(strict=True)
+    if not backup.is_dir():
+        raise OpsError('配套备份目录不存在')
+    target = safe_child_path(backup, 'module-source-before-upgrade', '旧模块备份')
+    roots = [pathlib.Path(addons).resolve(strict=True)]
+    roots.extend(pathlib.Path(p.strip()).expanduser().resolve()
+                 for p in conf['addons_path'].split(',') if p.strip())
+    if any(target == root or root in target.parents for root in roots):
+        raise OpsError('旧模块备份必须位于所有 addons 扫描目录之外')
+    if target.exists():
+        raise OpsError('旧模块备份目录已存在，拒绝覆盖')
+    target.mkdir(mode=0o700)
+    return target
+
+
 # ------------------------------------------------------------------ 配置读取
 def load(config_path='/etc/odoo.conf'):
     """返回配置 dict。缺失项用 Odoo 默认值；密码可能为 None（socket + trust 环境）。"""

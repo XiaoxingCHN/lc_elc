@@ -134,7 +134,7 @@ void main() {
     test('the two label kinds carry the agreed payload prefixes', () {
       expect(LabelKind.bag.payloadPrefix, 'LABB:');
       expect(LabelKind.location.payloadPrefix, 'LABL:');
-      expect(LabelKind.bag.defaultFields, contains('sn'));
+      expect(LabelKind.bag.defaultFields, contains('trace_code'));
       expect(LabelKind.location.defaultFields, contains('location'));
     });
   });
@@ -264,7 +264,7 @@ void main() {
     test('switching kind resets the selection and the field defaults', () {
       final notifier = build();
       notifier.toggleSelection(1, 'TRACE-1');
-      expect(notifier.state.fields, contains('sn'));
+      expect(notifier.state.fields, contains('trace_code'));
 
       notifier.setKind(LabelKind.location);
 

@@ -1,6 +1,8 @@
 # API维护入口
 
-当前已注册路由由tools/generate_routes.py直接解析三个Odoo模块的controller装饰器生成，见maintenance/registry/routes.json（25条注册项）。这份表记录URL、handler、源位置和显式type/auth/methods/csrf选项，不执行Odoo、不连接生产。
+当前已注册路由由tools/generate_routes.py直接解析三个Odoo模块的controller装饰器生成，见maintenance/registry/routes.json（30条注册项）。这份表记录URL、handler、源位置和显式type/auth/methods/csrf选项，不执行Odoo、不连接生产。
+
+两阶段入库新增 pending 接口与标签类型的请求、权限、幂等和返回语义见[实现契约](TWO_STAGE_RECEIPT_IMPLEMENTATION.md)。
 
 ```sh
 python tools/generate_routes.py

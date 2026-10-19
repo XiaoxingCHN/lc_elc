@@ -4,7 +4,7 @@
   "components": [
     {
       "id": "client",
-      "version": "1.0.1+2",
+      "version": "1.1.0+3",
       "source_root": "clients/app",
       "required_files": [
         "clients/app/pubspec.yaml",
@@ -27,7 +27,7 @@
       "version": {
         "lab_inventory": "19.0.1.0.0",
         "lab_catalog": "19.0.2.0.3",
-        "lab_workflow": "19.0.1.0.2"
+        "lab_workflow": "19.0.1.1.0"
       },
       "source_root": "server/ubuntu22.04/odoo_addons",
       "required_files": [
@@ -39,7 +39,7 @@
     },
     {
       "id": "server-ops",
-      "version": "archive-2026-10-19",
+      "version": "2026.10.19.1",
       "source_root": "server/ubuntu22.04",
       "required_files": [
         "server/ubuntu22.04/install_offline.sh",

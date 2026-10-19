@@ -10,6 +10,8 @@ import '../providers/label_providers.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/label_preview.dart';
 import '../widgets/status_views.dart';
+import 'package:go_router/go_router.dart';
+import '../unified_routes.dart';
 
 /// 标签 (labels): design the physical size in millimetres, preview the real A4
 /// PDF, save it and print it.
@@ -38,8 +40,8 @@ class LabelsScreen extends ConsumerStatefulWidget {
 }
 
 class _LabelsScreenState extends ConsumerState<LabelsScreen> {
-  final TextEditingController _width = TextEditingController(text: '50');
-  final TextEditingController _height = TextEditingController(text: '30');
+  final TextEditingController _width = TextEditingController(text: '60');
+  final TextEditingController _height = TextEditingController(text: '40');
   final TextEditingController _margin = TextEditingController(text: '10');
   final TextEditingController _gap = TextEditingController(text: '2');
   bool _applied = false;
@@ -55,7 +57,16 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     _applied = true;
     final notifier = ref.read(labelDesignerProvider.notifier);
     final kind = (widget.initialKind ?? '').toLowerCase();
-    if (kind == 'location') notifier.setKind(LabelKind.location);
+    notifier.setKind(switch (kind) {
+      'location' => LabelKind.location,
+      'pending' => LabelKind.pending,
+      _ => LabelKind.bag,
+    });
+    final design = ref.read(labelDesignerProvider);
+    _width.text = '${design.widthMm}';
+    _height.text = '${design.heightMm}';
+    _margin.text = '${design.marginMm}';
+    _gap.text = '${design.gapMm}';
     final ids = (widget.initialIds ?? '')
         .split(',')
         .map((value) => int.tryParse(value.trim()))
@@ -187,27 +198,21 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                 children: <Widget>[
                   Text('标签类型', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 6),
-                  SegmentedButton<LabelKind>(
-                    segments: const <ButtonSegment<LabelKind>>[
-                      ButtonSegment<LabelKind>(
-                        value: LabelKind.bag,
-                        label: Text('器件追溯标签'),
-                        icon: Icon(Icons.qr_code_2),
-                      ),
-                      ButtonSegment<LabelKind>(
-                        value: LabelKind.location,
-                        label: Text('库位标签'),
-                        icon: Icon(Icons.location_on_outlined),
-                      ),
+                  DropdownButtonFormField<LabelKind>(
+                    value: state.kind, isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: LabelKind.pending, child: Text('待入库袋标签')),
+                      DropdownMenuItem(value: LabelKind.bag, child: Text('已入库袋标签')),
+                      DropdownMenuItem(value: LabelKind.location, child: Text('库位标签')),
                     ],
-                    selected: <LabelKind>{state.kind},
-                    onSelectionChanged: (selection) =>
-                        ref.read(labelDesignerProvider.notifier).setKind(selection.first),
+                    onChanged: state.submitting ? null : (value) {
+                      if (value != null) ref.read(labelDesignerProvider.notifier).setKind(value);
+                    },
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    state.kind == LabelKind.bag
-                        ? '器件标签：文字（SN、库码、型号/C 编号、参数）+ 一个追溯二维码。'
+                    state.kind != LabelKind.location
+                        ? '器件标签：袋码、型号与关键参数，加一个追溯二维码。'
                         : '库位标签：只印一个库码二维码。',
                     style: theme.textTheme.labelSmall,
                   ),
@@ -228,7 +233,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          state.kind == LabelKind.bag ? '要打印的追溯袋' : '要打印的库位',
+                          state.kind != LabelKind.location ? '要打印的追溯袋' : '要打印的库位',
                           style: theme.textTheme.titleSmall,
                         ),
                       ),
@@ -248,7 +253,14 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       ),
                     ],
                   ),
-                  if (state.kind == LabelKind.bag)
+                  if (state.kind == LabelKind.pending)
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('已选 ${state.selection.length} 袋；补打沿用原袋码。'),
+                    TextButton.icon(
+                      onPressed: () => context.push(UnifiedRoutes.pendingReceipt),
+                      icon: const Icon(Icons.playlist_add), label: const Text('在制袋列表管理打印选择'),
+                    )])
+                  else if (state.kind == LabelKind.bag)
                     Text(
                       state.selection.isEmpty
                           ? '尚未选择追溯袋。可从器件库选择；扫描入库后也可在入库结果中直接打标签。'

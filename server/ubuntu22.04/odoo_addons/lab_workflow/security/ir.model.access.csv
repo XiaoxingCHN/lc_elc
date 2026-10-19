@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lab_pending_operator,lab.pending.receipt operator,model_lab_pending_receipt,group_lab_operator,1,0,0,0
 access_lab_bag_user,lab.bag read,model_lab_bag,group_lab_user,1,0,0,0
 access_lab_bag_operator,lab.bag operator,model_lab_bag,group_lab_operator,1,1,1,0
 access_lab_bag_manager,lab.bag manager,model_lab_bag,group_lab_manager,1,1,1,0

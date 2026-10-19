@@ -1,0 +1,134 @@
+{
+  "date": "2026-10-19",
+  "status": "deployed_verified",
+  "source_manifest": "maintenance/registry/source-server-two-stage-receipt-20261019.json",
+  "source_tree_sha256": "87976a0286517ba554e6c268c65e4ad9054ad64284b22524419c47f76f78f4a8",
+  "source_file_count": 127,
+  "source_match": true,
+  "local_validation": {
+    "command": "python tests/test_offline_logic.py",
+    "python": "3.12.9 MSYS2 UCRT64",
+    "exit_code": 0,
+    "collected": 28,
+    "passed": 23,
+    "skipped": 5,
+    "skip_reason": "reportlab unavailable; QR rendering tests skipped"
+  },
+  "production_validation": {
+    "target": "lc-nas / LcHardwareHouse",
+    "authentication": "user-authorized project password; getpass memory and sudo stdin only; no value persisted",
+    "initial_upgrade_exit_code": 255,
+    "initial_failure": "Odoo 19 rejects old module .pre-upgrade directories inside addons root",
+    "recovery": "preserved old directories moved to checked deployment stage/old-modules; existing upgrade tool rerun without code replacement",
+    "retry_exit_code": 0,
+    "service": "active",
+    "http_login_status": 200,
+    "anonymous_pending_api_denied": true,
+    "post_retry_runtime_errors": 0,
+    "post_retry_runtime_critical": 0,
+    "module_versions": {
+      "lab_inventory": "19.0.1.0.0",
+      "lab_catalog": "19.0.2.0.3",
+      "lab_workflow": "19.0.1.1.0"
+    },
+    "modules_installed": 3,
+    "deployed_addons_matching_files": 104,
+    "before_after_unchanged": {
+      "bag": 1,
+      "quant": 2,
+      "move": 1,
+      "operation": 1,
+      "catalog": 695217,
+      "location": 16,
+      "quantity_total": 0,
+      "reserved_total": 0
+    },
+    "pending_count": 0,
+    "trace_count": 1,
+    "missing_historical_trace_count": 0,
+    "new_unique_constraints": 2,
+    "permissions": {
+      "operator_reads": 2,
+      "unauthorized_denied": 2,
+      "public_denied": 1,
+      "pending_direct_create_denied": 5,
+      "trace_direct_create_denied": 5,
+      "pending_readonly_acl": true,
+      "trace_no_user_acl": true,
+      "exit_code": 0,
+      "transaction": "read only and rolled back"
+    },
+    "label_pdf": {
+      "bytes": 131799,
+      "sha256": "72c1136b6dce5c3579b1374b4f6cadeebdf5e2f042fe2d38c0c7d7470f50896b",
+      "pages": 1,
+      "labels": 1,
+      "qr_per_label": 1,
+      "production_render_only": true
+    },
+    "inventory_test_writes": false,
+    "source_uploaded": true,
+    "backup_completed": true,
+    "module_upgraded": true
+  },
+  "review": {
+    "pending_model": "global owner/current-company read rule; service-only writes; no unlink",
+    "trace_model": "no user ACL; service-only create; immutable; unique identity registry",
+    "migration": "init registers historical bag trace codes ON CONFLICT DO NOTHING; requires production preflight duplicate/count checks",
+    "service_boundary": "internal_only checks authenticated lab operator/manager before thread-local service context; RPC context cannot grant write privilege"
+  },
+  "final_source_manifest": "maintenance/registry/source-server-two-stage-receipt-opsfix-20261019.json",
+  "final_source_tree_sha256": "d2f0775da8e67b0e752516c42b9b9764006970e541cebb4473219aa6300f2cfe",
+  "production_backup": {
+    "primary": "/var/backups/lc-elc/20261019T073840Z-before-upgrade",
+    "retry": "/var/backups/lc-elc/20261019T074111Z-before-upgrade",
+    "db_dump": {
+      "bytes": 110502540,
+      "sha256": "3310d7620d63ebaa83d8dd59da9072ace9a62b214c6e05cefaf7a0f1256f7c5a2"
+    },
+    "filestore_archive": {
+      "bytes": 14372252,
+      "sha256": "5798312ad0648ddc903523b62cb14827b616ee66f0e6fb653e29e6fe19e50698"
+    },
+    "filestore_files": 154,
+    "filestore_source_bytes": 47713300,
+    "actual_data_dir": "/opt/odoo/.local/share/Odoo",
+    "effective_config": "remote controlled stage copy, root:odoo 0640; original configuration unchanged",
+    "hashes_verified": true,
+    "pg_restore_list_exit_code": 0,
+    "old_source_archive": {
+      "path": "/opt/odoo/deployments/two-stage-20261019-a1/old-source.tar.gz",
+      "bytes": 11877898,
+      "sha256": "b450005c22ad56eac3dd7db2c90051bec578d5224a727150d7c3dc79df31a50b"
+    },
+    "retained_modules": "/opt/odoo/deployments/two-stage-20261019-a1/old-modules",
+    "off_host_copy": false
+  },
+  "deployment": {
+    "stage": "/opt/odoo/deployments/two-stage-20261019-a1",
+    "candidate_archive_sha256": "7e9789e4c739d379a195e22c607d41b26d40f14650e4f3753c32a8251e53a70e",
+    "opsfix_archive_sha256": "55945f6def7ade3381225e6407a60b901a33351a1a2917b3272ccd456fd3c687",
+    "upgrade_log": "/opt/odoo/deployments/two-stage-20261019-a1/upgrade.log",
+    "retry_log": "/opt/odoo/deployments/two-stage-20261019-a1/upgrade-retry.log",
+    "facts": "/opt/odoo/deployments/two-stage-20261019-a1/deployment-facts.json",
+    "opsfix_files": {
+      "upgrade_modules.sh": "20374251db6d18dab4bd322a4d74b3f97218847252089ce72ae0463bc2c3f2fa",
+      "lc_odoo_conf.py": "7f394d32d3e482e9dcb14aec54e350e6f2eb5aa35382a8586a46d941e12276a7",
+      "lc_ops_tests.py": "11c54473c3c1e949346b199e396a8cc9e3fa2fac340d5ee0dd91d6ea2231ad0a"
+    },
+    "opsfix_local_checks": 108,
+    "opsfix_local_failures": 0,
+    "opsfix_local_exit_code": 0
+  },
+  "not_verified": [
+    "physical scanner and printer",
+    "production write path intentionally not tested with artificial inventory",
+    "new pending-label production data path has no pending records; isolated tests remain separate",
+    "full restore rehearsal of this backup",
+    "off-host backup"
+  ],
+  "approval_review": [
+    "generic alternate key attempt rejected and not executed",
+    "full production log export rejected and not executed; replaced with remote exception classification and counts only"
+  ]
+}

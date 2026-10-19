@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-19",
+  "scope": "local development candidate; no deployment or release artifacts",
+  "production_access": false,
+  "payload_verification": false,
+  "versions": {
+    "client_source": "1.1.0+3",
+    "lab_workflow_source": "19.0.1.1.0"
+  },
+  "environment": {
+    "flutter": "3.47.7",
+    "dart": "3.13.5",
+    "local_python": "3.12.14",
+    "orm": "isolated WSL Odoo 19, Python 3.10, PostgreSQL 14"
+  },
+  "checks": [
+    {
+      "name": "flutter_all",
+      "command": "dart <flutter_tools.snapshot> test --no-pub --reporter expanded",
+      "exit_code": 0,
+      "passed": 242,
+      "skipped": 5,
+      "failed": 0
+    },
+    {
+      "name": "python_logic",
+      "command": "python server/ubuntu22.04/odoo_addons/lab_workflow/tests/test_offline_logic.py",
+      "exit_code": 0,
+      "collected": 28,
+      "passed": 27,
+      "skipped": 1,
+      "failed": 0
+    },
+    {
+      "name": "odoo_business",
+      "command": "run_isolation_tests.sh --keep --with-http --skip-process-concurrency --real-catalog <current-addons>",
+      "exit_code": 0,
+      "collected": 54,
+      "passed": 53,
+      "skipped": 1,
+      "failed": 0,
+      "errors": 0
+    },
+    {
+      "name": "real_http_concurrency",
+      "exit_code": 0,
+      "passed_scenarios": 6,
+      "failed": 0,
+      "isolation": "private network namespace, fresh temporary database; independent authenticated sessions"
+    },
+    {
+      "name": "dart_analyze",
+      "command": "dart analyze lib",
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "info": 80
+    },
+    {
+      "name": "routes",
+      "command": "python tools/generate_routes.py --check",
+      "exit_code": 0,
+      "registrations": 30
+    },
+    {
+      "name": "repo_check",
+      "command": "python tools/repo_check.py --output maintenance/audit/two-stage-receipt-repo-check.json",
+      "exit_code": 0,
+      "passed_checks": 49,
+      "warning": "existing production-py312-rebuild payload not built"
+    },
+    {
+      "name": "diff_whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "name": "in_process_concurrency_fixture",
+      "status": "blocked/skipped",
+      "reason": "test-framework lock waits; interrupted only the verified task test process, retained failed attempt; final run explicitly skipped this fixture"
+    },
+    {
+      "name": "native_platform_builds_scanners_printers",
+      "status": "skipped",
+      "reason": "not exercised; no candidate installation packages or physical-device acceptance"
+    }
+  ],
+  "sources": {
+    "client": {
+      "manifest": "maintenance/registry/source-client-two-stage-receipt-20261019.json",
+      "file_count": 150,
+      "tree_sha256": "42f0e5d1dbd64f7611d25d025e53ae3e9a1577631de9a345e3d2ead24f4a1c27"
+    },
+    "server": {
+      "manifest": "maintenance/registry/source-server-two-stage-receipt-20261019.json",
+      "file_count": 127,
+      "tree_sha256": "87976a0286517ba554e6c268c65e4ad9054ad64284b22524419c47f76f78f4a8"
+    }
+  },
+  "log_sha256": {
+    "local/build/two-stage-flutter-all.log": "6aa5167a78418cf0a214e487870122b28ca55bce20275709d2da57c5feddfbb0",
+    "local/build/two-stage-python-test.log": "bb0a73608d1f9d7d19ecb31287d2fcfeac8ea74c174fbc3425707d9509c08a7b",
+    "local/build/two-stage-analyze.log": "b6ee8b2f3a89f1d78292d58f1750c5356f3578295ead03b7a4811001e7eff328",
+    "local/build/two-stage-odoo-isolation-final.log": "e8126e5c2a52f946e34879f4b747dfa3a77c5e60c2aece380c69b107dfe46867"
+  },
+  "ui_evidence": "local/build/two-stage-ui/scan-confirm.png",
+  "notes": [
+    "Initial offline pub get resolved dependencies but failed plugin symlink setup; not reported as PASS.",
+    "Initial sandbox test runs failed temp/loopback access; completed local tests with project temp path and execution permission.",
+    "Initial isolated HTTP run inherited an unavailable proxy; removed proxy only in test child environment.",
+    "Final HTTP return race uses two authorized sessions of the original borrower and requires explicit business rejection."
+  ]
+}

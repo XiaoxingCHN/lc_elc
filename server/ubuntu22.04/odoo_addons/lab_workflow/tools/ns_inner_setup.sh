@@ -231,7 +231,7 @@ else
   echo "== 3) HTTP 并发未启用（加 --with-http，这是并发的主验收路径）=="
 fi
 
-if [[ "$FAIL" -eq 0 ]]; then
+if [[ "$FAIL" -eq 0 && "${LABWF_SKIP_PROCESS_CONCURRENCY:-0}" != "1" ]]; then
   echo "== 4) 进程内并发测试（多线程 + Barrier + 独立真实连接 + 非 super 操作员）=="
   # post_install + -u：安装已完成并 commit，新连接能看到 schema，线程才能真正相交。
   # 注意：套件内部用**真实独立连接**（绕过测试模式 TestCursor patch）。
@@ -263,6 +263,9 @@ if [[ "$FAIL" -eq 0 ]]; then
   fi
 fi
 
+if [[ "${LABWF_SKIP_PROCESS_CONCURRENCY:-0}" == "1" ]]; then
+  echo "== 4) 进程内并发 skipped（显式参数）；HTTP 并发结果单独记录 =="
+fi
 echo "== 5) 导出日志/配置 =="
 cp -a "$W/logs/." "$OUT/" 2>/dev/null
 cp -a "$W/odoo.conf" "$OUT/" 2>/dev/null

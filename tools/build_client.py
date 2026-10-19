@@ -13,7 +13,7 @@ def plan(a):
  return host,flutter,cache,commands
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--server',default='http://192.168.31.105:8069');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--gradle-cache');p.add_argument('--server',default='http://192.168.31.105:8069');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');a=p.parse_args()
  if a.test_only:a.test=True
  host,flutter,cache,commands=plan(a)
  print(json.dumps({'source':'clients/app','host':host,'platform':a.platform,'pub_cache':str(cache),'commands':commands,'writes':'new timestamp directory under local/build; no release overwrite'},ensure_ascii=False,indent=2))
@@ -24,7 +24,7 @@ def main():
  if host=='linux' and not a.flutter and (ROOT/'dependencies/sdk/linux/EXPANDED_ON_WINDOWS_INCOMPLETE.txt').exists():p.error('Restore the preserved Linux SDK tar or WSL tool archive onto a Linux filesystem and pass --flutter explicitly; the Windows-expanded Linux SDK is not a complete runtime.')
  stamp=datetime.datetime.now().strftime('%Y%m%dT%H%M%S%f');work=ROOT/'local/build'/('client-'+a.platform+'-'+stamp);work.mkdir(parents=True)
  src=work/'source';shutil.copytree(ROOT/'clients/app',src,ignore=shutil.ignore_patterns('.dart_tool','build','ephemeral','.gradle','.cxx','.idea','local.properties','.flutter-plugins-dependencies','*.iml','GeneratedPluginRegistrant.java'))
- env=os.environ.copy();env['PUB_CACHE']=str(cache);env['CMAKE_BUILD_PARALLEL_LEVEL']='2';env['FLUTTER_SUPPRESS_ANALYTICS']='true';env['GRADLE_OPTS']='-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false';env['GRADLE_USER_HOME']=str(ROOT/'dependencies/gradle-cache');env['PATH']=str(flutter.parent)+os.pathsep+env.get('PATH','')
+ env=os.environ.copy();env['PUB_CACHE']=str(cache);env['CMAKE_BUILD_PARALLEL_LEVEL']='2';env['FLUTTER_SUPPRESS_ANALYTICS']='true';env['GRADLE_OPTS']='-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false';env['GRADLE_USER_HOME']=str(Path(a.gradle_cache).resolve() if a.gradle_cache else ROOT/'dependencies/gradle-cache');env['PATH']=str(flutter.parent)+os.pathsep+env.get('PATH','')
  if a.platform=='android':
   sdk=Path(a.android_sdk) if a.android_sdk else ROOT/'dependencies/android/sdk';jdk=Path(a.jdk) if a.jdk else ROOT/'dependencies/android/java'
   # Restored archives may contain one JDK subdirectory; choose only unambiguous layout.

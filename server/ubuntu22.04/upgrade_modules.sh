@@ -105,6 +105,19 @@ tail -3 "$BACKUP_LOG" | sed 's/^/  /'
 [[ -n "$BACKUP_DIR" ]] || { echo '未能解析备份目录，升级中止' >&2; exit 1; }
 echo "  备份点 $BACKUP_DIR"
 
+# 旧模块不能留在 addons 根：Odoo 19 会扫描并拒绝带 .pre-upgrade 的模块名。
+# 在停服务和移动代码前核验绝对目标、备份包含关系与所有 addons 扫描边界。
+CODE_BACKUP=''
+if [[ -n "$CODE_DIR" ]]; then
+  CODE_BACKUP=$($PY - "$CONFIG" "$SELF_DIR" "$ADDONS" "$BACKUP_DIR" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[2])
+import lc_odoo_conf as c
+print(c.prepare_code_backup(c.load(sys.argv[1]), sys.argv[3], sys.argv[4]))
+PYEOF
+  ) || { echo '旧代码备份位置校验失败，未停止服务或移动代码' >&2; exit 1; }
+fi
+
 # ---------- 2) 停服务（验证式；失败立即终止，绝不在服务可能仍在运行时 -u）
 echo
 echo "---- 2) 停止服务 ----"
@@ -127,22 +140,21 @@ fi
 # ---------- 3) 可选：换代码（旧的保留）
 RESTORE_CODE=''
 code_failure() {
-  echo "升级中止；服务保持停机。回滚代码：检查 $ADDONS 中各模块，已移动的旧代码位于 <模块>.pre-upgrade-$STAMP；先将失败新代码移到独立保留目录，再移回对应旧代码，勿删除或覆盖保留目录。" >&2
+  echo "升级中止；服务保持停机。回滚代码：检查 $ADDONS 中各模块，已移动的旧代码位于 $CODE_BACKUP/<模块>；先将失败新代码移到 addons 扫描目录之外，再移回对应旧代码，勿删除或覆盖保留目录。" >&2
   echo "升级前备份：$BACKUP_DIR；确认代码恢复后，按安装说明恢复备份，勿对旧代码再次 -u。" >&2
   exit 1
 }
 if [[ -n "$CODE_DIR" ]]; then
   echo
   echo "---- 3) 替换代码（旧代码保留）----"
-  STAMP=$(date -u +%Y%m%dT%H%M%SZ)
   for mod in lab_inventory lab_catalog lab_workflow; do
     [[ -d "$CODE_DIR/$mod" ]] || { echo "  $CODE_DIR/$mod 不存在" >&2; exit 1; }
     if [[ -d "$ADDONS/$mod" ]]; then
-      [[ ! -e "$ADDONS/$mod.pre-upgrade-$STAMP" ]] || { echo "旧代码保留目录已存在，拒绝覆盖" >&2; code_failure; }
-      mv -- "$ADDONS/$mod" "$ADDONS/$mod.pre-upgrade-$STAMP" || { echo "保留旧代码失败：$mod；升级中止，服务保持停机" >&2; code_failure; }
+      [[ ! -e "$CODE_BACKUP/$mod" ]] || { echo "旧代码保留目录已存在，拒绝覆盖" >&2; code_failure; }
+      mv -- "$ADDONS/$mod" "$CODE_BACKUP/$mod" || { echo "保留旧代码失败：$mod；升级中止，服务保持停机" >&2; code_failure; }
     fi
-    cp -a -- "$CODE_DIR/$mod" "$ADDONS/$mod" || { echo "复制新代码失败：$mod；升级中止，旧代码保留于 $ADDONS/$mod.pre-upgrade-$STAMP" >&2; code_failure; }
-    echo "  $mod 已替换（旧：$mod.pre-upgrade-$STAMP）"
+    cp -a -- "$CODE_DIR/$mod" "$ADDONS/$mod" || { echo "复制新代码失败：$mod；升级中止，旧代码保留于 $CODE_BACKUP/$mod" >&2; code_failure; }
+    echo "  $mod 已替换（旧：$CODE_BACKUP/$mod）"
   done
   # 归属：存在 odoo 用户则修正并**校验生效**；chown 静默失败会让服务读不到新代码。
   if ! $PY - "$SELF_DIR" "$ADDONS" <<'PYEOF'
@@ -164,7 +176,7 @@ PYEOF
     echo "归属修正/校验失败，升级中止" >&2
     exit 1
   fi
-  RESTORE_CODE="旧代码保留在 $ADDONS/<模块>.pre-upgrade-$STAMP；确认路径后先将当前失败代码移到独立保留目录，再移回旧代码。不要删除目录，也不要对旧代码再次执行 -u。"
+  RESTORE_CODE="旧代码保留在 $CODE_BACKUP/<模块>；确认路径后先将当前失败代码移到 addons 扫描目录之外，再移回旧代码。不要删除目录，也不要对旧代码再次执行 -u。"
 fi
 
 # ---------- 4) 升级模块
