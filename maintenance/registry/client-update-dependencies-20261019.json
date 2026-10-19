@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-19",
+  "dart_packages": [
+    {
+      "name": "cryptography",
+      "version": "2.9.0",
+      "source": "https://pub.dev/packages/cryptography/versions/2.9.0",
+      "archive_url": "https://pub.dev/api/archives/cryptography-2.9.0.tar.gz",
+      "sha256": "3eda3029d34ec9095a27a198ac9785630fe525c0eb6a49f3d575272f8e792ef0",
+      "usage": "Ed25519 verification; pure Dart on all supported platforms"
+    },
+    {
+      "name": "archive",
+      "version": "4.5.2",
+      "source": "https://pub.dev/packages/archive/versions/4.5.2",
+      "archive_url": "https://pub.dev/api/archives/archive-4.5.2.tar.gz",
+      "sha256": "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe",
+      "usage": "Desktop full-bundle decoding with explicit path/type/size checks"
+    }
+  ],
+  "restore": "Use clients/app/pubspec.lock and the pub-caches registry entry; flutter pub get --enforce-lockfile, or --offline with a matching cache. New pure Dart packages retained in both local platform caches.",
+  "publisher": {
+    "python": "3.12.14",
+    "requirements": "tools/requirements-client-release.txt",
+    "dependency": "cryptography 50.0.2; already installed in this task runtime; install into a developer venv only",
+    "source": "https://pypi.org/project/cryptography/50.0.2/"
+  },
+  "trusted_release_key": {
+    "key_id": "release-20261019",
+    "ed25519_public_base64": "GqUJm3fIWXvV/X+Dla7QOENo76+t67RUGPoOhFTzONc=",
+    "private_location": "local/private/signing/client-update-ed25519.pem (ignored; never distributed)",
+    "rotation": "A separately trusted client release must include the next accepted public key. Never trust keys supplied by an unverified update manifest."
+  }
+}

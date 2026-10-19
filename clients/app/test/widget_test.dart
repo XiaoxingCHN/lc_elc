@@ -14,6 +14,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/login_test_support.dart';
 
+import 'package:lab_inventory_client/updates/update_ui.dart';
+import 'package:lab_inventory_client/updates/update_platform.dart';
+
+class _NoUpdates extends UpdatePlatform {
+  @override
+  int get build => 0;
+}
+
 /// App-level startup behaviour.
 ///
 /// This file replaces the stock Flutter "counter" template test, which could
@@ -98,50 +106,53 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  testWidgets('startup shows a loading state and never flashes the login form',
-      (tester) async {
-    // A store whose preferences never load yet: the app is stuck in startup.
-    final pendingPreferences = Completer<SharedPreferences>();
-    final container = ProviderContainer(
-      overrides: [
-        secretBackendProvider.overrideWithValue(backend),
-        authGatewayProvider.overrideWithValue(gateway),
-        clockProvider.overrideWithValue(() => now),
-        loginMemoryStoreProvider.overrideWith(
-          (ref) => LoginMemoryStore(
-            backend: backend,
-            clock: () => now,
-            preferencesLoader: () => pendingPreferences.future,
+  testWidgets(
+    'startup shows a loading state and never flashes the login form',
+    (tester) async {
+      // A store whose preferences never load yet: the app is stuck in startup.
+      final pendingPreferences = Completer<SharedPreferences>();
+      final container = ProviderContainer(
+        overrides: [
+          updatePlatformProvider.overrideWithValue(_NoUpdates()),
+          secretBackendProvider.overrideWithValue(backend),
+          authGatewayProvider.overrideWithValue(gateway),
+          clockProvider.overrideWithValue(() => now),
+          loginMemoryStoreProvider.overrideWith(
+            (ref) => LoginMemoryStore(
+              backend: backend,
+              clock: () => now,
+              preferencesLoader: () => pendingPreferences.future,
+            ),
           ),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyApp()),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byType(SplashScreen), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsWidgets);
-    // The login form must not be reachable while startup is unresolved.
-    expect(find.byType(LoginScreen), findsNothing);
-    expect(find.text('密码 *'), findsNothing);
-    expect(find.text('登录'), findsNothing);
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
+      // The login form must not be reachable while startup is unresolved.
+      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.text('密码 *'), findsNothing);
+      expect(find.text('登录'), findsNothing);
 
-    // Let startup finish: the login form appears, the splash goes away.
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    pendingPreferences.complete(await SharedPreferences.getInstance());
+      // Let startup finish: the login form appears, the splash goes away.
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      pendingPreferences.complete(await SharedPreferences.getInstance());
 
-    await pumpUntil(tester, find.byType(LoginScreen));
-    await settleRoute(tester);
+      await pumpUntil(tester, find.byType(LoginScreen));
+      await settleRoute(tester);
 
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(SplashScreen), findsNothing);
-    expect(find.text('密码 *'), findsOneWidget);
-  });
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('密码 *'), findsOneWidget);
+    },
+  );
 
   testWidgets('a first-ever start lands on the login form', (tester) async {
     final container = buildAuthContainer(
@@ -165,53 +176,55 @@ void main() {
   });
 
   testWidgets(
-      'a fresh remembered login opens the unified library with real data',
-      (tester) async {
-    useDesktopSurface(tester);
-    final api = FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]);
-    final container = buildAuthContainer(
-      backend: backend,
-      gateway: gateway,
-      now: now,
-      apiClient: api,
-    );
-    addTearDown(container.dispose);
+    'a fresh remembered login opens the unified library with real data',
+    (tester) async {
+      useDesktopSurface(tester);
+      final api = FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]);
+      final container = buildAuthContainer(
+        backend: backend,
+        gateway: gateway,
+        now: now,
+        apiClient: api,
+      );
+      addTearDown(container.dispose);
 
-    final scope = LoginScope.fromInput(
-      baseUrl: url,
-      database: db,
-      login: user,
-    );
-    await seedRememberedLogin(
-      store: container.read(loginMemoryStoreProvider),
-      lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
-      password: password,
-    );
+      final scope = LoginScope.fromInput(
+        baseUrl: url,
+        database: db,
+        login: user,
+      );
+      await seedRememberedLogin(
+        store: container.read(loginMemoryStoreProvider),
+        lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+        password: password,
+      );
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyApp()),
-    );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
 
-    await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
-    await settleRoute(tester);
+      await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
+      await settleRoute(tester);
 
-    // The signed-in home is the one unified library ...
-    expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
-    expect(find.text('仓库'), findsOneWidget);
-    // ... it really queried the contract endpoint ...
-    expect(api.requestedPaths, contains('/lab/api/catalog/search'));
-    // ... and it rendered the captured row (lab stock and mall stock separate).
-    expect(find.text('10k 0603 resistor'), findsWidgets);
-    // The automatic sign-in happened exactly once, reusing the stored secret.
-    expect(gateway.calls, hasLength(1));
-    expect(gateway.calls.single.password, password);
-    expect(await backend.read(scope.secretKey), password);
-    // The old dashboard is not part of the signed-in experience.
-    expect(find.text('P0 原型 - 功能菜单'), findsNothing);
-  });
+      // The signed-in home is the one unified library ...
+      expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
+      expect(find.text('仓库'), findsOneWidget);
+      // ... it really queried the contract endpoint ...
+      expect(api.requestedPaths, contains('/lab/api/catalog/search'));
+      // ... and it rendered the captured row (lab stock and mall stock separate).
+      expect(find.text('10k 0603 resistor'), findsWidgets);
+      // The automatic sign-in happened exactly once, reusing the stored secret.
+      expect(gateway.calls, hasLength(1));
+      expect(gateway.calls.single.password, password);
+      expect(await backend.read(scope.secretKey), password);
+      // The old dashboard is not part of the signed-in experience.
+      expect(find.text('P0 原型 - 功能菜单'), findsNothing);
+    },
+  );
 
-  testWidgets('legacy /home and /products redirect to the unified library',
-      (tester) async {
+  testWidgets('legacy /home and /products redirect to the unified library', (
+    tester,
+  ) async {
     useDesktopSurface(tester);
     final container = buildAuthContainer(
       backend: backend,
@@ -240,37 +253,43 @@ void main() {
       await settleRoute(tester);
 
       final location = router.routerDelegate.currentConfiguration.uri.path;
-      expect(location, '/catalog', reason: '$legacy must not open a second library');
+      expect(
+        location,
+        '/catalog',
+        reason: '$legacy must not open a second library',
+      );
       expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
       expect(find.text('仓库'), findsOneWidget);
     }
   });
 
-  testWidgets('an expired remembered login lands on the login form with a notice',
-      (tester) async {
-    final container = buildAuthContainer(
-      backend: backend,
-      gateway: gateway,
-      now: now,
-      apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
-    );
-    addTearDown(container.dispose);
+  testWidgets(
+    'an expired remembered login lands on the login form with a notice',
+    (tester) async {
+      final container = buildAuthContainer(
+        backend: backend,
+        gateway: gateway,
+        now: now,
+        apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+      );
+      addTearDown(container.dispose);
 
-    await seedRememberedLogin(
-      store: container.read(loginMemoryStoreProvider),
-      lastSuccessfulLoginAt: now.subtract(const Duration(days: 10)),
-      password: password,
-    );
+      await seedRememberedLogin(
+        store: container.read(loginMemoryStoreProvider),
+        lastSuccessfulLoginAt: now.subtract(const Duration(days: 10)),
+        password: password,
+      );
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyApp()),
-    );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
 
-    await pumpUntil(tester, find.byType(LoginScreen));
-    await settleRoute(tester);
+      await pumpUntil(tester, find.byType(LoginScreen));
+      await settleRoute(tester);
 
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.textContaining('10 天'), findsWidgets);
-    expect(gateway.calls, isEmpty);
-  });
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.textContaining('10 天'), findsWidgets);
+      expect(gateway.calls, isEmpty);
+    },
+  );
 }

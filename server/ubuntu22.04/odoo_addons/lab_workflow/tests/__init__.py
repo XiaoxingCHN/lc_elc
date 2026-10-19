@@ -18,3 +18,4 @@
 from . import test_offline_logic          # noqa: F401
 from . import test_workflow_business      # noqa: F401
 from . import test_workflow_concurrency   # noqa: F401
+from . import test_client_updates        # noqa: F401

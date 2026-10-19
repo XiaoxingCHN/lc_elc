@@ -1,6 +1,12 @@
-# 当前维护交接：2026-10-19 两阶段入库候选
+# 当前维护交接：2026-10-19 器件选择修复
 
-后续：本轮功能/生产交接已上传既有GitHub的 `codex/two-stage-receipt-plan` 分支（功能提交0716829）；[客户端自动更新方案](../docs/development/CLIENT_UPDATE_PLAN.md)已梳理，尚未实现、未发布更新包，见[本轮上传与方案交接](handoffs/2026-10-19-github-update-plan.md)。
+最新：[器件选择与更新状态修复](handoffs/2026-10-19-receipt-picker-fix.md)。客户端1.1.2+5，修复真实打开选择弹层时的无限高度白屏，加入自定义入口和明确更新状态；Flutter272通过5跳过。服务端更新接口 **19.0.1.2.0已上线**，三端manifest204、库存数量不变；完整备份及只读验证见[部署交接](handoffs/2026-10-19-update-endpoint-deploy.md)。未发布stable更新包。
+
+以下为此前更新器开发时点：
+
+最新：[客户端更新器候选](handoffs/2026-10-19-client-updater.md)。client1.1.1+4、server候选19.0.1.2.0；启动/恢复检查、验签下载与三端安装入口已实现并构建，真实安装与GUI回退待测。生产19.0.1.1.0未变，未发布stable清单，未推送本轮实现。当前源清单见active-sources。
+
+历史上传：此前功能/生产交接已上传既有GitHub的 `codex/two-stage-receipt-plan` 分支（功能提交0716829）；[客户端自动更新方案](../docs/development/CLIENT_UPDATE_PLAN.md)已于方案阶段梳理；当前实现以顶部最新交接为准，见[本轮上传与方案交接](handoffs/2026-10-19-github-update-plan.md)。
 
 最新交接见 [服务端已上线](handoffs/2026-10-19-server-deploy.md) 和 [原生候选包](handoffs/2026-10-19-native-candidates.md)。生产lab_workflow **19.0.1.1.0**、三模块installed、服务active/HTTP200，库存及袋记录数量未改变；完整备份、权限与标签检查已核验。部署工具保留旧模块位置缺陷已修复，最终服务端源指向opsfix清单，108项故障测试通过。客户端1.1.0+3三端候选包构建完成但未发布，Windows仅进程冒烟，三端界面、安全存储和实体扫码打印仍待验收。功能与隔离测试见 [两阶段入库实现](handoffs/2026-10-19-two-stage-receipt.md)。
 

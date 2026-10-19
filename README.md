@@ -2,7 +2,9 @@
 
 这个仓库是后续人工和AI共同维护的唯一入口，归档基线日期为 **2026-10-19**。当前业务版本：客户端 **1.0.1+2**，EDA插件 **3.0.3**；Odoo三个模块分别独立版本管理。
 
-当前客户端 **1.1.0+3** 三端候选包已构建、尚未发布；生产 **lab_workflow 19.0.1.1.0** 已上线，新增[两阶段入库与袋标签](docs/development/TWO_STAGE_RECEIPT_IMPLEMENTATION.md)。完整备份、生产验收和原生候选未验收项见[当前交接](maintenance/HANDOFF_CURRENT.md)。
+生产更新接口 **lab_workflow 19.0.1.2.0 已上线**，三端检查HTTP204（尚未发布stable），库存/袋计数不变，见[部署交接](maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。
+
+最新客户端候选 **1.1.2+5** 修复[器件选择白屏和更新状态](maintenance/handoffs/2026-10-19-receipt-picker-fix.md)。此前客户端 **1.1.1+4** 三端候选新增[启动检查与下载更新](docs/development/CLIENT_UPDATE_IMPLEMENTATION.md)，服务端开发候选 **19.0.1.2.0**；该开发阶段未发布stable或部署新接口，彼时生产为 **lab_workflow 19.0.1.1.0**，完整备份与候选未验收项见[当前交接](maintenance/HANDOFF_CURRENT.md)。
 
 > 当前源码在本仓库，历史副本在local/archive。原F:/lc_elc_workspace保留用于来源追溯，不再作为新开发入口。初始归档没有上线；后续服务端按用户独立授权升级，未启动或重启采集器。
 

@@ -5,5 +5,6 @@ from . import lab_api_common
 from . import lab_inventory_api
 from . import lab_labels_api
 from . import lab_web
+from . import lab_client_updates
 
 __all__ = ['lab_api_common', 'lab_inventory_api', 'lab_labels_api', 'lab_web']

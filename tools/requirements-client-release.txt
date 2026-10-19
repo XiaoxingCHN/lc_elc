@@ -1,0 +1,2 @@
+# Offline developer publishing only; not required by Odoo or installed clients.
+cryptography==50.0.2

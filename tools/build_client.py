@@ -46,5 +46,14 @@ def main():
   if r.returncode:
    if os.name=='nt':print('If plugin symlink permissions caused failure, use dependencies/ensure_plugin_junctions.ps1 with -Project and -PubCache on THIS worktree, then rerun in it. Do not enable global developer settings automatically.')
    raise SystemExit(r.returncode)
+ if not a.test_only and a.platform in ('windows','linux'):
+  from prepare_client_update import prepare
+  if a.platform=='linux':bundle=src/'build/linux/x64/release/bundle'
+  else:
+   candidates=list((src/'build/windows').glob('*/runner/Release'))
+   if len(candidates)!=1:raise RuntimeError('Expected one Windows release bundle')
+   bundle=candidates[0]
+  dart=flutter.parent/'cache/dart-sdk/bin'/('dart.exe' if os.name=='nt' else 'dart')
+  prepare(src,bundle,dart,a.platform)
  print('Build/test completed. Inspect '+str(work)+'; register a new immutable release after platform acceptance.')
 if __name__=='__main__':main()

@@ -95,6 +95,34 @@
       }
     },
     {
+      "path": "/lab/client/updates/assets/<string:release_id>/<string:filename>",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_client_updates.py",
+      "handler": "artifact",
+      "line": 31,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "methods": [
+          "GET"
+        ],
+        "csrf": false
+      }
+    },
+    {
+      "path": "/lab/client/updates/manifest",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_client_updates.py",
+      "handler": "manifest",
+      "line": 19,
+      "registration": {
+        "type": "http",
+        "auth": "none",
+        "methods": [
+          "GET"
+        ],
+        "csrf": false
+      }
+    },
+    {
       "path": "/lab/labels/download",
       "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
       "handler": "lab_labels_download",

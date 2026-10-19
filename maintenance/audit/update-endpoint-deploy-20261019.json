@@ -1,0 +1,167 @@
+{
+  "date": "2026-10-19",
+  "status": "deployed_verified",
+  "authorization": "User explicitly authorized production update endpoint deployment, complete backup, lab_workflow upgrade and necessary restart. No stable artifact publication authorized or performed.",
+  "branch": "codex/two-stage-receipt-plan",
+  "base_commit": "8df35b502f89c6f61dfdfddbece3f22c5a7f559e",
+  "working_tree_dirty": true,
+  "source": {
+    "source_manifest": "maintenance/registry/source-server-updater-20261019.json",
+    "source_tree_sha256": "446e7ada847f86c15572f808c3175723e6e533dea845a0c0fd9e63f6b3ec841e",
+    "source_files": 130,
+    "source_match": true,
+    "package": "local/build/update-endpoint-deploy-20261019/server-updater-19.0.1.2.0-candidate.tar.gz",
+    "package_bytes": 11535892,
+    "package_sha256": "287b9fc67a64713c2ed3aa4ce0ac5a444ede29480351d79df98e33e3ae75b902",
+    "archive_verified_files": 130
+  },
+  "production": {
+    "stage": "/opt/odoo/deployments/update-endpoint-20261019-a1",
+    "source_tree_sha256": "446e7ada847f86c15572f808c3175723e6e533dea845a0c0fd9e63f6b3ec841e",
+    "actual_data_dir": "/opt/odoo/.local/share/Odoo",
+    "filestore_files": 134,
+    "filestore_bytes": 36468636,
+    "unchanged_other_module_files": 43,
+    "free_bytes": 216077144064,
+    "before": {
+      "modules": "lab_catalog|installed|19.0.2.0.3\nlab_inventory|installed|19.0.1.0.0\nlab_workflow|installed|19.0.1.1.0",
+      "counts": "bag|1\nquant|2\nmove|1\noperation|1\ncatalog|695217\nlocation|16\npending|0\ntrace|1",
+      "quant": "0.00|0.00"
+    },
+    "pre_service": "active",
+    "started_utc": "2026-10-19T13:12:56.802232+00:00",
+    "old_source": {
+      "path": "/opt/odoo/deployments/update-endpoint-20261019-a1/old-source.tar.gz",
+      "bytes": 11700288,
+      "sha256": "38e8306dfc708d709750be1a8a3feba7a773c3df0673e347aeea2c91dbc3bf67"
+    },
+    "backup_path": "/var/backups/lc-elc/20261019T131258Z-before-update-endpoint",
+    "backup_verified": {
+      "db.dump": {
+        "bytes": 110511511,
+        "sha256": "4da86809f9ff5b16e4d7a21b5f4323a010ad36510d30dfc07c431010c026a9ab"
+      },
+      "filestore.tar.gz": {
+        "bytes": 12183441,
+        "sha256": "aab5c4a00bf6123a57da1ebb76f9d06033a709e18ab365a8a9fb99eb396b23da"
+      },
+      "filestore_files": 134,
+      "filestore_source_bytes": 36468636,
+      "pg_restore_list_exit_code": 0
+    },
+    "old_module_path": "/var/backups/lc-elc/20261019T131258Z-before-update-endpoint/module-source-before-upgrade/lab_workflow",
+    "upgrade_exit_code": 0,
+    "upgrade_log": "/opt/odoo/deployments/update-endpoint-20261019-a1/upgrade.log",
+    "upgrade_error_counts": {
+      "ERROR": 0,
+      "CRITICAL": 0,
+      "Traceback": 0
+    },
+    "service": "active",
+    "completed_utc": "2026-10-19T13:13:19.362535+00:00",
+    "after": {
+      "modules": "lab_catalog|installed|19.0.2.0.3\nlab_inventory|installed|19.0.1.0.0\nlab_workflow|installed|19.0.1.2.0",
+      "counts": "bag|1\nquant|2\nmove|1\noperation|1\ncatalog|695217\nlocation|16\npending|0\ntrace|1",
+      "quant": "0.00|0.00"
+    },
+    "deployed_addons_matching_files": 107,
+    "http": {
+      "login": 200,
+      "android_universal": 204,
+      "windows_x64": 204,
+      "linux_x64": 204,
+      "invalid_arch": 404,
+      "anonymous_asset": 303
+    },
+    "stable_manifests_published": 0,
+    "runtime_log_checked": "/var/log/odoo/odoo.log",
+    "runtime_log_lines_since_start": 80,
+    "runtime_error_counts": {
+      "ERROR": 0,
+      "CRITICAL": 0,
+      "Traceback": 0
+    },
+    "permissions": {
+      "exit_code": 0,
+      "counts": {
+        "allowed_lab_accounts": 2,
+        "unauthorized_denied": 2,
+        "public_denied": 1,
+        "authenticated_missing_asset_404": 2
+      },
+      "transaction": "READ ONLY, rolled back",
+      "scope": "actual production users through controller guard; no authenticated HTTP cookie generated"
+    }
+  },
+  "lan_http": {
+    "login": 200,
+    "android_universal": 204,
+    "windows_x64": 204,
+    "linux_x64": 204
+  },
+  "commands": {
+    "source_package": "python local/build/update-endpoint-deploy-20261019/prepare.py",
+    "stage": "getpass SSH bridge -> remote stage.py",
+    "backup": "systemd verified stop; venv python odoo_backup.py --config <remote controlled effective config> --db LcHardwareHouse --label before-update-endpoint --addons-path /opt/odoo/custom-addons --no-service",
+    "upgrade": "runuser -u odoo -- <production venv python> <production odoo-bin> -c <remote controlled effective config> -d LcHardwareHouse -u lab_workflow --stop-after-init --no-http --log-level=warn",
+    "verify": "remote verify.py: read-only SQL, SHA256 source, GET endpoints, runtime log counters",
+    "permissions": "odoo shell READ ONLY + rollback; actual accounts through update controller guard, no HTTP auth cookie",
+    "lan": "python local/build/update-endpoint-deploy-20261019/lan.py"
+  },
+  "execution_exit_codes": {
+    "source_package": 0,
+    "stage": 0,
+    "backup": 0,
+    "upgrade": 0,
+    "verify_final": 0,
+    "permissions": 0,
+    "lan_http": 0
+  },
+  "checks": {
+    "source_and_archive_files": 130,
+    "deployed_addons_matching_files": 107,
+    "backup_filestore_member_hashes": 134,
+    "backup_artifacts_hashed": 2,
+    "pg_restore_list_exit_code": 0,
+    "lan_http_checks_passed": 4,
+    "production_http_checks_passed": 6,
+    "actual_accounts_checked": 5
+  },
+  "earlier_attempts": [
+    {
+      "action": "dedicated SSH identity read-only authentication",
+      "result": "rejected; subsequently authenticated via user-authorized getpass memory-only password"
+    },
+    {
+      "action": "first post-deploy source verification",
+      "exit_code": 1,
+      "reason": "verification incorrectly LF-normalized binary content; corrected verifier to frozen manifest UTF8-only normalization, final 107 files match; deployed source unchanged"
+    }
+  ],
+  "secrets": "No password/config/session/private key persisted to local file, Git or memory. Effective config exists only in remote root:odoo 0640 deployment stage. Private logs remain remote.",
+  "not_performed": [
+    "stable.json publication",
+    "client package upload/install",
+    "inventory test writes",
+    "crawler/service/network changes outside project",
+    "full backup restore drill",
+    "off-machine database backup",
+    "authenticated HTTP asset transfer with actual published artifact",
+    "native two-version application update acceptance"
+  ],
+  "repository_check": {
+    "command": "python tools/repo_check.py --output local/build/update-endpoint-deploy-20261019/repo-check.json",
+    "exit_code": 0,
+    "result": "PASS",
+    "passed_checks": 49,
+    "warnings": [
+      {
+        "check": "known-payload-not-built",
+        "id": "production-py312-rebuild",
+        "recovery": "See registered preparation commands; this is not a complete offline closure."
+      }
+    ],
+    "payload_verification": false,
+    "scoped_git_diff_check_exit_code": 0
+  }
+}

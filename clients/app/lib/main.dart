@@ -1,4 +1,5 @@
 import 'widgets/lab_ui.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,11 +8,14 @@ import 'features/unified/providers/unified_providers.dart';
 import 'providers/auth_provider.dart';
 import 'routes/app_router.dart';
 import 'services/odoo_client.dart';
+import 'updates/update_ui.dart';
+import 'updates/desktop_update.dart';
 
 void main() {
   // Bindings first: the secure-storage plugin (remembered login) is used from
   // the splash screen before the first frame completes.
   WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding.instance.addPostFrameCallback((_) => markUpdateReady());
 
   // ONE OdooClient for the whole app.
   //
@@ -28,8 +32,9 @@ void main() {
     ProviderScope(
       overrides: [
         odooClientProvider.overrideWithValue(client),
-        assetAuthenticatedFetcherProvider
-            .overrideWithValue(client.fetchAssetBytes),
+        assetAuthenticatedFetcherProvider.overrideWithValue(
+          client.fetchAssetBytes,
+        ),
       ],
       child: const MyApp(),
     ),
@@ -46,7 +51,10 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: '实验室库存系统',
       theme: LabTheme.light,
-      builder: (context, child) => DecoratedBox(decoration: LabTheme.background, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => DecoratedBox(
+        decoration: LabTheme.background,
+        child: UpdateHost(child: child ?? const SizedBox.shrink()),
+      ),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

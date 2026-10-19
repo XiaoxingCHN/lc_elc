@@ -188,7 +188,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   }
 
   Future<void> _pickItem() async {
-    final item = await ItemPickerDialog.show(context);
+    final item = await ItemPickerDialog.show(context, onCreate: _newItem);
     if (item == null || !mounted) return;
     await _run(() async {
       final detail = await _api.detail(item.itemKey);
@@ -201,6 +201,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
             ? _materials.single.templateId
             : null;
         _createAttempt = null;
+        _error = null;
       });
     });
   }
@@ -219,6 +220,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
       _materials = [];
       _templateId = null;
       _createAttempt = null;
+      _error = null;
     });
   }
 
@@ -233,10 +235,12 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
           count == null ||
           count < 1 ||
           count > 100) {
-        throw StateError('请选择器件，填写每袋数量和袋数（1～100）。');
+        setState(() => _error = '请选择器件，填写每袋数量和袋数（1～100）。');
+        return;
       }
       if (_materials.length > 1 && _templateId == null) {
-        throw StateError('请选择本次制袋对应的内部档案。');
+        setState(() => _error = '请选择本次制袋对应的内部档案。');
+        return;
       }
       _createAttempt = {
         'request_key': newRequestKey(),
@@ -378,7 +382,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
 
   void _print() {
     final ids = _records
-        .where((r) => r.selected && !r.isCancelled && (_showProcessed || r.isPending))
+        .where(
+          (r) =>
+              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
+        )
         .map((r) => r.id)
         .join(',');
     context.push(
@@ -408,7 +415,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     final theme = Theme.of(context);
     final locations = ref.watch(inventoryLocationsProvider);
     final selectedCount = _records
-        .where((r) => r.selected && !r.isCancelled && (_showProcessed || r.isPending))
+        .where(
+          (r) =>
+              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
+        )
         .length;
     final attempt = _tab == 0 ? _createAttempt : _confirmAttempt;
     return Scaffold(

@@ -1,0 +1,217 @@
+{
+  "date": "2026-10-19",
+  "client_version": "1.1.2+5",
+  "status": "candidate; not stable; native upgrade acceptance outstanding",
+  "source_manifest": "maintenance/registry/source-client-picker-fix-20261019.json",
+  "source_tree_sha256": "f61a4733881ac4b8572b570ad3cf28781c750df7e85d32b20e440ca7fce29e2e",
+  "source_base_commit": "8df35b502f89c6f61dfdfddbece3f22c5a7f559e",
+  "working_tree_dirty_at_build": true,
+  "environment": {
+    "windows": "Flutter3.47.7/MSVC14.44.35207/CMake4.1.1/Ninja",
+    "android": "WSL Ubuntu22.04/Flutter3.47.7/JDK17/SDK36/existing signing identity",
+    "linux": "WSL Ubuntu22.04/Flutter3.47.7/clang14/CMake3.22.1/private libsecret sysroot/PDFium5200"
+  },
+  "defaults": {
+    "server": "http://127.0.0.1:18069",
+    "database": "lc_candidate_test",
+    "saved_settings": "retained; updater uses current server"
+  },
+  "validation": {
+    "before_fix": {
+      "command": "flutter test --no-pub test/features/unified/item_picker_test.dart",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
+      "cause": "unbounded height in LabGlassSurface/AppBar placed directly in Column; 33 rendering exceptions"
+    },
+    "flutter_all": {
+      "command": "flutter test --no-pub",
+      "passed": 272,
+      "skipped": 5,
+      "exit_code": 0
+    },
+    "updater_after_fixture_cleanup": {
+      "command": "flutter test --no-pub test/updates/update_test.dart",
+      "passed": 11,
+      "exit_code": 0
+    },
+    "new_regressions": {
+      "picker": 7,
+      "public_http_update_status": 1,
+      "included_in_all": true
+    },
+    "analyze": {
+      "command": "flutter analyze --no-pub --no-fatal-infos",
+      "errors": 0,
+      "warnings": 0,
+      "infos": 118,
+      "exit_code": 0
+    },
+    "actual_render": {
+      "passed": 1,
+      "exit_code": 0,
+      "image": "local/build/picker-fix-20261019/picker.png",
+      "visually_reviewed": true
+    },
+    "maintenance": {
+      "command": "python -m unittest discover -s maintenance/checks -v",
+      "collected": 11,
+      "passed": 10,
+      "skipped": 1,
+      "exit_code": 0,
+      "skipped_reason": "Windows symlink creation privilege unavailable",
+      "temporary_directory": "local/build/picker-fix-20261019/test-temp"
+    },
+    "repository": {
+      "command": "python tools/repo_check.py --output maintenance/audit/receipt-picker-fix-repo-check-20261019.json",
+      "passed_checks": 49,
+      "exit_code": 0,
+      "known_warning": "production-py312-rebuild",
+      "verify_payloads": "not run"
+    },
+    "routes": {
+      "command": "python tools/generate_routes.py --check",
+      "registrations": 32,
+      "exit_code": 0
+    },
+    "git_diff_check": {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  },
+  "artifacts": [
+    {
+      "platform": "windows",
+      "path": "local/build/picker-fix-20261019/LC_ELC-Windows-1.1.2+5-candidate.zip",
+      "bytes": 19186421,
+      "sha256": "6509a999124f085640b3f17ddc70f864643d44267d51ffbe1a56f5087766ae0d",
+      "source_check": {
+        "files": 163,
+        "mismatches": []
+      },
+      "build_exit_code": 0,
+      "marker": {
+        "app_id": "com.example.lab_inventory_client",
+        "layout": 1,
+        "version": "1.1.2",
+        "build": 5,
+        "platform": "windows"
+      },
+      "os_code_signing": "unsigned candidate; no OS code-signing certificate"
+    },
+    {
+      "platform": "android",
+      "path": "local/build/picker-fix-20261019/LC_ELC-Android-1.1.2+5-candidate.apk",
+      "bytes": 74777513,
+      "sha256": "d5e2a557f4e639dd122446dd0b3f286378947ec237e486c1a2c80e631602f152",
+      "source_check": {
+        "files": 163,
+        "mismatches": []
+      },
+      "build_exit_code": 0,
+      "certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+      "apksigner_verify_exit_code": 0
+    },
+    {
+      "platform": "linux",
+      "path": "local/build/picker-fix-20261019/LC_ELC-Linux-1.1.2+5-candidate.tar.gz",
+      "bytes": 16343981,
+      "sha256": "5dda686b14009e509ab14f52c06a7c8543b02e209fd95e7667e598abc3ce29e4",
+      "source_check": {
+        "files": 163,
+        "mismatches": []
+      },
+      "build_exit_code": 0,
+      "marker": {
+        "app_id": "com.example.lab_inventory_client",
+        "layout": 1,
+        "version": "1.1.2",
+        "build": 5,
+        "platform": "linux"
+      },
+      "linked_libraries": [
+        {
+          "file": "lab_inventory_client",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "client_update_helper",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libapp.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libflutter_linux_gtk.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libflutter_secure_storage_linux_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libpdfium.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libprinting_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/liburl_launcher_linux_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        }
+      ],
+      "os_code_signing": "unsigned candidate; no OS code-signing certificate"
+    }
+  ],
+  "log_sha256": {
+    "local/build/picker-baseline.log": "99911fb934d66f50d1ddb6f172464476122b7c073aead3da024f0ead92ca9beb",
+    "local/build/picker-fix-targeted.log": "816c1bbd832367de3758c63287f921b4f1eb50a334f2f64f81bae21573334420",
+    "local/build/picker-fix-flutter-final.log": "92484370eca2c06172f2528f190816d94100906c6ba1c83d006d4dd885adcfb8",
+    "local/build/picker-fix-analyze-final.log": "4d5f3e0f25b0ff70c9c6af34b93d994b8f2df716863d266fcb9c25e9442c0ac4",
+    "local/build/picker-fix-updater-final.log": "4403a913fa2e479de4020b76b41e4fc84aed173f26b80584b1ca62e5d1a9ab61",
+    "local/build/picker-fix-20261019/evidence.log": "6f554a420eb92e1a64686daab531cf7b9105cca74bd400ea8088b4730c8f2ad0",
+    "local/build/picker-fix-20261019/android-build.log": "e1f0c7d5ddaad405363ceea8895252e1f3cc3a1d18aaf1f801e3f0bc285eca53",
+    "local/build/picker-fix-20261019/android-signature.log": "1b66c53b0ed11f2f03e0a538719f17713c96baa286a288f87a7ed3087439fb25",
+    "local/build/picker-fix-20261019/linux-launch.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local/build/picker-fix-20261019/windows-launch.log": "9a2cc75d408ef8ba79c937e9059959a81a2a3d7fa2ef6c01b88d8f58d90d7aca",
+    "local/build/picker-fix-maintenance.log": "85c08d93005f03a782a25d3d88e44d19df38519d63d7594314d904d45eb8a0fd",
+    "local/build/picker-fix-maintenance-final.log": "5ddc2199990170b482e2079fa98daa183b499d2a39c615b237145d6876befdee",
+    "local/build/picker-fix-20261019/android-badging.log": "72c3f5ee0c19f0847346ab50df603cfb55fa3d85e70629b459cfb0f8f997b15a",
+    "local/build/picker-fix-20261019/linux-check.log": "0874768f6c3c6b4d17fe874f19ce5b27cd7abc349c1cd12a994ecc98418d20f5"
+  },
+  "production": {
+    "status": "deployed_verified",
+    "version": "19.0.1.2.0",
+    "audit": "maintenance/audit/update-endpoint-deploy-20261019.json",
+    "root_agent_lan_recheck": {
+      "android": 204,
+      "windows": 204,
+      "linux": 204
+    },
+    "stable_published": false
+  },
+  "not_verified": [
+    "Physical Android installation and user retest",
+    "Full native two-version desktop upgrade/rollback",
+    "Real metered network detection",
+    "Power-loss and scanner/printer",
+    "Stable package publication; GitHub push"
+  ],
+  "notes": [
+    "Windows TEMP fixture now resolves its 8.3 alias before passing installer canonical-root checks. Production boundary unchanged.",
+    "Initial regression failures retained: broad text finder selected both search text and row; fixture expected noncanonical catalog key. Corrected finder and expected lcsc identity.",
+    "Initial local Android recipe had CRLF and was rejected by bash before building. Rewritten with LF; retry exit recorded.",
+    "Initial maintenance test run hit sandbox TEMP cleanup permission errors (5 errors). Rerun with a project-local TEMP passed 10 and skipped 1; initial log retained separately."
+  ]
+}

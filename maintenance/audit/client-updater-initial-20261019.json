@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-19",
+  "status": "implemented candidate; not deployed or published",
+  "client_version": "1.1.1+4",
+  "server_candidate_version": "19.0.1.2.0",
+  "production_version_unchanged": "19.0.1.1.0",
+  "client_source_manifest": "maintenance/registry/source-client-updater-final-20261019.json",
+  "client_source_tree_sha256": "1441a11a2e0163fbf1f5dbe042666f2be236c74ab7fd0ec826cee52fa9c0ac2f",
+  "server_source_manifest": "maintenance/registry/source-server-updater-20261019.json",
+  "server_source_tree_sha256": "446e7ada847f86c15572f808c3175723e6e533dea845a0c0fd9e63f6b3ec841e",
+  "defaults": {
+    "server": "http://127.0.0.1:18069",
+    "database": "lc_candidate_test"
+  },
+  "environment": {
+    "windows": "Flutter3.47.7, MSVC14.44.35207, CMake4.1.1, Ninja",
+    "android": "WSL Ubuntu22.04, Flutter3.47.7, JDK17, SDK36, registered existing debug signing identity",
+    "linux": "WSL Ubuntu22.04, Flutter3.47.7, clang14/CMake3.22.1; private libsecret dev sysroot; existing PDFium5200"
+  },
+  "validation": {
+    "flutter_all": {
+      "passed": 257,
+      "skipped": 5,
+      "exit_code": 0
+    },
+    "updater_subset_included_in_all": {
+      "passed": 15,
+      "exit_code": 0
+    },
+    "maintenance": {
+      "passed": 10,
+      "skipped": 1,
+      "exit_code": 0,
+      "skipped_reason": "Windows symlink privilege unavailable"
+    },
+    "odoo_isolation": {
+      "collected": 55,
+      "passed": 54,
+      "skipped": 1,
+      "exit_code": 0
+    },
+    "http_concurrency": {
+      "passed": 6,
+      "exit_code": 0
+    },
+    "dart_analyze": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 106,
+      "exit_code": 0
+    },
+    "ui_actual_flutter_render": {
+      "passed": 1,
+      "exit_code": 0,
+      "path": "local/build/updater-20261019/update-panel.png"
+    }
+  },
+  "artifacts": [
+    {
+      "platform": "windows",
+      "path": "local/build/updater-20261019/LC_ELC-Windows-1.1.1+4-candidate.zip",
+      "bytes": 19180270,
+      "sha256": "35d75d2fe351397db3e26b953b9ac5d9808e93c8964a1db691c040ff1b677a39",
+      "build_exit_code": 0,
+      "source_check": {
+        "files": 161,
+        "mismatches": []
+      },
+      "installation_marker": {
+        "app_id": "com.example.lab_inventory_client",
+        "layout": 1,
+        "version": "1.1.1",
+        "build": 4,
+        "platform": "windows"
+      },
+      "helper_sha256": "7956a51f2545a59b9cc4c0ccc49224093eb7206cba5b0d84bdd80e39cf74f07b"
+    },
+    {
+      "platform": "android",
+      "path": "local/build/updater-20261019/LC_ELC-Android-1.1.1+4-candidate.apk",
+      "bytes": 74695589,
+      "sha256": "1e3d64bda61abc10a99c68753e0d1087d289bca2252065d5a1d11792fe5c8f20",
+      "build_exit_code": 0,
+      "source_check": {
+        "files": 161,
+        "mismatches": []
+      },
+      "certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43"
+    },
+    {
+      "platform": "linux",
+      "path": "local/build/updater-20261019/LC_ELC-Linux-1.1.1+4-candidate.tar.gz",
+      "bytes": 16472071,
+      "sha256": "ba3c08607244250ecd286c923b07c7a757c1250817d9a0ef5e792b58c35c2caa",
+      "build_exit_code": 0,
+      "helper_mode": "0o755"
+    }
+  ],
+  "log_sha256": {
+    "local/build/updater-flutter-reviewed.log": "0018a7fb46f5873e6ed21ba439a4ead8723a1f6ac8aac4021e4524eaa7eeb6f4",
+    "local/build/updater-tests-final2.log": "b57f96ca802d255b2a4bcde675ea137206894b3e13d7b4073119f0a2362b6c26",
+    "local/build/updater-maintenance-tests-final.log": "45cb246bd71b7c8cc0a865c58bd0bcd61cb87e179f24ed111e1761970e7c1940",
+    "local/build/updater-analyze-reviewed.log": "aabddf00f71cdf91e32a9e27b582566ffc69817d84ffc842b45900ddd3eba339",
+    "local/build/updater-odoo-isolation-final.log": "5c7169ca778e34fe4daedb1effb6ad910dd56b877694db90b3fd704de531d5ae",
+    "local/build/updater-ui-evidence.log": "6acdcb3ff714d745549cd3ea3938d91ba0293adb617f0db5d9bc91ae065da113",
+    "local/build/updater-20261019/android-final.log": "5925394386e8cb92b86dfc413fe2f612ba295001163b9a3305d61ad9b1d52a81",
+    "local/build/updater-20261019/android-signature.log": "074fc3c6d9c6107f19cb8b4ed97bb5cccd4308a85e24a711fd86eb76f574d489",
+    "local/build/updater-20261019/linux-final.log": "6d55996ead4cee4eb739e1880a3dcca29f0f903c04f6d342ff8adf2c03060d74",
+    "local/build/client-windows-20261019T174544742/native-reviewed.log": "196326a775e5e6d3a9179460bf58b1bbc18e19f911fc107b9a3bf63670ce4894",
+    "local/build/client-windows-20261019T174544742/helper-reviewed.log": "04172d13132b326757476639c74896c6b0263f204e82794997b672e8c56ad27a"
+  },
+  "not_verified": [
+    "Real Android system install/permission confirmation on a physical device",
+    "Full Windows/Linux upgrade and rollback with two actual native app versions",
+    "Metered network detection on real devices",
+    "Power-loss interruption recovery",
+    "Physical scanner/printer",
+    "Publishing stable manifest or deployment of new server endpoint"
+  ],
+  "notes": [
+    "Initial login widget fixtures left automatic-check timers; tests now explicitly isolate update networking and UpdateHost pauses retries on disposal.",
+    "First HTTP isolation run aborted because masked /dev had no random devices; preserving standard device binds fixed it. Initial failed logs retained separately.",
+    "Initial Windows helper preparation hit system text encoding; explicit UTF8 fixed it.",
+    "No source push, production changes, or installation of these candidates occurred in this task."
+  ]
+}
