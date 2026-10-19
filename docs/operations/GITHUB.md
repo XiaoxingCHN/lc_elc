@@ -1,6 +1,6 @@
 # GitHub私有仓库与离线文件恢复
 
-本次只建立本地Git维护仓库，不创建远端、不推送、不把凭据交给脚本。目录名不是GitHub仓库地址。
+初始归档只建立本地Git维护仓库。后续用户已配置既有origin并授权上传；2026-10-19两阶段入库与服务端部署交接已提交到 `codex/two-stage-receipt-plan` 分支，主功能提交0716829。源码在Git，安装包/私有数据仍按载荷登记保留在Git之外；不改变仓库可见性、不强推main、不把凭据写入脚本。目录名不是GitHub仓库地址。
 
 ## 第一次推送
 
@@ -30,4 +30,4 @@ Git只含源码、规范、锁与登记，未提交离线载荷属正常。按de
 
 ## 自动检查
 
-.github/workflows/repository.yml准备了GitHub上的源码/维护工具检查，不连接生产，不需要私有载荷或账号。尚未推送，不能称云端CI已通过。所用action入口已查官方[checkout](https://github.com/actions/checkout)与[setup-python](https://github.com/actions/setup-python)，仅contents:read并不保留checkout认证。未来升级action须复核上游要求。
+.github/workflows/repository.yml准备了GitHub上的源码/维护工具检查，不连接生产，不需要私有载荷或账号。本轮已经推送，但未读取对应云端CI结果，不能称云端CI已通过。所用action入口已查官方[checkout](https://github.com/actions/checkout)与[setup-python](https://github.com/actions/setup-python)，仅contents:read并不保留checkout认证。未来升级action须复核上游要求。
