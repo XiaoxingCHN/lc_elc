@@ -1,3 +1,5 @@
+当前已发布1.1.3+6 stable，包在releases/1.1.3+6/LC_ELC-Android-1.1.3+6.apk，来源/签名/测试与旧入口失败后的手动覆盖说明见[交接](../../maintenance/handoffs/2026-10-19-android-install-fix.md)。以下为历史发布背景。
+
 最新：1.1.2+5已发布Android stable，完整包/签名/HTTP下载核验通过，见[发布交接](../../maintenance/handoffs/2026-10-19-android-stable.md)。用户已允许未知来源但旧安装入口失败，当前1.1.3+6安装修复见[交接](../../maintenance/handoffs/2026-10-19-android-install-fix.md)。以下1.0.1描述保留原发布背景。
 
 # Android客户端

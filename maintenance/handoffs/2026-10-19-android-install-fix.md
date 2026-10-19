@@ -31,3 +31,11 @@ Android1.1.2+5已按用户明确授权发布到更新通道，用户随后反馈
 ## 生产状态和回滚
 
 Odoo19.0.1.2.0服务保持当前版本。本轮仅客户端包与递增发行清单；build5的包和签名清单必须保留。最终通道切换结果、旧指针保存位置、下载校验和撤回操作见android-install-fix审计；不恢复数据库、不递归删除发行目录。
+
+## 最终交付与发布证据
+
+1.1.3+6已发布Android stable，发行android-1.1.3-build6-20261019、seq2。源提交11f03807015c2d811784c13b4b47a34e0d7d4afc（仅本地，未推送），166冻结文件与构建副本一致。APK clients/android/releases/1.1.3+6/LC_ELC-Android-1.1.3+6.apk，74,777,513字节，SHA256 7c900701ad781c18885e691eb45a0aba56a4b1141ff022104ace276668e40d3f；构建exit0（Gradle336.3秒），版本/既有证书核验通过。还检查APK实际DEX包含新INSTALL_CACHE_PATH等错误码，三架构Dart AOT均与旧包不同，避免只验证源文件而漏核对实际包。
+
+正式清单LAN200并验签，旧build4/build5接受build6、build6不重复升级；认证实际HTTP完整下载200/字节数/hash一致，无角色403、匿名303，另两平台204。临时2个文件会话清理，数据库READ ONLY并回滚；服务active且不重启。完整证据见[审计](../audit/android-install-fix-20261019.json)。
+
+旧指针备份为/opt/odoo/.local/share/Odoo/lab-client-updates/android/universal/stable-before-build6-20261019.json，原SHA256 1c9e119b0ccd7125cd3120b992ecff7d7355137b5853b3646ce2de40b91815ed。撤回时先核验当前指针发行/无符号链接，原子移至withdrawn-build6-20261019.json令检查204，保留所有发行及旧备份。不要把恢复seq1当常规回滚：已见seq2的客户端会拒绝旧序号；修复应使用更高build/seq。撤回不阻止已经缓存完整包的确认安装。此文记录撤回方法，本轮未实际撤回。

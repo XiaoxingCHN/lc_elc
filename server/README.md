@@ -1,6 +1,6 @@
 # 最新上线状态
 
-lab_workflow19.0.1.2.0更新接口已按本轮明确授权上线，服务active，三端manifest204（未发布stable）；备份、权限和库存不变证据见[交接](../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。以下此前候选/部署说明为各自时点。
+lab_workflow19.0.1.2.0更新接口已按本轮明确授权上线，服务active，Android manifest200（1.1.3+6 stable）、Windows/Linux204；备份、权限和库存不变证据见[交接](../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。以下此前候选/部署说明为各自时点。
 
 # Odoo服务端唯一维护入口
 

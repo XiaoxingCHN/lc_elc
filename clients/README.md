@@ -1,3 +1,5 @@
+最新Android stable **1.1.3+6** 修复安装入口缓存校验并显示具体原因；275 Flutter/9 JVM检查通过，实机仍待验证，旧安装入口失败时需手动覆盖一次。Windows/Linux仍为1.1.2+5候选。见[最新交接](../maintenance/handoffs/2026-10-19-android-install-fix.md)。以下为此前候选时点。
+
 最新开发候选 **1.1.2+5** 修复器件选择白屏及更新状态；三端构建和来源核验通过，包/hash见[修复审计](../maintenance/audit/receipt-picker-fix-20261019.json)。生产更新接口已上线，尚未发布stable包。
 
 # 三端客户端维护入口
