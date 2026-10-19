@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lab_root" name="实验室库存" sequence="60"
+              groups="lab_inventory.group_lab_admin,lab_inventory.group_lab_user"/>
+    <menuitem id="menu_lab_product" name="元器件档案" parent="menu_lab_root"
+              action="action_lab_product" sequence="10"/>
+    <menuitem id="menu_lab_location" name="库位管理" parent="menu_lab_root"
+              action="action_lab_location" sequence="20"/>
+    <menuitem id="menu_lab_mapping" name="类别→库位映射" parent="menu_lab_root"
+              action="action_lab_mapping" sequence="30"/>
+    <menuitem id="menu_lab_move" name="库存流水" parent="menu_lab_root"
+              action="action_lab_move" sequence="40"/>
+</odoo>

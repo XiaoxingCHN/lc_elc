@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_issue_line_tree" model="ir.ui.view">
+            <field name="name">lab.issue.line.tree</field>
+            <field name="model">lab.issue.line</field>
+            <field name="arch" type="xml">
+                <list string="领用记录" create="false" edit="false">
+                    <field name="date"/>
+                    <field name="bag_id"/>
+                    <field name="trace_code" readonly="1"/>
+                    <field name="product_tmpl_id"/>
+                    <field name="location_id"/>
+                    <field name="quantity" sum="领用合计"/>
+                    <field name="returned_quantity" sum="已归还"/>
+                    <field name="outstanding_quantity" sum="未归还"/>
+                    <field name="borrower_id"/>
+                    <field name="actor_id"/>
+                    <field name="project"/>
+                    <field name="issue_operation_id"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lab_issue_line_form" model="ir.ui.view">
+            <field name="name">lab.issue.line.form</field>
+            <field name="model">lab.issue.line</field>
+            <field name="arch" type="xml">
+                <form string="领用记录" create="false" edit="false">
+                    <header>
+                        <button name="action_open_return_form" type="object"
+                                string="登记归还" class="btn-primary"
+                                groups="lab_workflow.group_lab_operator"
+                                invisible="outstanding_quantity &lt;= 0"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="trace_code" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="领用信息">
+                                <field name="bag_id" readonly="1"/>
+                                <field name="product_tmpl_id" readonly="1"/>
+                                <field name="location_id" readonly="1"/>
+                                <field name="quantity" readonly="1"/>
+                                <field name="returned_quantity" readonly="1"/>
+                                <field name="outstanding_quantity" readonly="1"/>
+                            </group>
+                            <group string="责任与项目">
+                                <field name="borrower_id" readonly="1"/>
+                                <field name="actor_id" readonly="1"/>
+                                <field name="project" readonly="1"/>
+                                <field name="date" readonly="1"/>
+                                <field name="issue_operation_id" readonly="1"/>
+                                <field name="company_id" groups="base.group_multi_company"
+                                       readonly="1"/>
+                            </group>
+                        </group>
+                        <field name="note" readonly="1"/>
+                        <notebook>
+                            <page string="归还流水" name="returns">
+                                <field name="return_line_ids" readonly="1">
+                                    <list>
+                                        <field name="date"/>
+                                        <field name="quantity"/>
+                                        <field name="actor_id"/>
+                                        <field name="operation_id"/>
+                                        <field name="move_id"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_lab_issue_line_search" model="ir.ui.view">
+            <field name="name">lab.issue.line.search</field>
+            <field name="model">lab.issue.line</field>
+            <field name="arch" type="xml">
+                <search string="搜索领用记录">
+                    <field name="bag_id"/>
+                    <field name="borrower_id"/>
+                    <field name="actor_id"/>
+                    <field name="project"/>
+                    <separator/>
+                    <filter name="outstanding_only" string="只看未归还"
+                            domain="[('outstanding_quantity', '&gt;', 0)]"/>
+                    <filter name="mine" string="我领用的"
+                            domain="[('borrower_id', '=', uid)]"/>
+                    <filter name="my_actions" string="我操作的"
+                            domain="[('actor_id', '=', uid)]"/>
+                    <filter name="group_borrower" string="领用人"
+                            context="{'group_by': 'borrower_id'}"/>
+                    <filter name="group_project" string="项目"
+                            context="{'group_by': 'project'}"/>
+                    <filter name="group_material" string="物料"
+                            context="{'group_by': 'product_tmpl_id'}"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_lab_issue_line" model="ir.actions.act_window">
+            <field name="name">领用记录</field>
+            <field name="res_model">lab.issue.line</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_lab_issue_line_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">还没有领用记录。到扫码操作台扫码领料后，这里会记录领用人、项目和未归还数量。</p>
+            </field>
+        </record>
+
+        <record id="action_lab_return_wizard" model="ir.actions.act_window">
+            <field name="name">扫码/表单归还</field>
+            <field name="res_model">lab.issue.line</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('outstanding_quantity', '&gt;', 0)]</field>
+            <field name="context">{'search_default_outstanding_only': 1}</field>
+            <field name="help" type="html">
+                <p>选择一条未归还的领用记录，在表单里点「登记归还」，填入数量即可；
+                   归还默认回到原库位、原袋/批次，不能超过未归还数量。</p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

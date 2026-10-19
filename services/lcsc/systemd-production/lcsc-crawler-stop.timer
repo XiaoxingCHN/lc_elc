@@ -1,0 +1,11 @@
+[Unit]
+Description=End daily LCSC catalog collection window
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+AccuracySec=1min
+Persistent=true
+Unit=lcsc-crawler-stop.service
+
+[Install]
+WantedBy=timers.target

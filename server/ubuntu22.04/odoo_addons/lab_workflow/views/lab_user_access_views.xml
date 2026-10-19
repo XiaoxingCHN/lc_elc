@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_lab_access" model="ir.ui.view">
+        <field name="name">res.users.form.lab.access</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="priority">90</field>
+        <field name="arch" type="xml">
+            <xpath expr="(//field[@name='group_ids'][@widget='res_user_group_ids'])[1]" position="attributes">
+                <attribute name="widget">lab_user_group_ids</attribute>
+            </xpath>
+            <xpath expr="(//field[@name='group_ids'][@widget='res_user_group_ids'])[1]" position="attributes">
+                <attribute name="widget">lab_user_group_ids</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

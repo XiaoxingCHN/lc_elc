@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lab_product_list" model="ir.ui.view">
+        <field name="name">lab.product.list</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <list string="元器件档案">
+                <field name="lab_sn"/>
+                <field name="name"/>
+                <field name="default_code"/>
+                <field name="lab_lcsc_code"/>
+                <field name="lab_mpn"/>
+                <field name="lab_brand"/>
+                <field name="lab_package"/>
+                <field name="categ_id"/>
+                <field name="qty_available"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lab_product_form" model="ir.ui.view">
+        <field name="name">lab.product.form</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <form string="元器件">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="元器件名称"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="lab_sn" placeholder="LAB-000001"/>
+                            <field name="default_code" placeholder="LAB-000001"/>
+                            <!-- 实测：本实例 Odoo 19 的 product.template 只有 type，没有 detailed_type -->
+                            <field name="type"/>
+                            <field name="categ_id"/>
+                        </group>
+                        <group>
+                            <field name="lab_lcsc_code" placeholder="C123456"/>
+                            <field name="lab_mpn" placeholder="制造商型号"/>
+                            <field name="lab_brand"/>
+                            <field name="lab_package"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="实验室信息">
+                            <group>
+                                <field name="lab_description"/>
+                                <field name="lab_specifications" placeholder='{"阻值": "270Ω", "精度": "±1%"}'/>
+                                <field name="lab_datasheet_url" widget="url"/>
+                                <field name="lab_source_url" widget="url"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_lab_product_search" model="ir.ui.view">
+        <field name="name">lab.product.search</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <search string="元器件档案">
+                <field name="lab_sn"/>
+                <field name="name"/>
+                <field name="default_code"/>
+                <field name="lab_lcsc_code"/>
+                <field name="lab_mpn"/>
+                <field name="lab_brand"/>
+                <field name="lab_package"/>
+                <field name="categ_id"/>
+                <filter name="f_has_lcsc" string="已绑立创编号" domain="[('lab_lcsc_code','!=',False)]"/>
+                <filter name="f_no_lcsc" string="自来料（无立创编号）" domain="[('lab_lcsc_code','=',False)]"/>
+                <filter name="f_no_sn" string="缺 SN（需补）" domain="[('lab_sn','=',False)]"/>
+                <filter name="g_categ" string="分类" context="{'group_by': 'categ_id'}"/>
+                <filter name="g_brand" string="品牌" context="{'group_by': 'lab_brand'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lab_product" model="ir.actions.act_window">
+        <field name="name">元器件档案</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_lab_product_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_lab_product_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_lab_product_form')})]"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">创建第一个元器件</p>
+            <p>手动建料时留空“立创商城编号”；带 C 编号的物料可被补全脚本联网回填分类/描述。</p>
+        </field>
+    </record>
+</odoo>

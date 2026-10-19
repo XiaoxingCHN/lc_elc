@@ -1,0 +1,144 @@
+name: lab_inventory_client
+description: Flutter cross-platform client for the laboratory component inventory system (Odoo 19 JSON-RPC, no middleware).
+publish_to: 'none'
+
+version: 1.0.1+2
+
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Cupertino icon font.
+  # Some widget in the UI/dependency set renders a CupertinoIcons glyph; without
+  # this package the release build warns "Expected to find fonts for
+  # (packages/cupertino_icons/CupertinoIcons, MaterialIcons), but found
+  # (MaterialIcons)" and that glyph would be missing at runtime.
+  cupertino_icons: ^1.0.8
+
+  # State management.
+  # `StateNotifier` / `StateNotifierProvider` are re-exported by
+  # flutter_riverpod, so the standalone `riverpod` and `state_notifier`
+  # packages are intentionally NOT declared here.
+  flutter_riverpod: ^2.4.0
+
+  # Routing
+  go_router: ^12.0.0
+
+  # Networking
+  dio: ^5.3.0
+
+  # Session cookie handling.
+  # Odoo sets a `session_id` cookie on /web/session/authenticate and expects
+  # it back on every /web/dataset/call_kw call. Without these two packages the
+  # CookieManager/CookieJar references in lib/services/odoo_client.dart do not
+  # resolve and the project does not compile.
+  # Both are pure Dart (no native platform code), so they do not affect the
+  # Linux desktop build.
+  dio_cookie_manager: ^3.0.0
+  cookie_jar: ^4.0.0
+
+  # "Remember login" storage (see lib/services/login_memory_store.dart).
+  #
+  # flutter_secure_storage is the Flutter-ecosystem plugin used for the ONE
+  # secret this client keeps (the account password, and only after the server
+  # has actually accepted it). It delegates to the operating system key store:
+  #   * Windows -> AES-GCM blob; the data key stays in the Windows Credential
+  #                Manager (per-user DPAPI protected)
+  #   * Android -> RSA-OAEP wrapped data key in the Android Keystore, AES-GCM
+  #                payload (Android 6.0 / API 23 or newer)
+  #   * Linux   -> libsecret / org.freedesktop.Secret (GNOME Keyring, KWallet)
+  # If the platform key store is missing (typical for a headless Linux box
+  # without gnome-keyring) the write FAILS LOUDLY: this app never falls back to
+  # a plaintext or base64 "encrypted" file.
+  flutter_secure_storage: ^11.2.0
+
+  # Non-secret login preferences only: server URL, database, login name, the
+  # "remember login" choice and the last successful login timestamp.
+  # A password must never reach shared_preferences - enforced by
+  # test/services/login_memory_store_test.dart.
+  shared_preferences: ^2.5.6
+
+  # sha256, used only to derive a filesystem-safe, collision-resistant storage
+  # key from (server URL + database + login). The Windows backend names its
+  # files after the key, so the raw URL/login cannot be used directly.
+  # Official dart.dev package.
+  crypto: ^3.0.7
+
+  # ---------------------------------------------------------------------------
+  # Unified business UI (lib/features/unified + lib/services/lab_api_client.dart).
+  # Owned and version-controlled here: pubspec.yaml / pubspec.lock are changed in
+  # ONE place so the three platform builds resolve the same versions.
+  # Versions below are what `pub` resolved for Dart 3.13.5 / Flutter 3.47.7.
+  # ---------------------------------------------------------------------------
+
+  # A4 label layout -> PDF, on-screen preview, save and the system print dialog.
+  # Supported on Windows / Android / Linux (Linux needs libcups at build+run
+  # time, see lc_elc/docs/客户端登录记忆验收.md).
+  printing: ^5.15.1
+
+  # Direct use of the PDF document model: the client only PRINTS / PREVIEWS /
+  # SAVES the A4 PDF that the server rendered (`/lab/api/labels/preview` ->
+  # pdf_base64), so no client-side CJK font asset is declared. Chinese text in a
+  # PDF is the backend's font problem; the client never re-lays-out label text,
+  # and bundling a 17 MB CJK TTF here would be dead weight.
+  pdf: ^3.13.1
+
+  # Android camera scanning. mobile_scanner declares android/ios/macos/web; it
+  # has NO Windows or Linux implementation, so desktop scanning must keep using
+  # the keyboard-wedge scanner gun / manual input path in the same UI flow.
+  mobile_scanner: ^7.4.2
+
+  # Application support directory for the offline asset cache (images/material
+  # files) and for anything else that must survive a restart.
+  path_provider: ^2.1.6
+
+  # Idempotency keys (request_key) for receipt / issue / return.
+  uuid: ^4.6.0
+
+  # Opening datasheet / source URLs in the platform browser.
+  # Supported on Windows / Android / Linux.
+  url_launcher: ^6.3.3
+
+  # Deliberately NOT added yet: cached_network_image / flutter_cache_manager.
+  # Both drag in `sqflite`, which only ships Android/iOS/macOS implementations -
+  # on Windows and Linux the cache would throw at runtime, and the requirement is
+  # a three-platform offline cache. The offline cache is therefore implemented on
+  # dio + path_provider (see lc_elc/docs/ui_dependency_requests.json handling in
+  # the acceptance note) unless the UI owner requests otherwise.
+
+  # Data models (code generated by build_runner)
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
+
+  # Logging
+  logger: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+  # Code generation
+  build_runner: ^2.16.2
+  freezed: ^4.0.2
+  json_serializable: ^6.14.1
+
+flutter:
+  uses-material-design: true
+
+  # NOTE (removed dangling declarations)
+  # The original pubspec declared an `assets/` directory and a bundled
+  # `assets/fonts/Roboto-Regular.ttf` font family. Neither exists in this
+  # source tree, and Flutter treats a missing asset directory / missing font
+  # file as a hard build error ("unable to find directory entry in
+  # pubspec.yaml" / "unable to load asset"). Both declarations were removed.
+  # If you add real assets later, put the actual files in place FIRST and then
+  # re-add the `assets:` / `fonts:` sections here.
+  #
+  # No `fonts:` section is needed for the current UI: the Material default
+  # font is used, and `fontFamily: 'monospace'` in the detail screen resolves
+  # against the platform font list.

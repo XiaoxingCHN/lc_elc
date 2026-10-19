@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- Odoo 19 的普通用户详情只展示已归入 privilege 的权限。
+             使用原生三级选择器；没有用户/默认组赋值，升级不会改任何现有成员。 -->
+        <record id="module_category_lab_workflow" model="ir.module.category">
+            <field name="name">实验室</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="privilege_lab_inventory" model="res.groups.privilege">
+            <field name="name">实验室库存</field>
+            <field name="category_id" ref="module_category_lab_workflow"/>
+            <field name="sequence">10</field>
+            <field name="placeholder">无访问权限</field>
+            <field name="description">只读可查看库存；操作员可扫码入库、本人领料、归还和打印标签；管理员可维护库位和代他人领料。这里的管理员仅管理实验室库存，不授予系统设置权限。</field>
+        </record>
+
+        <!-- 实验室库存：基础可见性（有账号但不在本组内不能访问任何 lab 接口） -->
+        <record id="group_lab_user" model="res.groups">
+            <field name="name">只读</field>
+            <field name="privilege_id" ref="privilege_lab_inventory"/>
+            <field name="sequence">10</field>
+            <field name="comment">可以查看统一器件库、自己的领用记录与库存位置；不能改动库存。</field>
+        </record>
+
+        <!-- 普通操作员：扫码入库、领料、归还、打标签 -->
+        <record id="group_lab_operator" model="res.groups">
+            <field name="name">操作员</field>
+            <field name="privilege_id" ref="privilege_lab_inventory"/>
+            <field name="sequence">20</field>
+            <field name="comment">可以扫码入库、自助领料（只能领本人）、归还、生成并打印标签。</field>
+            <field name="implied_ids" eval="[(4, ref('group_lab_user'))]"/>
+        </record>
+
+        <!-- 库存管理员：代他人领料、库位维护、历史库存分袋适配 -->
+        <record id="group_lab_manager" model="res.groups">
+            <field name="name">管理员</field>
+            <field name="privilege_id" ref="privilege_lab_inventory"/>
+            <field name="sequence">30</field>
+            <field name="comment">可以代他人领料、维护库位与物料、执行历史库存分袋适配。</field>
+            <field name="implied_ids" eval="[(4, ref('group_lab_operator'))]"/>
+        </record>
+
+        <!-- 库存管理动作需要 stock 的库存用户能力（不设 stock 组则无法读库位） -->
+        <record id="group_lab_operator" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,11 @@
+{
+  "labInventoryMenu": "Lab Inventory",
+  "showInventoryPanel": "Catalog & Stock",
+  "bomCompare": "BOM Quantity Compare (read-only)",
+  "openReceipt": "Receive Stock",
+  "openIssue": "Issue Stock",
+  "openReturn": "Return Against Issue",
+  "openTrace": "Bag / Location Trace",
+  "openSettings": "Connection & Account",
+  "showDebugLog": "Diagnostics"
+}

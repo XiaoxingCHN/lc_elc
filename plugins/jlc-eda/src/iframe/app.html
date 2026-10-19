@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>实验室库存（Odoo 19）</title>
+    <style>
+/*__LAB_CSS__*/
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="title-block">
+          <h1>实验室库存 <span class="version" id="version"></span></h1>
+          <p class="status-line" id="status-line">正在连接扩展主模块…</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn ghost" id="btn-settings" type="button">连接设置</button>
+          <button class="btn ghost" id="btn-diagnostics" type="button">诊断</button>
+        </div>
+      </header>
+      <nav class="tabs" id="tabs" aria-label="功能导航"></nav>
+      <div class="banner" id="banner" hidden></div>
+      <main class="view" id="view">
+        <p class="muted">正在初始化…</p>
+      </main>
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+      <div id="modal-root"></div>
+    </div>
+    <script>
+/*__LAB_JS__*/
+    </script>
+  </body>
+</html>

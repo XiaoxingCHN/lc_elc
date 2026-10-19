@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+          不修改任何 core 记录（改 base.group_user 会在安装时报 ParseError）。
+          授权模型：
+            * base.group_user（所有内部用户）-> 只读资料索引
+            * group_lab_catalog_manager      -> 导入与索引维护
+          匿名用户一律被控制器拒绝。
+        -->
+        <record id="group_lab_catalog_user" model="res.groups">
+            <field name="name">器件库用户</field>
+            <!-- 合法授予 product 权限：建档要创建 product.template，不能靠 sudo 绕过。
+                 与 lab_inventory 的 operator 组一致，隐含 stock 操作员组。 -->
+            <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+            <field name="comment">可检索统一器件库、查看参数与手册、绑定/建档。不含库存写入权限。</field>
+        </record>
+
+        <record id="group_lab_catalog_manager" model="res.groups">
+            <field name="name">器件库管理员</field>
+            <field name="implied_ids" eval="[(4, ref('group_lab_catalog_user'))]"/>
+            <field name="comment">额外的资料库导入与索引维护权限。</field>
+        </record>
+
+    </data>
+</odoo>

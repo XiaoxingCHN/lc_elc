@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "artifacts": [
+    {
+      "id": "client-windows",
+      "path": "clients/windows/releases/1.0.1/LC_ELC-Windows-1.0.1.zip",
+      "bytes": 35271492,
+      "sha256": "ce194cca6172a4425c6fe5cfc1ef691ae5b93ba377e940f725abb6153db219cf",
+      "version": "1.0.1+2",
+      "component": "client",
+      "source_manifest": "maintenance/registry/source-client-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    },
+    {
+      "id": "client-android",
+      "path": "clients/android/releases/1.0.1/LC_ELC-Android-1.0.1.apk",
+      "bytes": 73690852,
+      "sha256": "fb655033ae8af697f01e2bd51e2ebb9d4ae52f0171bee87e9f5d3059a1f99b43",
+      "version": "1.0.1+2",
+      "component": "client",
+      "source_manifest": "maintenance/registry/source-client-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    },
+    {
+      "id": "client-linux",
+      "path": "clients/linux/releases/1.0.1/LC_ELC-Linux-1.0.1.tar.gz",
+      "bytes": 150393618,
+      "sha256": "622780ecd9c98b94e10d8df103ce7dc71ffed53840713facfffd76e73907453c",
+      "version": "1.0.1+2",
+      "component": "client",
+      "source_manifest": "maintenance/registry/source-client-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    },
+    {
+      "id": "eda-eext",
+      "path": "plugins/jlc-eda/releases/3.0.3/lab-inventory-odoo_v3.0.3.eext",
+      "bytes": 102828,
+      "sha256": "69665cbf3fac0732db7f6b01188014ac773dbc3d43e12062e8ffd039016998ef",
+      "version": "3.0.3",
+      "component": "eda",
+      "source_manifest": "maintenance/registry/source-eda-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    },
+    {
+      "id": "eda-bundle",
+      "path": "plugins/jlc-eda/releases/3.0.3/lab-inventory-odoo_v3.0.3-bundle.zip",
+      "bytes": 92969083,
+      "sha256": "5b48babfe8cb365c30588f79bb6e1c549769899ee95d75dabde4a6328cbf784b",
+      "version": "3.0.3",
+      "component": "eda",
+      "source_manifest": "maintenance/registry/source-eda-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    },
+    {
+      "id": "odoo-addons",
+      "path": "server/releases/2026-10-18/odoo-addons-20261018-1.0.2.zip",
+      "bytes": 11540092,
+      "sha256": "511ac5880e2d7107e5bf88e86ba60e694f4a48cdcae4c2352cfee7d47d58f4d3",
+      "version": "2026-10-18",
+      "component": "server",
+      "source_manifest": "maintenance/registry/source-server-baseline.json",
+      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
+      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks"
+    }
+  ]
+}

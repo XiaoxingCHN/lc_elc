@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- 实验室领用虚拟客户位：领用去向 / 归还来源（每公司一份） -->
+        <record id="location_lab_customer" model="stock.location">
+            <field name="name">实验室领用</field>
+            <field name="usage">customer</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="lab_note">领用去向/归还来源的虚拟库位（不对应物理位置）</field>
+        </record>
+
+        <!-- 标签字体（留空则按模块内置/系统字体自动挑选并实测字形） -->
+        <record id="param_label_font" model="ir.config_parameter">
+            <field name="key">lab_workflow.label_font</field>
+            <field name="value"></field>
+        </record>
+
+        <!-- 标签显示字段默认值（网页表单/客户端可用作默认勾选） -->
+        <record id="param_label_fields" model="ir.config_parameter">
+            <field name="key">lab_workflow.label_fields</field>
+            <field name="value">sn,location,mpn,catalog_code,parameters</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "baseline": "2026.10.19",
+  "components": [
+    {
+      "id": "client",
+      "version": "1.0.1+2",
+      "source_root": "clients/app",
+      "required_files": [
+        "clients/app/pubspec.yaml",
+        "clients/app/pubspec.lock",
+        "clients/app/lib/main.dart",
+        "clients/app/test/services/login_memory_store_test.dart"
+      ],
+      "guide": "docs/development/CLIENT.md",
+      "published_platforms": [
+        "windows",
+        "android",
+        "linux"
+      ]
+    },
+    {
+      "id": "odoo",
+      "version": {
+        "lab_inventory": "19.0.1.0.0",
+        "lab_catalog": "19.0.2.0.3",
+        "lab_workflow": "19.0.1.0.2"
+      },
+      "source_root": "server/ubuntu22.04/odoo_addons",
+      "required_files": [
+        "server/ubuntu22.04/odoo_addons/lab_inventory/__manifest__.py",
+        "server/ubuntu22.04/odoo_addons/lab_catalog/__manifest__.py",
+        "server/ubuntu22.04/odoo_addons/lab_workflow/__manifest__.py"
+      ],
+      "guide": "docs/development/SERVER.md"
+    },
+    {
+      "id": "server-ops",
+      "version": "archive-2026-10-19",
+      "source_root": "server/ubuntu22.04",
+      "required_files": [
+        "server/ubuntu22.04/install_offline.sh",
+        "server/ubuntu22.04/upgrade_modules.sh",
+        "server/ubuntu22.04/odoo_backup.py",
+        "server/ubuntu22.04/odoo_restore.py",
+        "server/ubuntu22.04/lc_odoo_conf.py"
+      ],
+      "guide": "docs/operations/SERVER.md"
+    },
+    {
+      "id": "eda",
+      "version": "3.0.3",
+      "source_root": "plugins/jlc-eda",
+      "required_files": [
+        "plugins/jlc-eda/package.json",
+        "plugins/jlc-eda/package-lock.json",
+        "plugins/jlc-eda/extension.json",
+        "plugins/jlc-eda/src/main/index.js",
+        "plugins/jlc-eda/bridge/server.mjs"
+      ],
+      "guide": "plugins/jlc-eda/MAINTENANCE.md"
+    },
+    {
+      "id": "crawler",
+      "version": "server-export-2026-10-19",
+      "source_root": "server/ubuntu22.04/crawler",
+      "required_files": [
+        "server/ubuntu22.04/crawler/lcsc_catalog_archive.py",
+        "server/ubuntu22.04/crawler/snapshot_catalog.py",
+        "server/ubuntu22.04/crawler/requirements.txt"
+      ],
+      "guide": "services/lcsc/README.md"
+    },
+    {
+      "id": "catalog-import",
+      "version": "with-lab_catalog",
+      "source_root": "server/ubuntu22.04/odoo_addons/lab_catalog/tools",
+      "required_files": [
+        "server/ubuntu22.04/odoo_addons/lab_catalog/tools/import_catalog.py",
+        "services/lcsc/systemd-production/lcsc-catalog-import.service",
+        "services/lcsc/systemd-production/lcsc-crawler.service.d/odoo-import.conf"
+      ],
+      "guide": "services/lcsc/README.md"
+    },
+    {
+      "id": "maintenance",
+      "version": "baseline-2026.10.19",
+      "source_root": "tools",
+      "required_files": [
+        "tools/repo_check.py",
+        "tools/build_client.py",
+        "tools/release.py",
+        "tools/fetch_payload.py",
+        "tools/offline_bundle.py",
+        "AGENTS.md"
+      ],
+      "guide": "docs/development/WORKFLOW.md"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "name": "real Code128 barcode HTTP endpoint returns PNG",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "bytes": 8219
+      }
+    },
+    {
+      "name": "real QR barcode HTTP endpoint returns PNG",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "bytes": 4383
+      }
+    },
+    {
+      "name": "stock location barcode PDF renders using existing records",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "bytes": 10450,
+        "locations": 1
+      }
+    }
+  ],
+  "locations": [
+    {
+      "id": 5,
+      "name": "库存",
+      "barcode": "WHSTOCK"
+    }
+  ],
+  "exitCode": 0
+}

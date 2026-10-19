@@ -1,0 +1,10 @@
+[Unit]
+Description=Start daily LCSC catalog collection window
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+AccuracySec=1min
+Unit=lcsc-crawler.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Odoo 19 laboratory inventory
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=odoo
+Group=odoo
+WorkingDirectory=/opt/odoo/odoo-19
+ExecStart=/opt/odoo/venv/bin/python /opt/odoo/odoo-19/odoo-bin -c /etc/odoo.conf
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "pass_lines": 100,
+  "fail_lines": 0,
+  "summary": [
+    " 检查项：100   失败：0",
+    "============================================================",
+    "TESTS_TOTAL=100 TESTS_FAILED=0"
+  ],
+  "environment": "WSL root; required for temporary fixture ownership checks",
+  "real_postgresql_or_systemd_access": false,
+  "prior_nonroot_run": "90 passed/10 precondition failures; preserved in local/logs; not counted as passing"
+}

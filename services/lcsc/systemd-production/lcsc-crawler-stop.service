@@ -1,0 +1,7 @@
+[Unit]
+Description=Stop LCSC catalog collection at end of daily window
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/bin/systemctl is-active --quiet lcsc-crawler.service
+ExecStart=/usr/bin/systemctl stop lcsc-crawler.service

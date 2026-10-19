@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_location_tree" model="ir.ui.view">
+            <field name="name">lab.stock.location.tree</field>
+            <field name="model">stock.location</field>
+            <field name="arch" type="xml">
+                <list string="库位与库码" create="false">
+                    <field name="complete_name"/>
+                    <field name="lab_code"/>
+                    <field name="usage"/>
+                    <field name="lab_bag_count"/>
+                    <field name="company_id" groups="base.group_multi_company"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lab_location_form" model="ir.ui.view">
+            <field name="name">lab.stock.location.form</field>
+            <field name="model">stock.location</field>
+            <field name="arch" type="xml">
+                <form string="库位">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="lab_code" placeholder="例如 K000123"/>
+                                <field name="location_id"/>
+                                <field name="usage"/>
+                            </group>
+                            <group>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                                <field name="lab_bag_count"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="说明">
+                            <field name="lab_note" nolabel="1"/>
+                        </group>
+                        <notebook>
+                            <page string="在库袋" name="bags">
+                                <field name="lab_bag_ids" readonly="1">
+                                    <list>
+                                        <field name="trace_code"/>
+                                        <field name="product_tmpl_id"/>
+                                        <field name="quantity"/>
+                                        <field name="receipt_date"/>
+                                        <field name="outstanding_quantity"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_lab_location" model="ir.actions.act_window">
+            <field name="name">库位与库码</field>
+            <field name="res_model">stock.location</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('usage', '=', 'internal')]</field>
+            <field name="context">{'search_default_internal': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">先建立内部库位，再给每个库位打库位标签。</p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

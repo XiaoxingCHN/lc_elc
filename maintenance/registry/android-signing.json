@@ -1,0 +1,12 @@
+{
+  "apk": "clients/android/releases/1.0.1/LC_ELC-Android-1.0.1.apk",
+  "apk_sha256": "fb655033ae8af697f01e2bd51e2ebb9d4ae52f0171bee87e9f5d3059a1f99b43",
+  "final_certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+  "matched_private_key_local_path": "local/private/signing/windows-debug.keystore",
+  "key_source_path": "F:/lc_elc_workspace/lc_elc/dependencies/android/user-cache/debug.keystore",
+  "matched_by": "apksigner verify --print-certs final APK; keytool -list public certificate for both candidates",
+  "wrong_wsl_key_certificate_sha256": "640b5268146135c40f787b24a5b2c706081ebdacca2d024e7aa26482473fa5ff",
+  "verification_date": "2026-10-19",
+  "private_key_in_git": false,
+  "private_key_in_offline_bundle": false
+}

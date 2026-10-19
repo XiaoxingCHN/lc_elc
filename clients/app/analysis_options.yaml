@@ -1,0 +1,27 @@
+# Static analysis configuration for the lab inventory client.
+#
+# Kept deliberately close to the Flutter defaults so that `flutter analyze`
+# behaves the same on every developer machine.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # build_runner output - regenerated, not hand-edited.
+    - "**/*.freezed.dart"
+    - "**/*.g.dart"
+    - build/**
+    - android/**
+    - windows/**
+    - linux/**
+
+  errors:
+    # `@JsonKey` placed on a freezed constructor parameter is reported as
+    # `invalid_annotation_target` by the analyzer. This is a known
+    # freezed + json_serializable combination and the analyzer reports it at
+    # ERROR severity, which would make `flutter analyze` fail the build.
+    # See: https://pub.dev/packages/freezed (json_serializable integration)
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    # Keep the default flutter_lints rule set; nothing added or removed here.

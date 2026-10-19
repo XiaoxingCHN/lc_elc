@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!--
+            记录规则说明：
+            * company_id 规则对所有组生效（跨公司隔离）
+            * 普通用户（group_lab_user）只能看到自己参与的业务记录
+            * 管理员（group_lab_manager）由 company 规则放行，可见本公司全部
+        -->
+
+        <!--
+            袋/库位/物料库存是**共享库存**（顶层权限口径）：
+            * read：本公司所有已授权 lab 用户都能看到全部袋与库位
+              （必须能看到别人入库的袋，才能自助领自己的材料）
+            * write/unlink：普通用户只能改「与自己有关」的记录，
+              真正的入库/领用/归还写入都由内部受控服务完成
+            * 跨公司一律隔离（company 全局规则）
+        -->
+        <record id="rule_lab_bag_company" model="ir.rule">
+            <field name="name">实验室袋：仅本公司</field>
+            <field name="model_id" ref="model_lab_bag"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_lab_bag_shared_read" model="ir.rule">
+            <field name="name">实验室袋：本公司共享只读</field>
+            <field name="model_id" ref="model_lab_bag"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_lab_bag_own" model="ir.rule">
+            <field name="name">实验室袋：普通用户只能改自己的领用与入库</field>
+            <field name="model_id" ref="model_lab_bag"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+            <field name="domain_force">[
+                '|', '|',
+                ('receipt_operation_id.actor_id', '=', user.id),
+                ('issue_line_ids.borrower_id', '=', user.id),
+                ('issue_line_ids.actor_id', '=', user.id)
+            ]</field>
+        </record>
+
+        <record id="rule_lab_operation_company" model="ir.rule">
+            <field name="name">实验室作业单：仅本公司</field>
+            <field name="model_id" ref="model_lab_operation"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_lab_operation_own" model="ir.rule">
+            <field name="name">实验室作业单：普通用户只看自己相关</field>
+            <field name="model_id" ref="model_lab_operation"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="domain_force">[
+                '|', '|',
+                ('actor_id', '=', user.id),
+                ('borrower_id', '=', user.id),
+                ('issue_line_ids.borrower_id', '=', user.id)
+            ]</field>
+        </record>
+
+        <!-- 作业单是共享库存的审计事实：本公司已授权用户可只读查看（写仍走受控服务） -->
+        <record id="rule_lab_operation_shared_read" model="ir.rule">
+            <field name="name">实验室作业单：本公司共享只读</field>
+            <field name="model_id" ref="model_lab_operation"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_lab_issue_line_company" model="ir.rule">
+            <field name="name">实验室领用明细：仅本公司</field>
+            <field name="model_id" ref="model_lab_issue_line"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_lab_issue_line_own" model="ir.rule">
+            <field name="name">实验室领用明细：普通用户只看自己</field>
+            <field name="model_id" ref="model_lab_issue_line"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="domain_force">[
+                '|',
+                ('borrower_id', '=', user.id),
+                ('actor_id', '=', user.id)
+            ]</field>
+        </record>
+
+        <!-- 管理员：本公司全部领用流水（代领/审计需要） -->
+        <record id="rule_lab_issue_line_manager" model="ir.rule">
+            <field name="name">实验室领用明细：管理员可见本公司全部</field>
+            <field name="model_id" ref="model_lab_issue_line"/>
+            <field name="groups" eval="[(4, ref('group_lab_manager'))]"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_lab_operation_manager" model="ir.rule">
+            <field name="name">实验室作业单：管理员可见本公司全部</field>
+            <field name="model_id" ref="model_lab_operation"/>
+            <field name="groups" eval="[(4, ref('group_lab_manager'))]"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_lab_return_line_company" model="ir.rule">
+            <field name="name">实验室归还流水：仅本公司</field>
+            <field name="model_id" ref="model_lab_return_line"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_lab_operation_line_company" model="ir.rule">
+            <field name="name">实验室作业明细：仅本公司</field>
+            <field name="model_id" ref="model_lab_operation_line"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_lab_request_log_own" model="ir.rule">
+            <field name="name">实验室请求记账：普通用户只看自己的请求</field>
+            <field name="model_id" ref="model_lab_request_log"/>
+            <field name="groups" eval="[(4, ref('group_lab_user'))]"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+        </record>
+
+        <record id="rule_lab_request_log_manager" model="ir.rule">
+            <field name="name">实验室请求记账：管理员可见本公司全部</field>
+            <field name="model_id" ref="model_lab_request_log"/>
+            <field name="groups" eval="[(4, ref('group_lab_manager'))]"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <menuitem id="menu_lab_root" name="作业与追溯" parent="lab_inventory.menu_lab_root"
+                  groups="lab_workflow.group_lab_user" sequence="15"/>
+
+        <menuitem id="menu_lab_operation" name="作业" parent="menu_lab_root"
+                  groups="lab_workflow.group_lab_user" sequence="10"/>
+
+        <menuitem id="menu_lab_scan" name="扫码操作台" parent="menu_lab_operation"
+                  action="action_lab_scan_console" sequence="10"
+                  groups="lab_workflow.group_lab_operator"/>
+
+        <menuitem id="menu_lab_issue_line" name="领用记录" parent="menu_lab_operation"
+                  action="action_lab_issue_line" sequence="20"
+                  groups="lab_workflow.group_lab_user"/>
+
+        <menuitem id="menu_lab_bag" name="库存袋与追溯码" parent="menu_lab_operation"
+                  action="action_lab_bag" sequence="30"
+                  groups="lab_workflow.group_lab_user"/>
+
+        <menuitem id="menu_lab_operation_list" name="库存作业流水" parent="menu_lab_operation"
+                  action="action_lab_operation" sequence="40"
+                  groups="lab_workflow.group_lab_user"/>
+
+        <menuitem id="menu_lab_config" name="配置" parent="menu_lab_root"
+                  groups="lab_workflow.group_lab_manager" sequence="90"/>
+
+        <menuitem id="menu_lab_location" name="库位与库码" parent="menu_lab_config"
+                  action="action_lab_location" sequence="10"
+                  groups="lab_workflow.group_lab_manager"/>
+
+        <menuitem id="menu_lab_labels" name="批量标签（A4）" parent="menu_lab_config"
+                  action="action_lab_label_open" sequence="20"
+                  groups="lab_workflow.group_lab_manager"/>
+
+        <menuitem id="menu_lab_request_log" name="请求记账（幂等）" parent="menu_lab_config"
+                  action="action_lab_request_log" sequence="30"
+                  groups="lab_workflow.group_lab_manager"/>
+
+    </data>
+</odoo>

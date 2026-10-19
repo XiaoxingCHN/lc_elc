@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_label_wizard_form" model="ir.ui.view">
+            <field name="name">lab.label.wizard.form</field>
+            <field name="model">lab.label.wizard</field>
+            <field name="arch" type="xml">
+                <form string="批量标签（A4）">
+                    <group>
+                        <group string="对象与纸张">
+                            <field name="kind"/>
+                            <field name="ids_text"/>
+                            <field name="copies"/>
+                            <field name="width_mm"/>
+                            <field name="height_mm"/>
+                            <field name="margin_mm"/>
+                            <field name="gap_mm"/>
+                        </group>
+                        <group string="打印文字（QR 只有一个，固定为追溯码/库码）">
+                            <field name="sn"/>
+                            <field name="location"/>
+                            <field name="mpn"/>
+                            <field name="catalog_code"/>
+                            <field name="parameters"/>
+                            <field name="quantity"/>
+                            <field name="item_name"/>
+                            <field name="trace_code"/>
+                            <field name="supplier"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="plan_text" nolabel="1" readonly="1"/>
+                    </group>
+                    <group string="生成结果">
+                        <field name="label_count" readonly="1"/>
+                        <field name="page_count" readonly="1"/>
+                        <field name="pdf_filename" readonly="1"/>
+                        <field name="pdf" filename="pdf_filename" readonly="1"/>
+                    </group>
+                    <footer>
+                        <button name="action_plan" type="object" string="试算排版"
+                                class="btn-secondary"/>
+                        <button name="action_generate" type="object" string="生成 PDF"
+                                class="btn-primary"/>
+                        <button string="关闭" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_lab_label_open" model="ir.actions.act_window">
+            <field name="name">批量标签（A4）</field>
+            <field name="res_model">lab.label.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="context">{'default_kind': 'location'}</field>
+        </record>
+
+    </data>
+</odoo>

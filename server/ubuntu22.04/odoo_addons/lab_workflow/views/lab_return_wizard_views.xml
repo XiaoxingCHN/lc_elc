@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_return_wizard_form" model="ir.ui.view">
+            <field name="name">lab.return.wizard.form</field>
+            <field name="model">lab.return.wizard</field>
+            <field name="arch" type="xml">
+                <form string="登记归还">
+                    <group>
+                        <group string="原领用记录">
+                            <field name="issue_line_id"/>
+                            <field name="trace_code"/>
+                            <field name="lot_id"/>
+                            <field name="location_id"/>
+                        </group>
+                        <group string="领用信息">
+                            <field name="borrower_id"/>
+                            <field name="project"/>
+                            <field name="outstanding_quantity"/>
+                        </group>
+                    </group>
+                    <group string="本次归还">
+                        <field name="quantity"/>
+                        <field name="note"/>
+                    </group>
+                    <field name="request_key" groups="base.group_no_one"/>
+                    <footer>
+                        <button name="action_return" type="object" string="确认归还"
+                                class="btn-primary"/>
+                        <button string="取消" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

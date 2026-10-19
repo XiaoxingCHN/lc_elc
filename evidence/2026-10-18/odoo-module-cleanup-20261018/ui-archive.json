@@ -1,0 +1,10 @@
+{
+  "files": [
+    "lab_workflow/__manifest__.py",
+    "lab_workflow/models/__init__.py",
+    "lab_workflow/models/lab_user_access.py",
+    "lab_workflow/views/lab_user_access_views.xml",
+    "lab_workflow/static/src/user_access/lab_user_group_ids.js"
+  ],
+  "sha256": "1d615294f30b4ff0efa913aa666fe96f6d12fde92d7f5116d94497c98f006c2b"
+}

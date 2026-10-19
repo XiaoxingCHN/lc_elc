@@ -1,0 +1,103 @@
+{
+  "name": "lab-inventory",
+  "uuid": "1329a87d576b4b8cbb8592b1c1012b8b",
+  "displayName": "实验室库存联动（Odoo 19）",
+  "description": "在嘉立创 EDA 专业版中查询实验室统一器件库、实时库存与袋追溯；按系统账号入库/领用/按原领用单归还，并提供只读 BOM 数量对比。",
+  "version": "3.0.3",
+  "publisher": "lab",
+  "engines": {
+    "eda": "^3.2.0"
+  },
+  "license": "Apache-2.0",
+  "categories": "Other",
+  "keywords": [
+    "Inventory",
+    "BOM",
+    "Odoo",
+    "Stock"
+  ],
+  "images": {
+    "logo": "./images/logo.png"
+  },
+  "activationEvents": {},
+  "entry": "./dist/index",
+  "dependentExtensions": {},
+  "headerMenus": {
+    "sch": [
+      {
+        "id": "labInventoryMenu",
+        "title": "库存联动",
+        "menuItems": [
+          {
+            "id": "showInventoryPanel",
+            "title": "器件库与库存",
+            "registerFn": "showInventoryPanel"
+          },
+          {
+            "id": "bomCompare",
+            "title": "BOM 数量对比（只读）",
+            "registerFn": "bomCompare"
+          },
+          {
+            "id": "openReceipt",
+            "title": "入库登记",
+            "registerFn": "openReceipt"
+          },
+          {
+            "id": "openIssue",
+            "title": "领用出库",
+            "registerFn": "openIssue"
+          },
+          {
+            "id": "openReturn",
+            "title": "按原领用单归还",
+            "registerFn": "openReturn"
+          },
+          {
+            "id": "openTrace",
+            "title": "袋/库位追溯",
+            "registerFn": "openTrace"
+          },
+          {
+            "id": "openSettings",
+            "title": "连接与账户",
+            "registerFn": "openSettings"
+          },
+          {
+            "id": "showDebugLog",
+            "title": "诊断日志",
+            "registerFn": "showDebugLog"
+          }
+        ]
+      }
+    ],
+    "pcb": [
+      {
+        "id": "labInventoryMenuPcb",
+        "title": "库存联动",
+        "menuItems": [
+          {
+            "id": "showInventoryPanelPcb",
+            "title": "器件库与库存",
+            "registerFn": "showInventoryPanel"
+          },
+          {
+            "id": "openTracePcb",
+            "title": "袋/库位追溯",
+            "registerFn": "openTrace"
+          },
+          {
+            "id": "openSettingsPcb",
+            "title": "连接与账户",
+            "registerFn": "openSettings"
+          },
+          {
+            "id": "showDebugLogPcb",
+            "title": "诊断日志",
+            "registerFn": "showDebugLog"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Odoo 19 注意事项（实测）：
+  1. stock.move 已无 name 字段，单据说明改用 reference / origin。
+  2. search 视图里 <group expand="0" string="分组"> 已不合法：
+     expand 属性被移除，且 <group> 内不再放 <filter>。
+     分组过滤器直接放在 <search> 顶层（用 context="{'group_by': ...}"）。
+-->
+<odoo>
+    <record id="view_lab_move_list" model="ir.ui.view">
+        <field name="name">lab.stock.move.list</field>
+        <field name="model">stock.move</field>
+        <field name="arch" type="xml">
+            <list string="库存流水">
+                <field name="create_date"/>
+                <field name="date"/>
+                <field name="reference"/>
+                <field name="origin"/>
+                <field name="product_id"/>
+                <field name="product_uom_qty"/>
+                <field name="product_uom"/>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <field name="state"/>
+                <field name="lab_source_type"/>
+                <field name="lab_remark"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lab_move_form" model="ir.ui.view">
+        <field name="name">lab.stock.move.form</field>
+        <field name="model">stock.move</field>
+        <field name="arch" type="xml">
+            <form string="库存流水">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="picking_id"/>
+                            <field name="reference"/>
+                            <field name="origin"/>
+                            <field name="product_id"/>
+                        </group>
+                        <group>
+                            <field name="product_uom_qty"/>
+                            <field name="product_uom"/>
+                            <field name="location_id"/>
+                            <field name="location_dest_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="state"/>
+                            <field name="date"/>
+                        </group>
+                        <group>
+                            <field name="lab_source_type"/>
+                            <field name="lab_remark"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="create_uid"/>
+                            <field name="create_date"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_lab_move_search" model="ir.ui.view">
+        <field name="name">lab.stock.move.search</field>
+        <field name="model">stock.move</field>
+        <field name="arch" type="xml">
+            <search string="库存流水">
+                <field name="product_id"/>
+                <field name="reference"/>
+                <field name="origin"/>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <field name="lab_remark"/>
+                <filter name="f_scan" string="扫码来源" domain="[('lab_source_type','=','SCAN')]"/>
+                <filter name="f_bom" string="BOM 来源" domain="[('lab_source_type','=','BOM')]"/>
+                <filter name="f_manual" string="手动来源" domain="[('lab_source_type','=','MANUAL')]"/>
+                <filter name="f_migration" string="迁移来源" domain="[('lab_source_type','=','MIGRATION')]"/>
+                <filter name="f_done" string="已完成" domain="[('state','=','done')]"/>
+                <filter name="g_source" string="来源类型" context="{'group_by': 'lab_source_type'}"/>
+                <filter name="g_product" string="元器件" context="{'group_by': 'product_id'}"/>
+                <filter name="g_dest" string="目标库位" context="{'group_by': 'location_dest_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lab_move" model="ir.actions.act_window">
+        <field name="name">库存流水</field>
+        <field name="res_model">stock.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_lab_move_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_lab_move_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_lab_move_form')})]"/>
+        <field name="context">{'create': False}</field>
+    </record>
+</odoo>

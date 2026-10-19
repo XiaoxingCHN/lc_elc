@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+      统一器件库主入口：与 lab_workflow 的业务按钮一起构成日常使用的第一屏。
+      OWL 客户端动作负责「单列表 + 分类树 + 组合筛选 + 图片卡片 + 详情」的商城式交互。
+    -->
+    <record id="action_lab_unified_catalog_client" model="ir.actions.client">
+        <field name="name">统一器件库</field>
+        <field name="tag">lab_catalog.unified</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="lab_inventory.menu_lab_root" name="实验室库存"
+              action="action_lab_unified_catalog_client" sequence="60" groups="lab_catalog.group_lab_catalog_user"/>
+
+    <menuitem id="menu_lab_catalog_root"
+              name="资料库管理"
+              parent="lab_inventory.menu_lab_root"
+              sequence="80"/>
+
+    <menuitem id="menu_lab_unified_catalog"
+              name="仓库"
+              parent="lab_inventory.menu_lab_root"
+              action="action_lab_unified_catalog_client"
+              sequence="1"/>
+
+    <menuitem id="menu_lab_catalog_index"
+              name="资料库索引"
+              parent="menu_lab_catalog_root"
+              action="view_lab_catalog_item_action"
+              sequence="20"
+              groups="lab_catalog.group_lab_catalog_manager"/>
+
+    <menuitem id="menu_lab_catalog_category"
+              name="商城分类"
+              parent="menu_lab_catalog_root"
+              action="view_lab_catalog_category_action"
+              sequence="30"
+              groups="lab_catalog.group_lab_catalog_manager"/>
+
+    <menuitem id="menu_lab_catalog_binding"
+              name="C 编号绑定"
+              parent="menu_lab_catalog_root"
+              action="view_lab_catalog_binding_action"
+              sequence="40"/>
+
+    <menuitem id="menu_lab_catalog_import_run"
+              name="导入批次"
+              parent="menu_lab_catalog_root"
+              action="view_lab_catalog_import_run_action"
+              sequence="50"
+              groups="lab_catalog.group_lab_catalog_manager"/>
+
+</odoo>

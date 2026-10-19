@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "summary": [
+    "Ran 26 tests in 0.462s",
+    "OK (skipped=1)"
+  ],
+  "log": "local/logs/server-offline-logic.log",
+  "production_access": false
+}

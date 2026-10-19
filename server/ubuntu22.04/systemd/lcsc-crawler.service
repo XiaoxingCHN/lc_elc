@@ -1,0 +1,35 @@
+[Unit]
+Description=LCSC Chinese electronics catalog collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lcsc
+Group=lcsc
+WorkingDirectory=/opt/lcsc-crawler/app
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+StateDirectory=lcsc-crawler
+ExecStartPre=/usr/bin/rm -f /var/lib/lcsc-crawler/STOP
+ExecStart=/opt/lcsc-crawler/.venv/bin/python /opt/lcsc-crawler/app/lcsc_catalog_archive.py chinese --output /var/lib/lcsc-crawler --workers 16 --delay 0.1 --status-interval 0.2 --no-export
+Restart=no
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=90
+Nice=10
+CPUWeight=20
+CPUQuota=50%
+MemoryHigh=768M
+MemoryMax=1G
+IOWeight=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lcsc-crawler
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

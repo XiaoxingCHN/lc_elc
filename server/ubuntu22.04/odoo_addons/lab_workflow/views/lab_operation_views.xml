@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_operation_tree" model="ir.ui.view">
+            <field name="name">lab.operation.tree</field>
+            <field name="model">lab.operation</field>
+            <field name="arch" type="xml">
+                <list string="库存作业" create="false" edit="false">
+                    <field name="name"/>
+                    <field name="operation_type"/>
+                    <field name="create_date"/>
+                    <field name="actor_id"/>
+                    <field name="borrower_id"/>
+                    <field name="project"/>
+                    <field name="total_quantity" sum="合计"/>
+                    <field name="move_count"/>
+                    <field name="state"/>
+                    <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lab_operation_form" model="ir.ui.view">
+            <field name="name">lab.operation.form</field>
+            <field name="model">lab.operation</field>
+            <field name="arch" type="xml">
+                <form string="库存作业" create="false" edit="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="operation_type"/>
+                                <field name="state"/>
+                                <field name="create_date"/>
+                                <field name="actor_id"/>
+                                <field name="borrower_id"/>
+                            </group>
+                            <group>
+                                <field name="project"/>
+                                <field name="partner_id"/>
+                                <field name="request_key"/>
+                                <field name="origin_operation_id"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                        </group>
+                        <field name="note"/>
+                        <notebook>
+                            <page string="作业明细" name="lines">
+                                <field name="line_ids" readonly="1">
+                                    <list>
+                                        <field name="product_tmpl_id"/>
+                                        <field name="bag_id"/>
+                                        <field name="lot_id"/>
+                                        <field name="quantity"/>
+                                        <field name="src_location_id"/>
+                                        <field name="dest_location_id"/>
+                                        <field name="move_id"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="库存移动（原生）" name="moves">
+                                <field name="move_ids" readonly="1">
+                                    <list>
+                                        <field name="reference"/>
+                                        <field name="product_id"/>
+                                        <field name="location_id"/>
+                                        <field name="location_dest_id"/>
+                                        <field name="quantity"/>
+                                        <field name="state"/>
+                                        <field name="date"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="归还流水" name="returns"
+                                  groups="lab_workflow.group_lab_manager">
+                                <field name="return_log_ids" readonly="1">
+                                    <list>
+                                        <field name="issue_line_id"/>
+                                        <field name="quantity"/>
+                                        <field name="actor_id"/>
+                                        <field name="date"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_lab_operation_search" model="ir.ui.view">
+            <field name="name">lab.operation.search</field>
+            <field name="model">lab.operation</field>
+            <field name="arch" type="xml">
+                <search string="搜索作业">
+                    <field name="name"/>
+                    <field name="actor_id"/>
+                    <field name="borrower_id"/>
+                    <field name="project"/>
+                    <field name="request_key"/>
+                    <separator/>
+                    <filter name="type_receipt" string="入库"
+                            domain="[('operation_type', '=', 'receipt')]"/>
+                    <filter name="type_issue" string="领用"
+                            domain="[('operation_type', '=', 'issue')]"/>
+                    <filter name="type_return" string="归还"
+                            domain="[('operation_type', '=', 'return')]"/>
+                    <filter name="type_adopt" string="历史适配"
+                            domain="[('operation_type', '=', 'adopt')]"/>
+                    <filter name="group_type" string="类型"
+                            context="{'group_by': 'operation_type'}"/>
+                    <filter name="group_actor" string="操作人"
+                            context="{'group_by': 'actor_id'}"/>
+                    <filter name="group_borrower" string="领用人"
+                            context="{'group_by': 'borrower_id'}"/>
+                    <filter name="group_project" string="项目"
+                            context="{'group_by': 'project'}"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_lab_operation" model="ir.actions.act_window">
+            <field name="name">库存作业流水</field>
+            <field name="res_model">lab.operation</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_lab_operation_search"/>
+        </record>
+
+    </data>
+</odoo>

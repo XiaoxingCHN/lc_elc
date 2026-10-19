@@ -1,0 +1,11 @@
+{
+  "库存联动": "Lab Inventory",
+  "器件库与库存": "Catalog & Stock",
+  "BOM 数量对比（只读）": "BOM Quantity Compare (read-only)",
+  "入库登记": "Receive Stock",
+  "领用出库": "Issue Stock",
+  "按原领用单归还": "Return Against Issue",
+  "袋/库位追溯": "Bag / Location Trace",
+  "连接与账户": "Connection & Account",
+  "诊断日志": "Diagnostics"
+}

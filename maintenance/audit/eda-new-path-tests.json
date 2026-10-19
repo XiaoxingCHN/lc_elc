@@ -1,0 +1,30 @@
+[
+  {
+    "name": "eda-unit",
+    "exit_code": 0,
+    "log": "local\\logs\\eda-unit.log",
+    "tests": 105,
+    "pass": 105,
+    "fail": 0,
+    "skipped": 0
+  },
+  {
+    "name": "eda-build",
+    "exit_code": 0,
+    "log": "local\\logs\\eda-build.log"
+  },
+  {
+    "name": "eda-package",
+    "exit_code": 0,
+    "log": "local\\logs\\eda-package.log",
+    "tests": 13,
+    "pass": 13,
+    "fail": 0,
+    "skipped": 0
+  },
+  {
+    "name": "eda-verify",
+    "exit_code": 0,
+    "log": "local\\logs\\eda-verify.log"
+  }
+]

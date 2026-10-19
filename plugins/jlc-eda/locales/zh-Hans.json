@@ -1,0 +1,11 @@
+{
+  "labInventoryMenu": "库存联动",
+  "showInventoryPanel": "器件库与库存",
+  "bomCompare": "BOM 数量对比（只读）",
+  "openReceipt": "入库登记",
+  "openIssue": "领用出库",
+  "openReturn": "按原领用单归还",
+  "openTrace": "袋/库位追溯",
+  "openSettings": "连接与账户",
+  "showDebugLog": "诊断日志"
+}

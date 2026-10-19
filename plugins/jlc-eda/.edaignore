@@ -1,0 +1,11 @@
+# Source, tests, tooling and analysis copies are never packaged.
+src/
+scripts/
+_reference/
+build/
+node_modules/
+package.json
+package-lock.json
+test-results/
+*.log
+ACCEPTANCE.md

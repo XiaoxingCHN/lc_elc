@@ -1,0 +1,160 @@
+{
+  "tests": [
+    {
+      "name": "only Settings, Website and Laboratory remain in app launcher",
+      "pass": true,
+      "evidence": [
+        {
+          "id": 329,
+          "name": "实验室库存"
+        },
+        {
+          "id": 232,
+          "name": "网站"
+        },
+        {
+          "id": 1,
+          "name": "设置"
+        }
+      ]
+    },
+    {
+      "name": "general settings opens without missing POS widget",
+      "pass": true,
+      "evidence": {
+        "settingsTabs": [
+          "一般设置",
+          "网站"
+        ],
+        "formVisible": 1
+      }
+    },
+    {
+      "name": "user administration remains accessible",
+      "pass": true,
+      "evidence": {
+        "userRows": 3
+      }
+    },
+    {
+      "name": "normal user detail exposes editable lab role selector without debug mode",
+      "pass": true,
+      "evidence": {
+        "debug": false,
+        "options": [
+          "无访问权限",
+          "只读",
+          "操作员",
+          "管理员"
+        ],
+        "visibleGroups": "网站\n网站\n实验室\n实验室库存?",
+        "editedRealUser": false
+      }
+    },
+    {
+      "name": "lab roles remain available for assigning new users",
+      "pass": true,
+      "evidence": [
+        {
+          "id": 81,
+          "name": "只读"
+        },
+        {
+          "id": 82,
+          "name": "操作员"
+        },
+        {
+          "id": 83,
+          "name": "管理员"
+        }
+      ]
+    },
+    {
+      "name": "warehouse and stock workflows remain visible",
+      "pass": true,
+      "evidence": {
+        "cards": 50
+      }
+    },
+    {
+      "name": "website and portal remain reachable",
+      "pass": true,
+      "evidence": [
+        {
+          "path": "/",
+          "status": 200
+        },
+        {
+          "path": "/my",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "barcode PNG and real stock location report still render",
+      "pass": true,
+      "evidence": {
+        "pngStatus": 200,
+        "pdfStatus": 200,
+        "pdfBytes": 10453
+      }
+    },
+    {
+      "name": "no uncaught Owl errors during tested navigation",
+      "pass": true,
+      "evidence": true
+    }
+  ],
+  "errors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  ],
+  "exitCode": 0
+}

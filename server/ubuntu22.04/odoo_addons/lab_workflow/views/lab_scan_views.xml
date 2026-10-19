@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <template id="lab_scan_console" name="实验室扫码操作台">
+            <t t-call="web.html_container">
+                <t t-call="web.layout">
+                    <t t-set="title">实验室扫码操作台</t>
+                    <div class="container mt-3">
+                        <h2>实验室库存 · 扫码操作台</h2>
+                        <p class="text-muted">
+                            当前账号：<t t-esc="username"/>
+                            （操作人固定记录为登录账号本身）
+                            <t t-if="permissions.get('can_issue_for_others')">
+                                · 具备代他人领料权限
+                            </t>
+                        </p>
+
+                        <div t-if="message" class="alert alert-success">
+                            <t t-esc="message"/>
+                        </div>
+                        <div t-if="error_message" class="alert alert-danger">
+                            <t t-esc="error_message"/>
+                        </div>
+
+                        <!-- 扫码解析 -->
+                        <div class="card mb-3">
+                            <div class="card-header">1. 扫码识别</div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <input type="text" id="lab_scan_input" class="form-control"
+                                               placeholder="把扫码枪光标放这里，扫袋追溯码 / 库位库码 / SN / 立创袋二维码"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-primary"
+                                                onclick="labResolve()">识别</button>
+                                    </div>
+                                </div>
+                                <pre id="lab_scan_result" class="mt-2 mb-0"
+                                     style="max-height:240px;overflow:auto"></pre>
+                            </div>
+                        </div>
+
+                        <!-- 入库 -->
+                        <div class="card mb-3"
+                             t-if="permissions.get('can_receipt')">
+                            <div class="card-header">2. 入库（创建真实袋库存）</div>
+                            <div class="card-body">
+                                <form method="post" action="/lab/scan/submit" class="row g-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <input type="hidden" name="action" value="receipt"/>
+                                    <input type="hidden" name="request_key" t-att-value="request_key"/>
+                                    <div class="col-md-4">
+                                        <label class="form-label">物料 item_key</label>
+                                        <input type="text" name="item_key" class="form-control"
+                                               placeholder="lcsc:C123 或 lab:42" required="required"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">物料 SN（同 C 多档案时必填）</label>
+                                        <input type="text" name="sn" class="form-control"
+                                               placeholder="LAB-000001"/>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">档案 ID（可选）</label>
+                                        <input type="number" name="product_template_id"
+                                               class="form-control"
+                                               placeholder="扫码识别后自动带出"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">入库库位</label>
+                                        <select name="location_id" class="form-select" required="required">
+                                            <option value="">请选择库位</option>
+                                            <t t-foreach="locations" t-as="loc">
+                                                <option t-att-value="loc['id']">
+                                                    <t t-esc="loc['path']"/>
+                                                    <t t-if="loc['code']"> · <t t-esc="loc['code']"/></t>
+                                                </option>
+                                            </t>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">数量</label>
+                                        <input type="number" step="any" min="0" name="quantity"
+                                               class="form-control" required="required"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">立创袋二维码（可选）</label>
+                                        <input type="text" name="supplier_qr" class="form-control"
+                                               placeholder="{on:SO...,pc:C123,...}"/>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">确认入库</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- 领用 -->
+                        <div class="card mb-3" t-if="permissions.get('can_issue')">
+                            <div class="card-header">3. 领料（领用人必须是系统账号）</div>
+                            <div class="card-body">
+                                <form method="post" action="/lab/scan/submit" class="row g-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <input type="hidden" name="action" value="issue"/>
+                                    <input type="hidden" name="request_key" t-att-value="request_key"/>
+                                    <div class="col-md-2">
+                                        <label class="form-label">袋 ID</label>
+                                        <input type="number" name="bag_id" class="form-control"
+                                               required="required"/>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">领用人（系统账号）</label>
+                                        <select name="borrower_id" class="form-select" required="required">
+                                            <option value="">请选择</option>
+                                            <t t-foreach="borrowers" t-as="person">
+                                                <option t-att-value="person['id']">
+                                                    <t t-esc="person['name']"/>
+                                                    <t t-if="person['is_self']">（本人）</t>
+                                                </option>
+                                            </t>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">项目</label>
+                                        <input type="text" name="project" class="form-control"
+                                               required="required"/>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">数量</label>
+                                        <input type="number" step="any" min="0" name="quantity"
+                                               class="form-control" required="required"/>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">确认领料</button>
+                                        <span class="text-muted ms-2">
+                                            普通账号只能领本人；代他人领料需要管理员权限。
+                                        </span>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- 归还 -->
+                        <div class="card mb-3" t-if="permissions.get('can_return')">
+                            <div class="card-header">4. 归还（必须选择原领用记录）</div>
+                            <div class="card-body">
+                                <p t-if="not open_issues" class="text-muted mb-0">
+                                    当前没有未归还的领用记录。
+                                </p>
+                                <table t-if="open_issues" class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>记录号</th>
+                                            <th>袋追溯码</th>
+                                            <th>领用人</th>
+                                            <th>项目</th>
+                                            <th>未归还</th>
+                                            <th>归还数量</th>
+                                            <th/>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="open_issues" t-as="line">
+                                            <td><t t-esc="line['issue_line_id']"/></td>
+                                            <td><t t-esc="line['trace_code']"/></td>
+                                            <td><t t-esc="line['borrower_name']"/></td>
+                                            <td><t t-esc="line['project']"/></td>
+                                            <td><t t-esc="line['outstanding_quantity']"/></td>
+                                            <td colspan="2">
+                                                <form method="post" action="/lab/scan/submit"
+                                                      class="d-flex gap-2">
+                                                    <input type="hidden" name="csrf_token"
+                                                           t-att-value="request.csrf_token()"/>
+                                                    <input type="hidden" name="action" value="return"/>
+                                                    <input type="hidden" name="request_key"
+                                                           t-att-value="request_key"/>
+                                                    <input type="hidden" name="issue_line_id"
+                                                           t-att-value="line['issue_line_id']"/>
+                                                    <input type="number" step="any" min="0"
+                                                           name="quantity" class="form-control form-control-sm"
+                                                           t-att-value="line['outstanding_quantity']"/>
+                                                    <button type="submit"
+                                                            class="btn btn-sm btn-primary">归还</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <a class="btn btn-link" href="/odoo/action-lab_workflow.action_lab_issue_line">
+                                查看全部领用记录
+                            </a>
+                            <a class="btn btn-link" href="/odoo/action-lab_workflow.action_lab_bag">
+                                查看全部库存袋
+                            </a>
+                            <a class="btn btn-link" href="/odoo/action-lab_workflow.action_lab_operation">
+                                查看库存作业流水
+                            </a>
+                        </div>
+                    </div>
+
+                    <script type="text/javascript">
+                        function labResolve() {
+                            var input = document.getElementById('lab_scan_input');
+                            var out = document.getElementById('lab_scan_result');
+                            var raw = input.value.trim();
+                            if (!raw) { out.textContent = '请输入或扫描内容'; return; }
+                            out.textContent = '识别中…';
+                            fetch('/lab/scan/resolve', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                                body: 'raw=' + encodeURIComponent(raw) + '&amp;csrf_token=' +
+                                      encodeURIComponent(document.querySelector('input[name=csrf_token]').value)
+                            }).then(function (resp) { return resp.json(); })
+                              .then(function (json) {
+                                  out.textContent = JSON.stringify(json, null, 2);
+                              })
+                              .catch(function (err) { out.textContent = '识别失败：' + err; });
+                        }
+                        document.addEventListener('DOMContentLoaded', function () {
+                            var input = document.getElementById('lab_scan_input');
+                            if (input) {
+                                input.focus();
+                                input.addEventListener('keydown', function (event) {
+                                    if (event.key === 'Enter') { event.preventDefault(); labResolve(); }
+                                });
+                            }
+                        });
+                    </script>
+                </t>
+            </t>
+        </template>
+
+        <record id="action_lab_scan_console" model="ir.actions.act_url">
+            <field name="name">扫码操作台</field>
+            <field name="url">/lab/scan</field>
+            <field name="target">self</field>
+        </record>
+
+    </data>
+</odoo>

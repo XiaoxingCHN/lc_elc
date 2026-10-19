@@ -1,0 +1,27 @@
+{
+  "changes": [
+    {
+      "path": "clients/app/lib/providers/products_provider.dart",
+      "before_sha256": "3ac53dafe091bc55d426f1f822939cf8f4a10212d0f3492ab1cfaa445e6cb212",
+      "after_sha256": "53d929313294d6aca09cfed46beca43f20e8129f7f2ec4b1c2a13e030ff78f8c",
+      "reason": "Whitespace-only canonical archive formatting: two blank-line trailing spaces and one extra EOF blank line; no business logic change.",
+      "original_preserved_at": "local/archive/source-import-before-format/clients/app/lib/providers/products_provider.dart"
+    },
+    {
+      "path": "server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml",
+      "before_sha256": "032e7ea9a8342d8dde97b2559c0022a0f4459c56960176deda3a479dab11533c",
+      "after_sha256": "b550faef28306e79162461c7ce0b5142b51ddd81bcd394a1c9bd57020cfab505",
+      "reason": "Whitespace-only canonical archive formatting: two blank-line trailing spaces and one extra EOF blank line; no business logic change.",
+      "original_preserved_at": "local/archive/source-import-before-format/server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml"
+    },
+    {
+      "path": "dependencies/ensure_plugin_junctions.ps1",
+      "before_sha256": "19adfebf7fd134867c856629a0037e20e78ed702fd3474e7f569d4f1ba8c6b93",
+      "after_sha256": "68086d6da6acfc97aecba8b40d33362e2c0dbdd77cfc6785662713e04ea64ade",
+      "reason": "Default project path shared_source -> app for new repository layout; callers can explicitly pass -Project/-PubCache."
+    }
+  ],
+  "rules": "Original workspace untouched. Current artifact source import was verified before formatting; imported artifact bytes remain immutable.",
+  "unified_diff": "--- import/clients/app/lib/providers/products_provider.dart\n+++ maintained/clients/app/lib/providers/products_provider.dart\n@@ -6,7 +6,7 @@\n /// Products list provider - fetches all products from Odoo\n final productsProvider = FutureProvider<List<Product>>((ref) async {\n   final auth = ref.watch(authProvider);\n-  \n+\n   if (!auth.isAuthenticated) {\n     throw Exception('Not authenticated');\n   }\n@@ -58,7 +58,7 @@\n /// Single product detail provider\n final productDetailProvider = FutureProvider.family<Product, int>((ref, productId) async {\n   final auth = ref.watch(authProvider);\n-  \n+\n   if (!auth.isAuthenticated) {\n     throw Exception('Not authenticated');\n   }\n--- import/server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml\n+++ maintained/server/ubuntu22.04/odoo_addons/lab_catalog/static/src/unified/unified_catalog.xml\n@@ -390,4 +390,3 @@\n   </t>\n \n </templates>\n-\n",
+  "patch_local_path": "local/archive/source-import-before-format/TRANSFORM.patch"
+}

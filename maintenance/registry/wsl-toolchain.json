@@ -1,0 +1,23 @@
+{
+  "path": "/mnt/f/lc_elc/dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz",
+  "bytes": 4436412077,
+  "sha256": "7d9c152d1a58dd04e319b173459f40bce13cb38d47dc06a34657b8e5aea475b1",
+  "source_root": "WSL Ubuntu-22.04:/var/tmp",
+  "members_roots": [
+    "lc-wb-android-20261014-232017/jdk17",
+    "lc-wb-android-20261014-232017/sdk",
+    "lc-wb-android-20261014-232017/flutter",
+    "lc-wb-android-20261014-232017/pubcache",
+    "lc-wb-android-20261014-232017/gradle/wrapper",
+    "lc-wb-android-20261014-232017/gradle/caches/modules-2",
+    "lc-elc-ui-linux-20261014-171408/sysroot",
+    "lc-elc-ui-linux-20261014-171408/prebuilt",
+    "lc-elc-wb-linux-20261014-135303/bin"
+  ],
+  "excluded": [
+    "signing keys",
+    "gradle.properties",
+    "locks/logs/tmp"
+  ],
+  "restore": "mkdir -p <private-wsl-tools>; tar -xzf <archive> -C <private-wsl-tools>; pass extracted Flutter/JDK/SDK/pubcache paths to tools/build_client.py; use Linux adapters from the extracted bin/sysroot/prebuilt only after reviewing their historical absolute paths."
+}

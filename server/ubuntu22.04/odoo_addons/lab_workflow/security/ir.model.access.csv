@@ -1,0 +1,23 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lab_bag_user,lab.bag read,model_lab_bag,group_lab_user,1,0,0,0
+access_lab_bag_operator,lab.bag operator,model_lab_bag,group_lab_operator,1,1,1,0
+access_lab_bag_manager,lab.bag manager,model_lab_bag,group_lab_manager,1,1,1,0
+access_lab_operation_user,lab.operation read,model_lab_operation,group_lab_user,1,0,0,0
+access_lab_operation_operator,lab.operation operator,model_lab_operation,group_lab_operator,1,1,1,0
+access_lab_operation_manager,lab.operation manager,model_lab_operation,group_lab_manager,1,1,1,0
+access_lab_operation_line_user,lab.operation.line read,model_lab_operation_line,group_lab_user,1,0,0,0
+access_lab_operation_line_operator,lab.operation.line operator,model_lab_operation_line,group_lab_operator,1,1,1,0
+access_lab_operation_line_manager,lab.operation.line manager,model_lab_operation_line,group_lab_manager,1,1,1,0
+access_lab_issue_line_user,lab.issue.line read,model_lab_issue_line,group_lab_user,1,0,0,0
+access_lab_issue_line_operator,lab.issue.line operator,model_lab_issue_line,group_lab_operator,1,1,1,0
+access_lab_issue_line_manager,lab.issue.line manager,model_lab_issue_line,group_lab_manager,1,1,1,0
+access_lab_return_line_user,lab.return.line read,model_lab_return_line,group_lab_user,1,0,0,0
+access_lab_return_line_operator,lab.return.line operator,model_lab_return_line,group_lab_operator,1,1,1,0
+access_lab_return_line_manager,lab.return.line manager,model_lab_return_line,group_lab_manager,1,1,1,0
+access_lab_request_log_user,lab.request.log read,model_lab_request_log,group_lab_user,1,0,0,0
+access_lab_request_log_operator,lab.request.log operator,model_lab_request_log,group_lab_operator,1,0,1,0
+access_lab_label_wizard_user,lab.label.wizard user,model_lab_label_wizard,group_lab_user,1,1,1,0
+access_lab_label_wizard_operator,lab.label.wizard operator,model_lab_label_wizard,group_lab_operator,1,1,1,0
+access_lab_return_wizard_user,lab.return.wizard user,model_lab_return_wizard,group_lab_user,1,1,1,0
+access_lab_return_wizard_operator,lab.return.wizard operator,model_lab_return_wizard,group_lab_operator,1,1,1,0
+access_lab_request_log_manager,lab.request.log manager,model_lab_request_log,group_lab_manager,1,1,1,0

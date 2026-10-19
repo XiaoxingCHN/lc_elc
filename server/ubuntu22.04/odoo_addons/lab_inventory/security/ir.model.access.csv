@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lab_mapping_admin,lab.inbound.category.mapping.admin,model_lab_inbound_category_mapping,lab_inventory.group_lab_admin,1,1,1,1
+access_lab_mapping_user,lab.inbound.category.mapping.user,model_lab_inbound_category_mapping,lab_inventory.group_lab_user,1,0,0,0

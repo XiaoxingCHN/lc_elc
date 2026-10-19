@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+          实验室库存的**持久化**默认产品分类。
+
+          为什么需要它：全新生产安装（without_demo=all）里没有 demo 数据，
+          `product.product_category_all` 之类的 XMLID 可能根本不存在。
+          早期版本直接 env.ref() 那个 XMLID，导致"第一个新 C 编号建档"必报
+          External ID not found -> INTERNAL_ERROR（root 在独立生产 HTTP 验收中实测）。
+
+          这里用 noupdate 建一个**不依赖任何其它模块 XMLID**的根分类，
+          作为 create_material 的最后回退；正常情况仍优先使用 Odoo 自己的
+          default_get 默认分类。
+        -->
+        <record id="categ_lab_catalog" model="product.category">
+            <field name="name">实验室库存</field>
+        </record>
+
+    </data>
+</odoo>

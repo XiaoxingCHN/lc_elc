@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "baseline_date": "2026-10-19",
+  "rules": "All paths are repository-relative unless explicitly remote-only or external. Sources are pinned original metadata; unavailable upstream exact bytes require a trusted retained backup.",
+  "payloads": [
+    {
+      "id": "flutter-windows",
+      "path": "dependencies/sdk/flutter_windows_3.47.7-stable.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id flutter-windows --download"
+        ],
+        "url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.7-stable.zip",
+        "metadata": "dependencies/sdk/flutter-windows-release.json"
+      },
+      "sha256": "c2c875da25a1a1448d18ee4e8f398b2f6fce888b4775d8f9130538e16d826cb4",
+      "version": "3.47.7"
+    },
+    {
+      "id": "flutter-linux",
+      "path": "dependencies/sdk/flutter_linux_3.47.7-stable.tar.xz",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id flutter-linux --download"
+        ],
+        "url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.7-stable.tar.xz",
+        "metadata": "dependencies/sdk/flutter-linux-release.json"
+      },
+      "sha256": "af7455f540df951184c7953fbe3cf884766e7541dacf8571f9f582db03dd6230",
+      "version": "3.47.7"
+    },
+    {
+      "id": "android-cmdline-tools",
+      "path": "dependencies/android/commandlinetools-win-16111833_latest.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id android-cmdline-tools --download"
+        ],
+        "url": "https://dl.google.com/android/repository/commandlinetools-win-16111833_latest.zip",
+        "metadata": "dependencies/android/cmdline-tools-download.json"
+      },
+      "sha256": "e5885e2e59038c0778a85fc19f01de7ce7c567c105553f7617b936b1e0e87b2b"
+    },
+    {
+      "id": "android-jdk17",
+      "path": "dependencies/android/amazon-corretto-17.0.20.12.1-windows-x64-jdk.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id android-jdk17 --download"
+        ],
+        "url": "https://corretto.aws/downloads/resources/17.0.20.12.1/amazon-corretto-17.0.20.12.1-windows-x64-jdk.zip",
+        "metadata": "dependencies/android/jdk17-download.json"
+      },
+      "sha256": "1ac8d9dc48b170684ac6223113f524325bd842d14ed74dac28927f8165cffd3a"
+    },
+    {
+      "id": "android-platform36",
+      "path": "dependencies/android/downloads/platform-36_r02.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id android-platform36 --download"
+        ],
+        "url": "https://dl.google.com/android/repository/platform-36_r02.zip",
+        "metadata": "dependencies/android/downloads/platforms-android-36.json"
+      },
+      "sha256": "37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e"
+    },
+    {
+      "id": "android-buildtools36",
+      "path": "dependencies/android/downloads/build-tools_r36_windows.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id android-buildtools36 --download"
+        ],
+        "url": "https://dl.google.com/android/repository/build-tools_r36_windows.zip",
+        "metadata": "dependencies/android/downloads/build-tools-36.0.0.json"
+      },
+      "sha256": "aa1095cb14d83e483818a748a2c06faaeb8e601561b06a356a119a1b2ca280d3"
+    },
+    {
+      "id": "android-ndk28",
+      "path": "dependencies/android/downloads/android-ndk-r28c-windows.zip",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id android-ndk28 --download"
+        ],
+        "url": "https://dl.google.com/android/repository/android-ndk-r28c-windows.zip",
+        "metadata": "dependencies/android/downloads/ndk-28.2.13676358.json"
+      },
+      "sha256": "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
+    },
+    {
+      "id": "windows-vc-runtime",
+      "path": "dependencies/windows/vc_redist.x64.exe",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id windows-vc-runtime --download"
+        ],
+        "url": "https://download.visualstudio.microsoft.com/download/pr/ebdab8e5-1d7b-4d9f-a11b-cbb1720c3b12/843068991DAAA1F73AD9F6239BCE4D0F6A07A51F18C37EA2A867E9BECA71295C/VC_redist.x64.exe",
+        "metadata": "dependencies/windows/vc-runtime-download.json"
+      },
+      "sha256": "843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c"
+    },
+    {
+      "id": "odoo-source",
+      "path": "dependencies/server/out/odoo/odoo-ab96189527544254a751adbfaafca6563ceb3f96.tar.gz",
+      "type": "group",
+      "acquisition": {
+        "method": "pinned-git-archive",
+        "commands": [
+          "cd dependencies/server",
+          "OUT_DIR=<new-output> WORK_DIR=<private-work> ODOO_REV=ab96189527544254a751adbfaafca6563ceb3f96 bash 02_fetch_odoo.sh"
+        ],
+        "upstream": "https://github.com/odoo/odoo.git"
+      },
+      "version": "19.0@ab96189527544254a751adbfaafca6563ceb3f96",
+      "limitations": "git archive generation may not be byte-identical; preserve the shipped archive and verify against its original SHA256SUMS."
+    },
+    {
+      "id": "ubuntu-server-debs",
+      "path": "dependencies/server/out/debs",
+      "type": "group",
+      "acquisition": {
+        "method": "apt-closure-from-ubuntu-jammy",
+        "commands": [
+          "cd dependencies/server",
+          "OUT_DIR=<new-output> WORK_DIR=<private-work> bash 01_download_apt_closure.sh",
+          "cd <new-output> && sha256sum -c SHA256SUMS"
+        ]
+      },
+      "original_manifest": "dependencies/server/out/MANIFEST.json",
+      "limitations": "544 original DEBs; APT script resolves the current official mirror, so historical exact bytes are not guaranteed. Retain original DEBs, Packages and SHA256SUMS; do not overwrite preserved out."
+    },
+    {
+      "id": "odoo-py310-wheels",
+      "path": "dependencies/server/out/wheelhouse-odoo",
+      "type": "group",
+      "acquisition": {
+        "method": "pinned-requirements-and-constraints",
+        "commands": [
+          "cd dependencies/server",
+          "OUT_DIR=<new-output> WORK_DIR=<private-work> bash 03_build_odoo_wheelhouse.sh",
+          "OUT_DIR=<new-output> WORK_DIR=<private-work> bash 03b_build_quarantined_from_debs.sh"
+        ]
+      },
+      "constraints": "dependencies/server/out/constraints-odoo.txt",
+      "limitations": "Python3.10 preparation path only. Not a complete Python3.12 production rebuild bundle."
+    },
+    {
+      "id": "crawler-wheels",
+      "path": "dependencies/server/out/wheelhouse-crawler",
+      "type": "group",
+      "acquisition": {
+        "method": "pypi-locked-wheelhouse",
+        "commands": [
+          "cd dependencies/server",
+          "OUT_DIR=<new-output> WORK_DIR=<private-work> bash 03a_requests_wheelhouse.sh",
+          "python -m venv <private-venv>",
+          "<private-venv>/bin/python -m pip install --no-index --find-links dependencies/server/out/wheelhouse-crawler -r server/ubuntu22.04/crawler/requirements.txt"
+        ]
+      },
+      "constraints": "dependencies/server/out/constraints-crawler.txt"
+    },
+    {
+      "id": "barcode-py312",
+      "path": "dependencies/server/out/extras-barcode/python312/rl_renderPM-4.0.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id barcode-py312 --download"
+        ],
+        "url": "https://files.pythonhosted.org/packages/0c/2c/9b6a0a0c93d9d4f2cf54921ddb56496321d0a8f6d69a650cbcf136502239/rl_renderPM-4.0.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+      },
+      "sha256": "b1bfaa95daa4a302958bd5afc0d7ec260fb10c3667e228ff4ab6f78e7dd6e78f",
+      "version": "rl-renderPM4.0.3/cp312"
+    },
+    {
+      "id": "flutter-expanded-toolchains",
+      "path": "dependencies/sdk",
+      "type": "group",
+      "acquisition": {
+        "method": "restore-from-preserved-archives",
+        "commands": [
+          "powershell -File dependencies/restore_client_tools.ps1 -TargetRoot <private-tools> -AndroidProject clients/app -Verify",
+          "tar -xJf dependencies/sdk/flutter_linux_3.47.7-stable.tar.xz -C <linux-tools>"
+        ]
+      },
+      "upstream": "https://docs.flutter.dev/install/archive"
+    },
+    {
+      "id": "pub-caches",
+      "path": "dependencies/pub-cache-windows + dependencies/pub-cache-linux",
+      "type": "group",
+      "acquisition": {
+        "method": "pubspec-lock-resolve",
+        "commands": [
+          "Set PUB_CACHE to a new cache directory for your platform",
+          "cd clients/app",
+          "flutter pub get --enforce-lockfile",
+          "For offline replay set PUB_CACHE to preserved matching cache and use --offline"
+        ]
+      },
+      "lock": "clients/app/pubspec.lock",
+      "upstream": "https://pub.dev",
+      "limitations": "Caches are platform state, not authority. Required native Pdfium downloads are outside Dart dependency resolution."
+    },
+    {
+      "id": "gradle-cache",
+      "path": "dependencies/gradle-cache",
+      "type": "group",
+      "acquisition": {
+        "method": "gradle-wrapper-and-maven-resolution",
+        "commands": [
+          "cd clients/app/android",
+          "./gradlew --gradle-user-home <new-private-cache> --version",
+          "On a networked build machine run the Android build from clients/README to populate pinned build dependencies; then preserve this cache for offline builds."
+        ]
+      },
+      "lock": "clients/app/android/gradle/wrapper/gradle-wrapper.properties",
+      "upstream": "https://services.gradle.org/distributions/gradle-9.3.1-all.zip",
+      "limitations": "No proxy or credential gradle.properties is shipped. Do not claim every Gradle build is offline-tested after restoration."
+    },
+    {
+      "id": "linux-runtime-debs",
+      "path": "dependencies/linux-runtime/out/debs",
+      "type": "group",
+      "acquisition": {
+        "method": "ubuntu-runtime-closure",
+        "commands": [
+          "See dependencies/linux-runtime/apt_packages.list",
+          "On Ubuntu22.04 prepare/download the listed packages in an isolated output directory; retain Package indexes and SHA256SUMS",
+          "python dependencies/linux-runtime/verify_deb_closure.py --help"
+        ]
+      },
+      "original_manifest": "dependencies/linux-runtime/out/SHA256SUMS",
+      "limitations": "Current Linux1.0.1 release contains its 199-DEB runtime closure; that is more recent than the older 171-DEB baseline."
+    },
+    {
+      "id": "eda-node-windows",
+      "path": "plugins/jlc-eda/bridge/runtime/node.exe",
+      "type": "file",
+      "acquisition": {
+        "method": "extract-from-verified-current-bundle",
+        "commands": [
+          "Verify plugins/jlc-eda/releases/3.0.3/lab-inventory-odoo_v3.0.3-bundle.zip against registry/releases.json",
+          "Extract only bridge/runtime/ under plugins/jlc-eda, preserving NODE-LICENSE.txt",
+          "Alternative upstream Node version archive is https://nodejs.org/dist/v24.19.0/; verify its published checksums before use."
+        ],
+        "upstream": "https://nodejs.org/en/download"
+      },
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "version": "24.19.0",
+      "limitations": "Bundled runtime is Windows only; Linux bridge requires a compatible Linux Node installation."
+    },
+    {
+      "id": "eda-npm-cache",
+      "path": "dependencies/npm-cache",
+      "type": "group",
+      "acquisition": {
+        "method": "npm-package-lock-integrity",
+        "commands": [
+          "cd plugins/jlc-eda",
+          "npm ci --cache ../../dependencies/npm-cache --no-audit --no-fund",
+          "For replay use npm ci --offline --cache ../../dependencies/npm-cache --no-audit --no-fund"
+        ]
+      },
+      "lock": "plugins/jlc-eda/package-lock.json",
+      "upstream": "https://registry.npmjs.org",
+      "limitations": "See CURRENT_STATE for whether the new isolated offline replay passed; existing node_modules is separately preserved and not a substitute for a tested cache."
+    },
+    {
+      "id": "current-client-releases",
+      "path": "clients/<platform>/releases/1.0.1",
+      "type": "group",
+      "acquisition": {
+        "method": "imported-project-build-artifacts",
+        "commands": [
+          "Copy the current full release directory from the local archive or trusted offline payload bundle",
+          "Use python tools/offline_bundle.py export --file <backup>/lc-elc-payloads.tar on the current machine; import on the target machine",
+          "For a new build follow clients/<platform>/README.md; do not expect byte-identical artifacts or change Android signing identity."
+        ]
+      },
+      "source": "clients/app",
+      "registry": "maintenance/registry/releases.json",
+      "limitations": "No remote artifact server or GitHub release has been created in this task. Without a payload backup, exact old binary recovery is not guaranteed."
+    },
+    {
+      "id": "current-eda-release",
+      "path": "plugins/jlc-eda/releases/3.0.3",
+      "type": "group",
+      "acquisition": {
+        "method": "imported-project-build-artifacts",
+        "commands": [
+          "Copy from trusted offline payload bundle; verify release registry",
+          "To build a NEW candidate: cd plugins/jlc-eda && npm ci && npm run test:all && npm run verify"
+        ]
+      },
+      "source": "plugins/jlc-eda",
+      "registry": "maintenance/registry/releases.json"
+    },
+    {
+      "id": "current-server-release",
+      "path": "server/releases/2026-10-18",
+      "type": "group",
+      "acquisition": {
+        "method": "imported-project-build-artifacts",
+        "commands": [
+          "Copy from trusted offline payload bundle and verify release registry",
+          "For a NEW source package assemble server/ubuntu22.04 with matching dependencies/server/out; do not reuse old Ubuntu20261015 zip as current code."
+        ]
+      },
+      "source": "server/ubuntu22.04",
+      "registry": "maintenance/registry/releases.json"
+    },
+    {
+      "id": "catalog-checkpoint",
+      "path": "data/catalog/checkpoint-20261015",
+      "type": "group",
+      "acquisition": {
+        "method": "self-collected-consistent-sqlite-snapshot",
+        "commands": [
+          "Restore the exact existing checkpoint from a trusted offline payload bundle; verify SHA in data README/registry",
+          "To create a NEW snapshot first pause the authorized collector, then python server/ubuntu22.04/crawler/snapshot_catalog.py --source <collector-data>/components.sqlite3 --destination <new-checkpoint>/components.sqlite3",
+          "Copy matching categories_cn.json; run python server/ubuntu22.04/verify_checkpoint.py <new-checkpoint>"
+        ]
+      },
+      "limitations": "Historical local snapshot has662768 cn records; production has newer data. Not downloadable from a package registry. Do not overwrite production with it."
+    },
+    {
+      "id": "production-backup",
+      "path": "/opt/odoo/backups/module-cleanup-production-20261018T153740Z",
+      "type": "remote-only",
+      "acquisition": {
+        "method": "server-side-backup-not-downloaded",
+        "commands": [
+          "Authorized administrator may copy the complete matching database.dump, filestore.tgz and custom-addons.tgz from that exact server directory through a trusted SSH backup channel",
+          "Verify database.dump SHA256 1bd86e42ca5c2055f856203d88718a0314cc14ca0f89a9e7d6efc8e784a9f310; keep backup set together outside Git."
+        ]
+      },
+      "limitations": "This archive contains only backup location/hash, not backup data. No production credentials are in the repository."
+    },
+    {
+      "id": "windows-msvc",
+      "path": "external: installed Visual Studio C++ toolchain",
+      "type": "external",
+      "acquisition": {
+        "method": "external-vendor-install",
+        "commands": [
+          "Use Microsoft Visual Studio Installer and select Desktop development with C++, v143 toolset and Windows SDK",
+          "Current original machine D:/VS2026 portable toolset14.44.35207; not shipped as an offline installer. See clients/windows/README.md."
+        ]
+      },
+      "upstream": "https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170"
+    },
+    {
+      "id": "android-signing-key",
+      "path": "local/private/signing/windows-debug.keystore",
+      "type": "private",
+      "acquisition": {
+        "method": "private-controlled-backup",
+        "commands": [
+          "The existing matching key has been copied opaquely from the original offline Android user-cache; verify public certificate against maintenance/registry/android-signing.json",
+          "Create a separately controlled backup of this key; do not upload it to GitHub or include it in the ordinary payload bundle."
+        ]
+      },
+      "limitations": "Cannot be redownloaded from an upstream package registry; a newly generated key will not preserve update identity."
+    },
+    {
+      "id": "wsl-build-tools",
+      "path": "dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz",
+      "type": "file",
+      "sha256": "7d9c152d1a58dd04e319b173459f40bce13cb38d47dc06a34657b8e5aea475b1",
+      "bytes": 4436412077,
+      "acquisition": {
+        "method": "self-exported-original-wsl-toolchains",
+        "commands": [
+          "Copy this exact archive from a trusted offline payload bundle; it was exported read-only from the source WSL paths registered in maintenance/registry/wsl-toolchain.json",
+          "python tools/fetch_payload.py --id wsl-build-tools --verify",
+          "mkdir -p <private-wsl-tools>; tar -xzf <archive-path> -C <private-wsl-tools>",
+          "Pass extracted Flutter/JDK/SDK/pubcache paths to tools/build_client.py; review historical Linux wrapper paths before reusing bin/sysroot/prebuilt."
+        ]
+      },
+      "limitations": "No signing keys or credential gradle.properties. This preserves original tools and caches, not a proof that a fresh machine rebuilds every platform offline."
+    },
+    {
+      "id": "production-py312-rebuild",
+      "path": "dependencies/server-production-py312/wheelhouse",
+      "type": "not-yet-built",
+      "acquisition": {
+        "method": "exact-production-package-metadata-exported-read-only",
+        "commands": [
+          "Create an isolated Python3.12 Ubuntu22.04 preparation environment; do not change the host global Python",
+          "<py312-venv>/bin/python -m pip download --only-binary=:all: --dest <new-wheelhouse> -r maintenance/registry/production-python312-requirements.txt",
+          "If any package has no suitable wheel, build only that version in the isolated preparation environment with its native build dependencies, then verify installation offline in a disposable matching-ABI environment."
+        ]
+      },
+      "source": "maintenance/registry/production-python312-packages.json",
+      "limitations": "Public installed package versions were exported read-only. A complete matching production wheelhouse is not yet built/accepted; do not mistake cp310 or the one cp312 barcode wheel for the complete production closure."
+    },
+    {
+      "id": "catalog-sqlite-file",
+      "path": "data/catalog/checkpoint-20261015/components.sqlite3",
+      "type": "file",
+      "sha256": "ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823",
+      "acquisition": {
+        "method": "self-collected-historical-checkpoint",
+        "commands": [
+          "Copy the exact SQLite file from the retained trusted offline payload bundle, not from a public package registry",
+          "python tools/fetch_payload.py --id catalog-sqlite-file --verify",
+          "For a NEW snapshot follow data/README.md and snapshot_catalog.py; keep its categories and manifest together."
+        ]
+      },
+      "limitations": "662768 cn records historical local snapshot, not the latest production database."
+    }
+  ]
+}

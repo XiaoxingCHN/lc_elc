@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lab_bag_tree" model="ir.ui.view">
+            <field name="name">lab.bag.tree</field>
+            <field name="model">lab.bag</field>
+            <field name="arch" type="xml">
+                <list string="库存袋" create="true" edit="false">
+                    <field name="trace_code"/>
+                    <field name="product_tmpl_id"/>
+                    <field name="location_id"/>
+                    <field name="lot_id"/>
+                    <field name="quantity" sum="数量合计"/>
+                    <field name="outstanding_quantity" sum="未归还"/>
+                    <field name="receipt_date"/>
+                    <field name="supplier_order" optional="show"/>
+                    <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lab_bag_form" model="ir.ui.view">
+            <field name="name">lab.bag.form</field>
+            <field name="model">lab.bag</field>
+            <field name="arch" type="xml">
+                <form string="库存袋">
+                    <header>
+                        <button name="%(action_lab_label_open)d" type="action"
+                                string="打印器件标签" class="btn-primary"
+                                groups="lab_workflow.group_lab_operator"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="trace_code" readonly="1"/></h1>
+                            <field name="payload" readonly="1" class="text-muted"/>
+                        </div>
+                        <group>
+                            <group string="物料">
+                                <field name="product_tmpl_id" readonly="1"/>
+                                <field name="product_id" readonly="1"/>
+                            </group>
+                            <group string="位置与批次">
+                                <field name="location_id"/>
+                                <field name="lot_id" readonly="1"/>
+                                <field name="quantity" readonly="1"/>
+                                <field name="outstanding_quantity"/>
+                                <field name="uom_id"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="入库信息">
+                                <field name="receipt_date"/>
+                                <field name="initial_quantity"/>
+                                <field name="receipt_operation_id"/>
+                            </group>
+                            <group string="来料信息">
+                                <field name="supplier_order"/>
+                                <field name="supplier_mpn"/>
+                                <field name="supplier_payload"/>
+                            </group>
+                        </group>
+                        <group>
+                            <field name="note"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                        <notebook>
+                            <page string="领用明细" name="issues">
+                                <field name="issue_line_ids" readonly="1">
+                                    <list>
+                                        <field name="date"/>
+                                        <field name="quantity"/>
+                                        <field name="returned_quantity"/>
+                                        <field name="outstanding_quantity"/>
+                                        <field name="borrower_id"/>
+                                        <field name="actor_id"/>
+                                        <field name="project"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="作业流水" name="operations">
+                                <field name="operation_line_ids" readonly="1">
+                                    <list>
+                                        <field name="operation_id"/>
+                                        <field name="quantity"/>
+                                        <field name="src_location_id"/>
+                                        <field name="dest_location_id"/>
+                                        <field name="move_id"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_lab_bag_search" model="ir.ui.view">
+            <field name="name">lab.bag.search</field>
+            <field name="model">lab.bag</field>
+            <field name="arch" type="xml">
+                <search string="搜索库存袋">
+                    <field name="trace_code"/>
+                    <field name="product_tmpl_id"/>
+                    <field name="lot_id"/>
+                    <field name="location_id"/>
+                    <separator/>
+                    <filter name="has_stock" string="有库存"
+                            domain="[('quantity', '&gt;', 0)]"/>
+                    <filter name="has_outstanding" string="有未归还"
+                            domain="[('outstanding_quantity', '&gt;', 0)]"/>
+                    <!-- Odoo 19：search 视图的 <group> 不能放 <filter>，也不支持 expand -->
+                    <filter name="group_material" string="按物料分组"
+                            context="{'group_by': 'product_tmpl_id'}"/>
+                    <filter name="group_location" string="按库位分组"
+                            context="{'group_by': 'location_id'}"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_lab_bag" model="ir.actions.act_window">
+            <field name="name">库存袋与追溯码</field>
+            <field name="res_model">lab.bag</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_lab_bag_search"/>
+            <field name="context">{'search_default_has_stock': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">还没有库存袋。扫码入库后，每个物理袋都会有一条记录和唯一追溯码。</p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

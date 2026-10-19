@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  原生界面增强（可选文件）。
+  这些视图继承 Odoo 原生菜单（库存→产品、配置→库位、制造→BOM 等），
+  让 lab_* 自定义字段直接出现在原生界面里。
+
+  如果安装时报 "External ID not found"（某个原生视图 xmlid 在你的版本被改名/移除），
+  按报错提示删除对应的 <record> 即可，模块其余功能不受影响——
+  实验室库存菜单下的界面由自带视图驱动，不依赖本文件。
+-->
+<odoo>
+    <record id="view_product_template_form_lab" model="ir.ui.view">
+        <field name="name">product.template.form.lab</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <field name="categ_id" position="after">
+                <field name="lab_lcsc_code"/>
+                <field name="lab_mpn"/>
+                <field name="lab_brand"/>
+                <field name="lab_package"/>
+            </field>
+            <notebook position="inside">
+                <page string="实验室信息">
+                    <group>
+                        <field name="lab_description"/>
+                        <field name="lab_specifications"/>
+                        <field name="lab_datasheet_url" widget="url"/>
+                        <field name="lab_source_url" widget="url"/>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+    <record id="view_product_template_list_lab" model="ir.ui.view">
+        <field name="name">product.template.list.lab</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="lab_lcsc_code"/>
+                <field name="lab_mpn"/>
+                <field name="lab_brand"/>
+                <field name="lab_package"/>
+            </field>
+        </field>
+    </record>
+    <record id="view_stock_location_form_lab" model="ir.ui.view">
+        <field name="name">stock.location.form.lab</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="arch" type="xml">
+            <field name="usage" position="after">
+                <field name="lab_location_type"/>
+                <field name="lab_color"/>
+                <field name="lab_sort"/>
+            </field>
+        </field>
+    </record>
+    <record id="view_stock_move_form_lab" model="ir.ui.view">
+        <field name="name">stock.move.form.lab</field>
+        <field name="model">stock.move</field>
+        <field name="inherit_id" ref="stock.view_move_form"/>
+        <field name="arch" type="xml">
+            <field name="product_uom_qty" position="after">
+                <field name="lab_source_type"/>
+                <field name="lab_remark"/>
+            </field>
+        </field>
+    </record>
+    <record id="view_mrp_bom_form_lab" model="ir.ui.view">
+        <field name="name">mrp.bom.form.lab</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='bom_line_ids']//field[@name='product_id']" position="after">
+                <field name="lab_allocation"/>
+                <field name="lab_smt_note"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

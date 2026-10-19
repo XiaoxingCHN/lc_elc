@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_lab_catalog_item_tree" model="ir.ui.view">
+        <field name="name">lab.catalog.item.tree</field>
+        <field name="model">lab.catalog.item</field>
+        <field name="arch" type="xml">
+            <list string="器件库索引" create="false" edit="false" delete="false">
+                <field name="catalog_code"/>
+                <field name="name"/>
+                <field name="mpn"/>
+                <field name="brand"/>
+                <field name="package"/>
+                <field name="category_name"/>
+                <field name="catalog_stock" string="商城现货(参考)"/>
+                <field name="has_image" optional="hide"/>
+                <field name="has_datasheet" optional="hide"/>
+                <field name="fetched_at" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_item_search" model="ir.ui.view">
+        <field name="name">lab.catalog.item.search</field>
+        <field name="model">lab.catalog.item</field>
+        <field name="arch" type="xml">
+            <search string="器件库索引">
+                <!-- Odoo 19：<group> 不再支持 string/expand，分组过滤器直接放 <search> 顶层；
+                     也不在此处放裸 <field>（RelaxNG 会报 "search has extra content: field"）。
+                     保持最小形式，避免视图校验失败中断模块安装。 -->
+                <filter name="has_image" string="有图片" domain="[('has_image','=',True)]"/>
+                <filter name="has_datasheet" string="有手册" domain="[('has_datasheet','=',True)]"/>
+                <separator/>
+                <filter name="market_cn" string="中文站" domain="[('market','=','cn')]"/>
+                <separator/>
+                <filter name="group_brand" string="按品牌" context="{'group_by':'brand_code'}"/>
+                <filter name="group_package" string="按封装" context="{'group_by':'package'}"/>
+                <filter name="group_category" string="按分类" context="{'group_by':'category_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_item_form" model="ir.ui.view">
+        <field name="name">lab.catalog.item.form</field>
+        <field name="model">lab.catalog.item</field>
+        <field name="arch" type="xml">
+            <form string="器件库索引" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="catalog_code" readonly="1"/></h1>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="商城信息">
+                            <field name="mpn"/>
+                            <field name="brand"/>
+                            <field name="brand_code"/>
+                            <field name="package"/>
+                            <field name="category_id"/>
+                            <field name="category_path"/>
+                            <field name="catalog_stock"/>
+                            <field name="price"/>
+                            <field name="currency"/>
+                            <field name="source_url" widget="url"/>
+                        </group>
+                        <group string="实验室库存">
+                            <!-- 库存是**实时**从 stock.quant 聚合的，本模型不存库存字段：
+                                 /lab/api/catalog/* 返回的 lab_quantity / has_stock 才是权威值。
+                                 这里仅展示绑定关系，避免再出现"陈旧快照冒充实时"。 -->
+                            <field name="source_fingerprint" string="来源指纹"/>
+                        </group>
+                        <group string="来源与索引">
+                            <field name="market"/>
+                            <field name="fetched_at"/>
+                            <field name="source_fingerprint"/>
+                            <field name="import_run_id"/>
+                            <field name="image_url" widget="url"/>
+                            <field name="datasheet_url" widget="url"/>
+                            <field name="search_text"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="参数">
+                            <field name="param_ids" readonly="1">
+                                <list create="false" edit="false">
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="value"/>
+                                    <field name="detail_value"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_item_action" model="ir.actions.act_window">
+        <field name="name">器件库索引</field>
+        <field name="res_model">lab.catalog.item</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('market','=','cn')]</field>
+        <field name="context">{'search_default_has_stock': 0}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">索引为空</p>
+            <p>请先运行目录导入工具把立创资料快照导入本数据库。</p>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_category_tree" model="ir.ui.view">
+        <field name="name">lab.catalog.category.tree</field>
+        <field name="model">lab.catalog.category</field>
+        <field name="arch" type="xml">
+            <list string="分类" create="false" edit="false" delete="false">
+                <field name="catalog_id"/>
+                <field name="name"/>
+                <field name="name_en"/>
+                <field name="code"/>
+                <field name="parent_id"/>
+                <field name="level"/>
+                <field name="product_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_category_action" model="ir.actions.act_window">
+        <field name="name">商城分类</field>
+        <field name="res_model">lab.catalog.category</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <record id="view_lab_catalog_binding_tree" model="ir.ui.view">
+        <field name="name">lab.catalog.binding.tree</field>
+        <field name="model">lab.catalog.binding</field>
+        <field name="arch" type="xml">
+            <list string="绑定关系" editable="bottom">
+                <field name="catalog_code"/>
+                <field name="product_template_id"/>
+                <field name="source"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="note"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_binding_action" model="ir.actions.act_window">
+        <field name="name">C 编号绑定</field>
+        <field name="res_model">lab.catalog.binding</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <record id="view_lab_catalog_import_run_tree" model="ir.ui.view">
+        <field name="name">lab.catalog.import.run.tree</field>
+        <field name="model">lab.catalog.import.run</field>
+        <field name="arch" type="xml">
+            <list string="导入批次" create="false" edit="false">
+                <field name="name"/>
+                <field name="state"/>
+                <field name="market"/>
+                <field name="rows_seen"/>
+                <field name="rows_written"/>
+                <field name="rows_skipped"/>
+                <field name="rows_failed"/>
+                <field name="last_code"/>
+                <field name="started_at"/>
+                <field name="finished_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_import_run_form" model="ir.ui.view">
+        <field name="name">lab.catalog.import.run.form</field>
+        <field name="model">lab.catalog.import.run</field>
+        <field name="arch" type="xml">
+            <form string="导入批次" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="state"/>
+                        <field name="market"/>
+                        <field name="source_path"/>
+                        <field name="source_sha256"/>
+                        <field name="started_at"/>
+                        <field name="finished_at"/>
+                        <field name="catalog_revision"/>
+                    </group>
+                    <group>
+                        <field name="rows_seen"/>
+                        <field name="rows_written"/>
+                        <field name="rows_skipped"/>
+                        <field name="rows_failed"/>
+                        <field name="last_code"/>
+                    </group>
+                    <field name="log"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_lab_catalog_import_run_action" model="ir.actions.act_window">
+        <field name="name">导入批次</field>
+        <field name="res_model">lab.catalog.import.run</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!--
+            角色与依赖模块权限的对应关系（root 要求）：
+
+            * 实验室库存/只读  -> 统一器件库只读（lab_catalog.group_lab_catalog_user）
+              有账号但没有 lab 角色仍不能访问任何 /lab/api 接口。
+            * 实验室库存/操作员 -> 只读 + 统一器件库使用 + stock 库存用户
+              可以扫码入库、自助领料、打标签；不能代他人领料、不能改库位结构。
+            * 实验室库存/管理员 -> 操作员 + stock 库存管理员 + lab_catalog 管理员
+              可以代他人领料、维护库位/物料、执行历史库存分袋适配、看请求记账。
+
+            这里只声明 imply，不直接给高权限；即使别的模块没装对应组也不会报错
+            （Odoo 对不存在的 group xmlid 会忽略 imply 项）。
+        -->
+
+        <record id="group_lab_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('lab_catalog.group_lab_catalog_user'))]"/>
+        </record>
+
+        <record id="group_lab_operator" model="res.groups">
+            <field name="implied_ids" eval="[
+                (4, ref('lab_catalog.group_lab_catalog_user')),
+                (4, ref('stock.group_stock_user'))
+            ]"/>
+        </record>
+
+        <record id="group_lab_manager" model="res.groups">
+            <field name="implied_ids" eval="[
+                (4, ref('stock.group_stock_manager')),
+                (4, ref('lab_catalog.group_lab_catalog_manager'))
+            ]"/>
+        </record>
+
+    </data>
+</odoo>

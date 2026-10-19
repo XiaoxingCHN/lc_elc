@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "derived_from": "AST of current controller decorators; not runtime or full business schema",
+  "routes": [
+    {
+      "path": "/lab/api/asset",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/asset_cache.py",
+      "handler": "asset",
+      "line": 312,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "methods": [
+          "GET"
+        ],
+        "csrf": false
+      }
+    },
+    {
+      "path": "/lab/api/catalog/bind",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_bind",
+      "line": 164,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/api/catalog/categories",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_categories",
+      "line": 107,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/api/catalog/create_material",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_create_material",
+      "line": 202,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/api/catalog/detail",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_detail",
+      "line": 93,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/api/catalog/facets",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_facets",
+      "line": 133,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/api/catalog/search",
+      "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
+      "handler": "catalog_search",
+      "line": 56,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": [
+          "POST"
+        ]
+      }
+    },
+    {
+      "path": "/lab/labels/download",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
+      "handler": "lab_labels_download",
+      "line": 157,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "csrf": true
+      }
+    },
+    {
+      "path": "/lab/labels/plan",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
+      "handler": "lab_labels_plan",
+      "line": 138,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "csrf": true
+      }
+    },
+    {
+      "path": "/lab/scan",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
+      "handler": "lab_scan_console",
+      "line": 28,
+      "registration": {
+        "type": "http",
+        "auth": "user"
+      }
+    },
+    {
+      "path": "/lab/scan/resolve",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
+      "handler": "lab_scan_resolve",
+      "line": 57,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "csrf": true
+      }
+    },
+    {
+      "path": "/lab/scan/submit",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_web.py",
+      "handler": "lab_scan_submit",
+      "line": 74,
+      "registration": {
+        "type": "http",
+        "auth": "user",
+        "csrf": true
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_bootstrap",
+      "line": 34,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_locations",
+      "line": 42,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_location_create",
+      "line": 51,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_resolve_code",
+      "line": 66,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_receipt",
+      "line": 78,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_issue",
+      "line": 90,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_return",
+      "line": 102,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_issues",
+      "line": 117,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_history",
+      "line": 134,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_legacy_stock",
+      "line": 151,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_inventory_api.py",
+      "handler": "lab_adopt_stock",
+      "line": 163,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_labels_api.py",
+      "handler": "lab_labels_plan",
+      "line": 26,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    },
+    {
+      "path": "dynamic-route",
+      "source": "server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_labels_api.py",
+      "handler": "lab_labels_preview",
+      "line": 45,
+      "registration": {
+        "type": "jsonrpc",
+        "auth": "user",
+        "methods": "dynamic; inspect source",
+        "csrf": false
+      }
+    }
+  ]
+}

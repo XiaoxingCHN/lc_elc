@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <t t-name="lab_catalog.UnifiedCatalog">
+    <div class="lc-unified d-flex flex-column h-100">
+
+      <header class="lc-warehouse-heading">
+        <div><span class="lc-eyebrow">LAB INVENTORY</span><h1>仓库</h1><p>库存与元器件资料，一处查找</p></div>
+        <span class="lc-order-note"><i class="fa fa-check-circle"/> 有库存优先 · 同一器件合并展示</span>
+      </header>
+      <div class="lc-topbar">
+        <div class="lc-search">
+          <i class="fa fa-search"/>
+          <input type="text" class="lc-search-input"
+                 placeholder="搜索 C 编号 / 型号 (MPN) / 名称 / 品牌，回车检索"
+                 t-att-value="state.query" t-on-input="onQueryInput" t-on-keydown="onQueryKeydown"/>
+        </div>
+        <label class="lc-stock-toggle">
+          <input type="checkbox" t-att-checked="state.stockOnly" t-on-change="toggleStockOnly"/>
+          <span>只看有库存</span>
+        </label>
+        <button class="btn btn-link" t-on-click="clearFilters">清除筛选</button>
+        <div class="lc-rev d-none" t-if="state.catalogRevision">
+          <span>目录版本 <t t-esc="state.catalogRevision"/></span>
+          <span class="ms-2">库存版本 <t t-esc="state.inventoryRevision"/></span>
+        </div>
+      </div>
+
+      <div class="lc-body d-flex flex-grow-1">
+
+        <aside class="lc-sidebar">
+          <div class="lc-sidebar-title">器件分类</div>
+          <button class="lc-category-all" t-on-click="() => this.selectCategory({id: null})">全部分类</button>
+          <ul class="lc-cat-list">
+            <t t-foreach="categoryRows" t-as="cat" t-key="cat.id">
+              <li>
+                <div class="lc-cat-item"
+                     t-att-class="{'lc-active': state.categoryId === cat.id}"
+                     t-on-click="() => this.selectCategory(cat)">
+                  <span t-att-style="'padding-left:' + (cat.depth * 12) + 'px'"><t t-esc="cat.name"/></span>
+                  <small t-esc="cat.product_count"/>
+                </div>
+              </li>
+            </t>
+          </ul>
+        </aside>
+
+        <main class="lc-main">
+          <select class="lc-mobile-category" t-att-value="state.categoryId || ''" t-on-change="onCategorySelect" aria-label="器件分类">
+            <option value="">全部分类</option><option t-foreach="allCategoryRows" t-as="cat" t-key="cat.id" t-att-value="cat.id"><t t-esc="cat.categoryLabel"/></option>
+          </select>
+          <details class="lc-facets"><summary>筛选 · 品牌 / 封装 / 参数</summary>
+            <div class="lc-facet-group" t-if="state.facets.brands.length">
+              <span class="lc-facet-label">品牌</span>
+              <t t-foreach="state.facets.brands" t-as="b" t-key="b.code">
+                <button class="lc-chip" t-att-class="{'lc-chip-on': state.brands.includes(b.code)}"
+                        t-on-click="() => this.toggleBrand(b.code)">
+                  <t t-esc="b.label"/> <small t-esc="b.count"/>
+                </button>
+              </t>
+            </div>
+            <div class="lc-facet-group" t-if="state.facets.packages.length">
+              <span class="lc-facet-label">封装</span>
+              <t t-foreach="state.facets.packages" t-as="p" t-key="p.value">
+                <button class="lc-chip" t-att-class="{'lc-chip-on': state.packages.includes(p.value)}"
+                        t-on-click="() => this.togglePackage(p.value)">
+                  <t t-esc="p.value"/> <small t-esc="p.count"/>
+                </button>
+              </t>
+            </div>
+            <t t-foreach="state.showAllParameters ? state.facets.parameters : state.facets.parameters.slice(0, 8)" t-as="pp" t-key="pp.code">
+              <div class="lc-facet-group"><span class="lc-facet-label" t-esc="pp.name"/>
+                <button t-foreach="pp.values" t-as="pv" t-key="pv.value" class="lc-chip"
+                  t-att-class="{'lc-chip-on': (state.parameters[pp.code] || []).includes(pv.value)}"
+                  t-on-click="() => this.toggleParameter(pp.code, pv.value)">
+                  <t t-esc="pv.value"/> <small t-esc="pv.count"/>
+                </button>
+              </div>
+            </t>
+            <button t-if="state.facets.parameters.length > 8" class="btn btn-link btn-sm" t-on-click="() => this.state.showAllParameters = !this.state.showAllParameters">
+              <t t-if="state.showAllParameters">收起参数</t><t t-else="">展开全部参数</t>
+            </button>
+          </details>
+
+          <div class="lc-result-meta">
+            <span t-if="!state.loading">共 <b t-esc="state.total"/></span> 条，有库存优先
+          </div>
+          <div class="lc-error" t-if="state.error" t-esc="state.error"/>
+
+          <div class="lc-cards">
+            <t t-foreach="state.items" t-as="item" t-key="item.item_key">
+              <div class="lc-card" t-att-class="{'lc-card-stock': item.has_stock}"
+                   t-on-click="() => this.openDetail(item)">
+                <div class="lc-card-img">
+                  <img t-if="item.image_url" t-att-src="imageSrc(item)" t-att-alt="item.name"
+                       t-on-error="onImageError"/>
+                  <div class="lc-img-placeholder" t-att-style="item.image_url ? 'display:none' : ''">
+                    <i class="fa fa-cube"/><span>暂无图片</span>
+                  </div>
+                  <span class="lc-badge-stock" t-if="item.has_stock">
+                    库存 <t t-esc="formatQty(item.lab_quantity)"/>
+                  </span>
+                </div>
+                <div class="lc-card-body">
+                  <div class="lc-card-code"><t t-esc="item.catalog_code or item.item_key"/></div>
+                  <div class="lc-card-name" t-esc="item.name"/>
+                  <div class="lc-card-sub"><span t-esc="item.mpn"/> · <span t-esc="item.package"/></div>
+                  <div class="lc-card-brand" t-esc="item.brand"/>
+                  <div class="lc-card-mall">
+                    商城现货 <t t-esc="item.catalog_stock"/>（参考，不计入实验室库存）
+                  </div>
+                  <div class="lc-card-tags">
+                    <span class="lc-tag" t-if="item.has_datasheet">手册</span>
+                    <span class="lc-tag" t-if="item.param_count">参数 <t t-esc="item.param_count"/></span>
+                    <span class="lc-tag lc-tag-merged" t-if="item.lab_template_ids.length > 1">
+                      合并 <t t-esc="item.lab_template_ids.length"/> 个档案
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </t>
+          </div>
+
+          <div class="lc-empty" t-if="!state.loading and !state.items.length">
+            没有匹配的器件，试试其他关键词或调整筛选条件。
+          </div>
+          <div class="lc-more" t-if="state.nextCursor">
+            <button class="btn btn-secondary" t-on-click="loadMore" t-att-disabled="state.loading">
+              <t t-if="state.loading">加载中…</t><t t-else="">加载更多</t>
+            </button>
+          </div>
+        </main>
+
+        <aside class="lc-detail" t-if="state.selected">
+          <div class="lc-detail-head">
+            <h4 t-esc="state.selected.catalog_code or state.selected.item_key"/>
+            <button class="btn btn-sm btn-link" t-on-click="closeDetail">返回仓库</button>
+          </div>
+          <div class="lc-detail-loading" t-if="state.detailLoading">载入中…</div>
+
+          <div t-if="state.detail">
+            <div class="lc-detail-img">
+              <img t-if="state.detail.item.image_url"
+                   t-att-src="assetSrc(state.detail.item.image_url)" alt="器件图片"
+                   t-on-error="onImageError"/>
+              <div class="lc-img-placeholder"
+                   t-att-style="state.detail.item.image_url ? 'display:none' : ''">
+                <i class="fa fa-cube"/><span>该器件没有采集到真实图片</span>
+              </div>
+            </div>
+
+            <h5 t-esc="state.detail.item.name"/>
+            <dl class="lc-dl">
+              <dt>型号</dt><dd t-esc="state.detail.item.mpn"/>
+              <dt>品牌</dt><dd t-esc="state.detail.item.brand"/>
+              <dt>封装</dt><dd t-esc="state.detail.item.package"/>
+              <dt>分类</dt><dd t-esc="state.detail.item.category_name"/>
+              <dt>实验室库存</dt>
+              <dd><b t-esc="formatQty(state.detail.item.lab_quantity)"/></dd>
+              <dt>商城现货</dt><dd><t t-esc="state.detail.item.catalog_stock"/>（参考）</dd>
+            </dl>
+
+            <div class="lc-detail-actions">
+              <button class="btn btn-outline-primary btn-sm" t-on-click="() => this.setMode('receipt')">入库</button>
+              <button class="btn btn-outline-warning btn-sm" t-on-click="() => this.setMode('issue')">领料</button>
+              <button class="btn btn-outline-info btn-sm" t-on-click="() => this.setMode('return')">归还</button>
+              <button class="btn btn-outline-secondary btn-sm" t-on-click="() => this.setMode('labels')">标签</button>
+            </div>
+
+            <!-- 事务结果 / 错误（不把内部错误谎称模块未安装） -->
+            <div class="lc-wf-msg" t-att-class="'lc-wf-' + state.wfMessageType"
+                 t-if="state.wfMessage" t-esc="state.wfMessage"/>
+
+            <!-- 同一 C 编号多档案：必须显式选择，绝不随机取 first -->
+            <div class="lc-candidates" t-if="state.candidates.length">
+              <div class="lc-detail-title">该 C 编号下有多个实验室档案，请选择 SN</div>
+              <button class="btn btn-sm btn-outline-primary w-100 mb-1"
+                      t-foreach="state.candidates" t-as="c" t-key="c.product_template_id"
+                      t-on-click="() => { this.state.form.templateId = c.product_template_id; this.createMaterial(); }">
+                <t t-esc="c.sn"/> — <t t-esc="c.name"/>
+              </button>
+            </div>
+
+            <!-- ================= 入库 ================= -->
+            <div class="lc-workflow" t-if="state.wfMode === 'receipt'">
+              <div class="lc-workflow-title">入库登记</div>
+              <label>目标库位</label>
+              <select data-field="locationId" t-on-change="onField" t-att-value="state.form.locationId">
+                <option value="">-- 选择库位 --</option>
+                <t t-foreach="state.locations" t-as="l" t-key="l.id">
+                  <option t-att-value="l.id"><t t-esc="l.path or l.name"/></option>
+                </t>
+              </select>
+              <label>归属 SN 档案</label>
+              <select data-field="templateId" t-on-change="onField" t-att-value="state.form.templateId">
+                <option value="">-- （无档案将按资料新建）--</option>
+                <t t-foreach="state.detail.item.lab_template_ids" t-as="tid" t-key="tid">
+                  <t t-foreach="state.detail.lab_templates" t-as="labTemplate" t-key="labTemplate.id">
+                    <option t-if="labTemplate.id === tid" t-att-value="tid"><t t-esc="labTemplate.sn"/> — <t t-esc="labTemplate.name"/></option>
+                  </t>
+                </t>
+              </select>
+              <label>数量</label>
+              <input type="number" min="1" step="1" data-field="qty" t-att-value="state.form.qty" t-on-input="onField"/>
+              <button class="btn btn-sm btn-success w-100" t-att-disabled="state.wfBusy" t-on-click="submitReceipt">
+                确认入库
+              </button>
+              <div class="lc-borrower-hint">
+                同 C 编号有多个档案时请先选择 SN；服务端会校验归属与公司，不会随机取第一个。
+              </div>
+            </div>
+
+            <!-- ================= 领料 ================= -->
+            <div class="lc-workflow" t-if="state.wfMode === 'issue'">
+              <div class="lc-workflow-title">领用出库</div>
+              <label>来源袋</label>
+              <select data-field="bagId" t-on-change="onField" t-att-value="state.form.bagId">
+                <option value="">-- 选择袋 --</option>
+                <t t-foreach="state.detail.bags" t-as="b" t-key="b.id">
+                  <option t-att-value="b.id">
+                    <t t-esc="b.trace_code"/> · 余 <t t-esc="formatQty(b.quantity)"/>
+                    <t t-if="b.location_id"> @ <t t-esc="b.location_id[1]"/></t>
+                  </option>
+                </t>
+              </select>
+              <label>领用人（系统账号）</label>
+              <select data-field="borrowerId" t-on-change="onField" t-att-value="state.form.borrowerId">
+                <option value="">-- 请选择 --</option>
+                <t t-foreach="state.borrowers" t-as="u" t-key="u.id">
+                  <option t-att-value="u.id"><t t-esc="u.name"/><t t-if="u.login"> (<t t-esc="u.login"/>)</t></option>
+                </t>
+              </select>
+              <label>项目</label>
+              <input type="text" data-field="project" t-att-value="state.form.project" t-on-input="onField"/>
+              <label>数量</label>
+              <input type="number" min="1" step="1" data-field="qty" t-att-value="state.form.qty" t-on-input="onField"/>
+              <button class="btn btn-sm btn-warning w-100" t-att-disabled="state.wfBusy" t-on-click="submitIssue">
+                确认领料
+              </button>
+              <div class="lc-borrower-hint">
+                操作人始终记当前登录账号，另存；普通用户只能为本人领料，管理员可代领。
+              </div>
+            </div>
+
+            <!-- ================= 归还 ================= -->
+            <div class="lc-workflow" t-if="state.wfMode === 'return'">
+              <div class="lc-workflow-title">按原领用单归还</div>
+              <label>原领料记录</label>
+              <select data-field="issueLineId" t-on-change="onField" t-att-value="state.form.issueLineId">
+                <option value="">-- 选择领料记录 --</option>
+                <t t-foreach="state.detail.issues" t-as="i" t-key="i.id">
+                  <option t-att-value="i.id">
+                    #<t t-esc="i.id"/> · 未归还 <t t-esc="formatQty(i.outstanding_quantity)"/>
+                    <t t-if="i.project"> · <t t-esc="i.project"/></t>
+                  </option>
+                </t>
+              </select>
+              <label>归还数量</label>
+              <input type="number" min="1" step="1" data-field="qty" t-att-value="state.form.qty" t-on-input="onField"/>
+              <button class="btn btn-sm btn-info w-100" t-att-disabled="state.wfBusy" t-on-click="submitReturn">
+                确认归还
+              </button>
+              <div class="lc-borrower-hint">必须选择原领料记录，且不能超过未归还数量。</div>
+            </div>
+
+            <!-- ================= 标签 ================= -->
+            <div class="lc-workflow" t-if="state.wfMode === 'labels'">
+              <div class="lc-workflow-title">标签（A4 PDF）</div>
+              <label>类型</label>
+              <select data-field="labelKind" t-on-change="onField" t-att-value="state.form.labelKind">
+                <option value="bag">器件/袋标签（一个追溯二维码）</option>
+                <option value="location">库位标签（一个库码二维码）</option>
+              </select>
+              <label>袋（可选；不选则全部）</label>
+              <select data-field="bagId" t-on-change="onField" t-att-value="state.form.bagId">
+                <option value="">-- 全部袋 --</option>
+                <t t-foreach="state.detail.bags" t-as="b" t-key="b.id">
+                  <option t-att-value="b.id"><t t-esc="b.trace_code"/></option>
+                </t>
+              </select>
+              <div class="lc-mm">
+                <span><label>宽 mm</label>
+                  <input type="number" step="0.5" data-field="widthMm" t-att-value="state.form.widthMm" t-on-input="onField"/></span>
+                <span><label>高 mm</label>
+                  <input type="number" step="0.5" data-field="heightMm" t-att-value="state.form.heightMm" t-on-input="onField"/></span>
+                <span><label>页边距 mm</label>
+                  <input type="number" step="0.5" data-field="marginMm" t-att-value="state.form.marginMm" t-on-input="onField"/></span>
+                <span><label>间距 mm</label>
+                  <input type="number" step="0.5" data-field="gapMm" t-att-value="state.form.gapMm" t-on-input="onField"/></span>
+                <span><label>份数</label>
+                  <input type="number" min="1" step="1" data-field="copies" t-att-value="state.form.copies" t-on-input="onField"/></span>
+              </div>
+              <button class="btn btn-sm btn-secondary w-100 mb-1" t-att-disabled="state.wfBusy" t-on-click="previewLabels">
+                生成 A4 PDF 预览
+              </button>
+              <div class="lc-label-actions" t-if="state.labelPdfUrl">
+                <button class="btn btn-sm btn-outline-secondary" t-on-click="printLabels">打印</button>
+                <button class="btn btn-sm btn-outline-secondary" t-on-click="downloadLabels">下载</button>
+                <span class="lc-borrower-hint" t-if="state.labelInfo">
+                  <t t-esc="state.labelInfo.filename"/> · <t t-esc="state.labelInfo.count"/> 张 /
+                  <t t-esc="state.labelInfo.pages"/> 页
+                </span>
+              </div>
+              <iframe t-if="state.labelPdfUrl" class="lc-pdf" t-att-src="state.labelPdfUrl" title="labels"/>
+              <div class="lc-borrower-hint">生成或重印 PDF 不会改变任何库存。</div>
+            </div>
+
+            <!-- ================= 袋 / 未归还 / 历史 ================= -->
+            <div class="lc-detail-section" t-if="state.detail.lab_templates.length">
+              <div class="lc-detail-title">
+                实验室档案 / SN（<t t-esc="state.detail.lab_templates.length"/>）
+              </div>
+              <table class="lc-table">
+                <thead><tr><th>SN</th><th>名称</th><th>数量</th><th>可用</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="state.detail.lab_templates" t-as="t" t-key="t.id">
+                    <td t-esc="t.sn"/><td t-esc="t.name"/>
+                    <td t-esc="formatQty(t.quantity)"/><td t-esc="formatQty(t.available_quantity)"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="lc-detail-section" t-if="state.detail.bags.length">
+              <div class="lc-detail-title">袋 / 批次（所有 SN 汇总）</div>
+              <table class="lc-table">
+                <thead><tr><th>追溯码</th><th>库位</th><th>数量</th><th>入库时间</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="state.detail.bags" t-as="b" t-key="b.id">
+                    <td t-esc="b.trace_code"/>
+                    <td t-esc="b.location_id ? b.location_id[1] : ''"/>
+                    <td t-esc="formatQty(b.quantity)"/>
+                    <td t-esc="b.receipt_date"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="lc-detail-section" t-if="state.detail.issues.length">
+              <div class="lc-detail-title">未归还领料</div>
+              <table class="lc-table">
+                <thead><tr><th>记录</th><th>项目</th><th>未归还</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="state.detail.issues" t-as="i" t-key="i.id">
+                    <td t-esc="i.id"/><td t-esc="i.project"/>
+                    <td t-esc="formatQty(i.outstanding_quantity)"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="lc-detail-section" t-if="state.detail.locations.length">
+              <div class="lc-detail-title">库位分布</div>
+              <table class="lc-table">
+                <thead><tr><th>库位</th><th>数量</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="state.detail.locations" t-as="l" t-key="l.location">
+                    <td t-esc="l.location"/><td t-esc="formatQty(l.quantity)"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="lc-detail-section" t-if="state.detail.parameters.length">
+              <div class="lc-detail-title">参数</div>
+              <dl class="lc-dl lc-dl-params">
+                <t t-foreach="state.detail.parameters" t-as="p" t-key="p.code or p.name">
+                  <dt t-esc="p.name"/><dd t-esc="p.value"/>
+                </t>
+              </dl>
+            </div>
+
+            <div class="lc-detail-section" t-if="state.detail.files.length">
+              <div class="lc-detail-title">文档 / 数据手册</div>
+              <ul class="lc-files">
+                <t t-foreach="state.detail.files" t-as="f" t-key="f.fileUrl or f.fileName">
+                  <li t-if="f.fileUrl">
+                    <a t-att-href="assetSrc(f.fileUrl)" target="_blank" rel="noopener">
+                      <t t-esc="f.fileName or f.fileType"/>
+                    </a>
+                    <small t-esc="f.fileType"/>
+                  </li>
+                </t>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </t>
+
+</templates>

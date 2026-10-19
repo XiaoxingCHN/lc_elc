@@ -1,0 +1,5 @@
+{
+  "client": "maintenance/registry/source-client-baseline.json",
+  "server": "maintenance/registry/source-server-baseline.json",
+  "eda": "maintenance/registry/source-eda-baseline.json"
+}

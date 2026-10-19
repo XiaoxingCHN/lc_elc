@@ -1,0 +1,27 @@
+[Unit]
+Description=Import LCSC crawler snapshot into Odoo catalog
+After=postgresql.service odoo.service
+Requires=postgresql.service
+ConditionPathExists=/var/lib/lcsc-crawler/components.sqlite3
+ConditionPathExists=/var/lib/lcsc-crawler/categories_cn.json
+
+[Service]
+Type=oneshot
+User=odoo
+Group=lcsc
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=+/usr/bin/chmod 0640 /var/lib/lcsc-crawler/components.sqlite3 /var/lib/lcsc-crawler/categories_cn.json
+ExecStart=/opt/odoo/venv/bin/python3 /opt/odoo/custom-addons/lab_catalog/tools/import_catalog.py --snapshot /var/lib/lcsc-crawler/components.sqlite3 --categories /var/lib/lcsc-crawler/categories_cn.json --dbname LcHardwareHouse --dbhost /var/run/postgresql --dbuser odoo --verify
+Nice=10
+CPUWeight=20
+CPUQuota=50%
+MemoryHigh=1G
+MemoryMax=2G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lcsc-crawler
+StandardOutput=journal
+StandardError=journal

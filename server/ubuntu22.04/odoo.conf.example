@@ -1,0 +1,17 @@
+[options]
+; 复制到/etc/odoo.conf前设置真实主密码，禁止使用此占位符。
+admin_passwd = REPLACE_WITH_RANDOM_MASTER_PASSWORD
+db_host = False
+db_port = False
+db_user = odoo
+db_password = False
+addons_path = /opt/odoo/odoo-19/addons,/opt/odoo/custom-addons
+data_dir = /var/lib/odoo
+http_interface = 0.0.0.0
+http_port = 8069
+gevent_port = 8072
+proxy_mode = False
+list_db = False
+dbfilter = ^LcHardwareHouse$
+workers = 0
+logfile = /var/log/odoo/odoo.log

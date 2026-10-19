@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lab_catalog_item_user,lab.catalog.item user,model_lab_catalog_item,group_lab_catalog_user,1,0,0,0
+access_lab_catalog_param_user,lab.catalog.param user,model_lab_catalog_param,group_lab_catalog_user,1,0,0,0
+access_lab_catalog_category_user,lab.catalog.category user,model_lab_catalog_category,group_lab_catalog_user,1,0,0,0
+access_lab_catalog_binding_user,lab.catalog.binding user,model_lab_catalog_binding,group_lab_catalog_user,1,0,1,0
+access_lab_catalog_item_manager,lab.catalog.item manager,model_lab_catalog_item,group_lab_catalog_manager,1,1,1,1
+access_lab_catalog_param_manager,lab.catalog.param manager,model_lab_catalog_param,group_lab_catalog_manager,1,1,1,1
+access_lab_catalog_category_manager,lab.catalog.category manager,model_lab_catalog_category,group_lab_catalog_manager,1,1,1,1
+access_lab_catalog_binding_manager,lab.catalog.binding manager,model_lab_catalog_binding,group_lab_catalog_manager,1,1,1,1
+access_lab_catalog_import_run_manager,lab.catalog.import.run manager,model_lab_catalog_import_run,group_lab_catalog_manager,1,1,1,1
+access_product_template_lab_user,product.template for lab catalog user,product.model_product_template,group_lab_catalog_user,1,1,1,0
+access_product_product_lab_user,product.product for lab catalog user,product.model_product_product,group_lab_catalog_user,1,1,1,0
