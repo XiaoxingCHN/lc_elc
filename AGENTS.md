@@ -35,3 +35,7 @@
 发布前冻结完整源清单，用 tools/release.py snapshot 登记文件和版本；新快照用--activate更新active-sources.json，旧manifest和产物关联不可改写；成品必须记录source manifest、SHA256、构建环境和签名公证书。客户端版本不要与Odoo模块版本混为一个版本。更新CHANGELOG和CURRENT_STATE；旧包不可覆盖。
 
 任务结束写maintenance/templates/HANDOFF.md规定的交接，不记录隐私。没有通过的事项写清剩余工作。不要自创远端仓库或推送；GitHub准备流程见docs/operations/GITHUB.md。
+
+## 本机 TOMC 记忆
+
+本机可选项目笔记位于 `.tomc/memory.sqlite3`，整个 `.tomc/` 已排除 Git。使用已安装 TOMC 的原生 notebook 存储；运行 `python .tomc/memory.py list`，按实际任务用 `recall <name> <task>` 读取。使用和来源说明见 `.tomc/README.md`；若该目录不存在，直接按上述权威文档接手，无需阻塞维护。记忆是有日期的文档快照，不替代最新源码/登记表，不扩大生产授权。只显式保存已授权项目资料，不自动收集当前对话或任何凭据。

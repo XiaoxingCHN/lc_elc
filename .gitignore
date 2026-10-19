@@ -66,3 +66,6 @@ local.properties
 !/releases/
 /releases/*
 !/releases/README.md
+
+# Local TOMC project notebooks and machine-specific configuration.
+/.tomc/
