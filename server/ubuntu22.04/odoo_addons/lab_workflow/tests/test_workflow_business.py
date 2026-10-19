@@ -92,6 +92,104 @@ class LabWorkflowTransactionTest(TransactionCase):
             'note': '测试入库',
         })[0]
 
+    def _pending(self, count=1):
+        return self.common.with_user(self.operator).lab_pending_create({
+            'request_key': _key('prepare'), 'item_key': 'lcsc:C999001',
+            'product_template_id': self.template.id, 'quantity': 10, 'count': count,
+        })['records']
+
+    def test_pending_prepare_does_not_create_stock(self):
+        before = self.template._lab_quantity()
+        moves = self.env['stock.move'].search_count([])
+        records = self._pending(2)
+        self.assertEqual(len({r['trace_code'] for r in records}), 2)
+        self.assertEqual(self.template._lab_quantity(), before)
+        self.assertEqual(self.env['stock.move'].search_count([]), moves)
+        self.assertFalse(self.env['lab.bag'].search([('trace_code', 'in', [r['trace_code'] for r in records])]))
+        pdf = self.common.with_user(self.operator).lab_labels_preview(
+            kind='pending', ids=[r['id'] for r in records], width_mm=60, height_mm=40,
+            fields=['trace_code', 'name', 'mpn', 'catalog_code', 'package', 'parameters'])
+        self.assertTrue(pdf.get('pdf_base64'))
+        self.assertEqual(self.template._lab_quantity(), before)
+
+    def test_pending_create_key_replay_and_manual_archive(self):
+        common = self.common.with_user(self.operator)
+        payload = {'request_key': _key('prepare'), 'material': {
+            'name': '手工建档器件', 'mpn': 'MANUAL-R', 'package': '0603',
+            'specification': '10kΩ ±1%'}, 'quantity': 20, 'count': 2}
+        first = common.lab_pending_create(payload)
+        second = common.lab_pending_create(payload)
+        self.assertEqual(first, second)
+        templates = {r['product_template_id'] for r in first['records']}
+        self.assertEqual(len(templates), 1)
+        self.assertEqual(self.env['product.template'].browse(templates.pop())._lab_quantity(), 0)
+
+    def test_pending_confirm_once_keeps_printed_code(self):
+        record = self._pending()[0]
+        common = self.common.with_user(self.operator)
+        payload = {'request_key': _key('confirm'), 'pending_id': record['id'],
+                   'location_id': self.location_a.id, 'quantity': 8}
+        before = self.template._lab_quantity()
+        data = common.lab_pending_confirm(payload)
+        self.assertEqual(data['bag']['trace_code'], record['trace_code'])
+        self.assertEqual(common.lab_pending_confirm(payload)['bag']['id'], data['bag']['id'])
+        self.assertTrue(common.lab_pending_confirm({**payload, 'request_key': _key()})['replayed'])
+        self.assertEqual(self.template._lab_quantity(), before + 8)
+        pending = self.env['lab.pending.receipt'].browse(record['id'])
+        self.assertEqual(pending.initial_quantity, 10)
+        self.assertEqual(pending.quantity, 8)
+
+    def test_pending_cancel_prevents_confirm(self):
+        record = self._pending()[0]
+        common = self.common.with_user(self.operator)
+        common.lab_pending_update({'pending_id': record['id'], 'action': 'cancel'})
+        with self.assertRaises(LabApiError):
+            common.lab_pending_confirm({'request_key': _key(), 'pending_id': record['id'],
+                'location_id': self.location_a.id, 'quantity': 10})
+        self.assertFalse(self.env['lab.bag'].search([('trace_code', '=', record['trace_code'])]))
+
+    def test_pending_recommends_same_code_across_archives(self):
+        record = self._pending()[0]
+        other = self.env['product.template'].create({
+            'name': '相同立创料号另一个档案', 'lab_lcsc_code': self.template.lab_lcsc_code,
+            'lab_sn': 'LAB-OTHER-PENDING', 'type': 'consu', 'is_storable': True, 'tracking': 'lot'})
+        self.common.with_user(self.operator).lab_receipt({
+            'request_key': _key(), 'item_key': 'lcsc:C999001',
+            'product_template_id': other.id, 'quantity': 5, 'location_id': self.location_a.id})
+        resolved = self.common.with_user(self.operator).lab_pending_resolve(record['payload'])
+        self.assertEqual(resolved['recommendations'][0]['id'], self.location_a.id)
+        self.assertEqual(resolved['recommendations'][0]['reason'], '相同器件')
+
+    def test_pending_owner_and_direct_rpc_boundaries(self):
+        record = self._pending()[0]
+        with self.assertRaises(LabApiError):
+            self.common.with_user(self.other_operator).lab_pending_update({
+                'pending_id': record['id'], 'action': 'select', 'selected': True})
+        with self.assertRaises(LabApiError):
+            self.common.with_user(self.outsider).lab_pending_list()
+        with self.assertRaises(AccessError):
+            self.env['lab.pending.receipt'].with_user(self.operator).with_context(
+                lab_workflow_internal=True).browse(record['id']).write({'state': 'done'})
+        with self.assertRaises(AccessError):
+            self.env['lab.pending.receipt'].with_user(self.operator).create({
+                'trace_code': 'FAKE-1', 'owner_id': self.operator.id,
+                'company_id': self.company.id, 'product_tmpl_id': self.template.id,
+                'quantity': 1, 'initial_quantity': 1})
+
+    def test_pending_same_key_cannot_confirm_a_different_bag(self):
+        records = self._pending(2)
+        common = self.common.with_user(self.operator)
+        payload = {'request_key': _key(), 'pending_id': records[0]['id'],
+                   'location_id': self.location_a.id, 'quantity': 10}
+        common.lab_pending_confirm(payload)
+        with self.assertRaises(LabApiError):
+            common.lab_pending_confirm({**payload, 'pending_id': records[1]['id']})
+
+    def test_pending_reserved_code_cannot_use_direct_receipt(self):
+        record = self._pending()[0]
+        with self.assertRaises(LabApiError):
+            self._receipt(10, trace_code=record['trace_code'])
+
     def _issue(self, bag_id, quantity, borrower=None, project='测试项目', user=None):
         common = self.common.with_user(user or self.operator)
         return common.lab_issue({

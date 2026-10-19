@@ -11,6 +11,7 @@ from . import lab_bag
 from . import lab_operation
 from . import lab_issue
 from . import lab_workflow_api
+from . import lab_pending_receipt
 from . import lab_labels
 from . import lab_label_wizard
 from . import lab_return_wizard

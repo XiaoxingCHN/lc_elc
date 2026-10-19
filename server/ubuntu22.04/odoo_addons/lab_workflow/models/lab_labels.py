@@ -45,7 +45,11 @@ class LabWorkflowLabels(models.AbstractModel):
             raise LabApiError.validation('一次最多打印 200 个标签（可用份数放大）',
                                          {'ids': 'too_many'})
         payloads = []
-        if spec.kind == label_render.KIND_BAG:
+        if spec.kind == 'pending':
+            self._lab_check_service_permission('lab_pending_list')
+            records = [self._lab_pending_record(i) for i in ids]
+            payloads = [record._lab_label_facts() for record in records]
+        elif spec.kind == label_render.KIND_BAG:
             bags = self.env['lab.bag'].browse([int(i) for i in ids]).exists()
             missing = sorted(set(int(i) for i in ids) - set(bags.ids))
             if missing:

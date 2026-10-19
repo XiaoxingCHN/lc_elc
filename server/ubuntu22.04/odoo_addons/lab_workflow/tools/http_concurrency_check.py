@@ -194,6 +194,8 @@ def main():
 
     session_a = _login_or_create(admin, args.db, args.user_a, args.pass_a)
     session_b = _login_or_create(admin, args.db, args.user_b, args.pass_b)
+    device = Session(args.url, args.db, session_a.login, session_a.password, 'second-device')
+    device.authenticate()
 
     location_id = args.location_id
     if not location_id:
@@ -260,7 +262,7 @@ def main():
         lambda: session_a.envelope(API + '/inventory/return', {
             'request_key': str(uuid.uuid4()), 'issue_line_id': issue_line_id,
             'quantity': 15}),
-        lambda: session_b.envelope(API + '/inventory/return', {
+        lambda: device.envelope(API + '/inventory/return', {
             'request_key': str(uuid.uuid4()), 'issue_line_id': issue_line_id,
             'quantity': 15}),
     )
@@ -270,6 +272,9 @@ def main():
     if successes != 1:
         failures_total += 1
         _logger.error('场景2 失败：期望 1 次成功，实际 %d', successes)
+    if any(e.get('code') not in ('PRECONDITION_FAILED', 'VALIDATION_ERROR') for e in errors):
+        failures_total += 1
+        _logger.error('场景2 失败：应当是明确的业务拒绝，实际 %s', [e.get('code') for e in errors])
     outstanding = None
     for entry in (results.get('a', (None, {}))[1], results.get('b', (None, {}))[1]):
         if isinstance(entry, dict) and entry.get('ok'):
@@ -348,9 +353,43 @@ def main():
         _logger.error('场景4 失败：拒绝码应为 CONFLICT，实际 %s', errors[0].get('code'))
 
     # ------------------------------------------------------------------
+    # Two independently authenticated devices of the SAME owner prepare/confirm
+    # one physical bag. Other owners remain excluded by the server record rule.
+    _logger.info('=== 场景5：两设备同请求制袋，不创建库存 ===')
+    prepare = {'request_key': str(uuid.uuid4()), 'item_key': item_key, 'quantity': 12, 'count': 1}
+    results = concurrent(
+        lambda: session_a.envelope(API + '/inventory/pending/create', prepare),
+        lambda: device.envelope(API + '/inventory/pending/create', prepare))
+    successes, errors = summarize(results)
+    prepared = [entry[1]['data']['records'][0] for entry in results.values()
+                if entry[0] == 'ok' and entry[1].get('ok')]
+    if successes != 2 or len({p['id'] for p in prepared}) != 1:
+        raise AssertionError('并发制袋未返回同一条记录：%s' % errors)
+    record = prepared[0]
+    count = admin.call('/web/dataset/call_kw', {
+        'model': 'lab.bag', 'method': 'search_count',
+        'args': [[['trace_code', '=', record['trace_code']]]], 'kwargs': {}})['result']
+    if count != 0:
+        raise AssertionError('制袋阶段错误创建了正式库存袋')
+
+    _logger.info('=== 场景6：两设备不同请求同时确认同一袋 ===')
+    def confirm(session):
+        return session.envelope(API + '/inventory/pending/confirm', {
+            'request_key': str(uuid.uuid4()), 'pending_id': record['id'],
+            'quantity': 12, 'location_id': location_id})
+    results = concurrent(lambda: confirm(session_a), lambda: confirm(device))
+    successes, errors = summarize(results)
+    if successes != 2:
+        raise AssertionError('并发确认失败：%s' % errors)
+    ids = {entry[1]['data']['record']['bag_id'] for entry in results.values()}
+    resolved = session_a.envelope(API + '/inventory/resolve_code', {'raw': record['payload']})
+    if len(ids) != 1 or resolved['data']['bag']['quantity'] != 12:
+        raise AssertionError('同袋重复入库或数量不一致')
+    _logger.info('同袋并发确认通过：一个正式袋，数量 12，二维码保持不变')
+
     print('\n===== 并发验收结果 =====')
     if failures_total == 0:
-        print('全部 4 个并发场景通过：真实相交执行、非 super 操作员、无死锁。')
+        print('全部 6 个并发场景通过：真实相交执行、非 super 操作员、无死锁。')
         return 0
     print('有 %d 项不通过，请查看上面的 ERROR 日志与服务端 code。' % failures_total)
     return 1

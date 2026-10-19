@@ -146,7 +146,8 @@ class LabBag(models.Model):
         for _attempt in range(20):
             candidate = sequence.next_by_code(TRACE_SEQUENCE)
             code = inventory_codec.normalize_trace_code(candidate)
-            if code and not self.search_count([('trace_code', '=', code)]):
+            if (code and not self.sudo().search_count([('trace_code', '=', code)])
+                    and not self.env['lab.pending.receipt'].sudo().search_count([('trace_code', '=', code)])):
                 return code
         raise ValidationError(_('无法生成唯一追溯码，请检查 ir.sequence 配置。'))
 
@@ -202,6 +203,11 @@ class LabBag(models.Model):
                 if not normalized:
                     raise ValidationError(_('追溯码「%s」非法。') % vals['trace_code'])
                 vals['trace_code'] = normalized
+            reservation = self.env['lab.pending.receipt'].sudo().search(
+                [('trace_code', '=', vals['trace_code'])], limit=1)
+            if reservation and vals.get('pending_receipt_id') != reservation.id:
+                raise ValidationError(_('该袋码已预留，请使用待入库确认流程。'))
+            self.env['lab.trace.code'].sudo()._lab_reserve(vals['trace_code'], reservation or None)
             if not vals.get('product_id') and vals.get('product_tmpl_id'):
                 template = self.env['product.template'].browse(vals['product_tmpl_id'])
                 vals['product_id'] = template.product_variant_id.id
@@ -210,12 +216,15 @@ class LabBag(models.Model):
                 vals['product_tmpl_id'] = product.product_tmpl_id.id
         return super().create(vals_list)
 
+    pending_receipt_id = fields.Many2one('lab.pending.receipt', ondelete='restrict', copy=False)
+    _pending_receipt_unique = models.Constraint('unique(pending_receipt_id)', '同一待入库记录只能生成一个正式袋。')
+
     # ------------------------------------------------------------------
     # 服务边界：禁止绕过接口改追溯码/批次/数量绑定
     # ------------------------------------------------------------------
     PROTECTED_WRITE_FIELDS = ('trace_code', 'lot_id', 'location_id', 'quantity',
                               'product_id', 'product_tmpl_id', 'initial_quantity',
-                              'receipt_operation_id', 'company_id')
+                              'receipt_operation_id', 'company_id', 'pending_receipt_id')
 
     def write(self, values):
         self.env['lab.workflow.common'].lab_guard_fields(
@@ -259,6 +268,9 @@ class LabBag(models.Model):
             'location': location.complete_name or location.display_name,
             'location_id': location.id,
             'mpn': template.lab_mpn or '',
+            'package': template.lab_package or '',
+            'brand': template.lab_brand or '',
+            'initial_quantity': self.initial_quantity,
             'catalog_code': template.lab_lcsc_code or '',
             'parameters': parameters,
             'quantity': self.quantity,

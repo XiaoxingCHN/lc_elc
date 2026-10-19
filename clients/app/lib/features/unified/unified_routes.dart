@@ -6,6 +6,7 @@ import 'screens/history_screen.dart';
 import 'screens/issue_screen.dart';
 import 'screens/labels_screen.dart';
 import 'screens/receipt_screen.dart';
+import 'screens/pending_receipt_screen.dart';
 import 'screens/return_screen.dart';
 import 'screens/unified_catalog_screen.dart';
 import 'screens/unified_item_detail_screen.dart';
@@ -38,6 +39,7 @@ class UnifiedRoutes {
 
   /// 入库.
   static const String receipt = '/receipt';
+  static const String pendingReceipt = '/receipt/prepare';
 
   /// 领料.
   static const String issue = '/issue';
@@ -117,6 +119,14 @@ class UnifiedRoutes {
 /// only build screens. Every screen reads its data from Riverpod providers, so
 /// no constructor plumbing is needed from `main.dart`.
 final List<RouteBase> unifiedRoutes = <RouteBase>[
+  GoRoute(
+    path: UnifiedRoutes.pendingReceipt,
+    builder: (context, state) => LabPageFrame(
+      fallbackLocation: UnifiedRoutes.catalog,
+      child: PendingReceiptScreen(initialTab: state.uri.queryParameters['step'] == 'scan' ? 1 : 0,
+        initialItemKey: state.uri.queryParameters['item_key']),
+    ),
+  ),
   GoRoute(
     path: UnifiedRoutes.catalog,
     name: 'unifiedCatalog',

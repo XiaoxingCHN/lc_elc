@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="0">
+        <record id="rule_lab_pending_owner_company" model="ir.rule">
+            <field name="name">待入库袋：当前账号和当前公司</field>
+            <field name="model_id" ref="model_lab_pending_receipt"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('owner_id', '=', user.id), ('company_id', '=', company_id)]</field>
+        </record>
 
         <!--
             记录规则说明：

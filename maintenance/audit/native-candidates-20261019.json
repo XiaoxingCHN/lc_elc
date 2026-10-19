@@ -1,0 +1,188 @@
+{
+  "version": "1.1.0+3",
+  "status": "candidate; not released",
+  "source_manifest": "maintenance/registry/source-client-two-stage-receipt-20261019.json",
+  "source_tree_sha256": "42f0e5d1dbd64f7611d25d025e53ae3e9a1577631de9a345e3d2ead24f4a1c27",
+  "defaults": {
+    "server": "http://127.0.0.1:18069",
+    "database": "lc_candidate_test"
+  },
+  "environment": {
+    "flutter": "3.47.7",
+    "windows": "MSVC14.44.35207, CMake4.1.1, Ninja, portable VS2026",
+    "android": "WSL Ubuntu22.04, JDK17, SDK36",
+    "linux": "WSL Ubuntu22.04, clang14, CMake3.22.1, Ninja; host GTK, private libsecret dev sysroot"
+  },
+  "artifacts": [
+    {
+      "platform": "android",
+      "file": "local/build/client-android-20261019T151453585941/source/build/app/outputs/flutter-apk/app-release.apk",
+      "bytes": 74141893,
+      "sha256": "4caabcdcd9d10ba60e8ce2b01ad067a835b15fa667fe69dc9e85f791bf5e1deb",
+      "build_exit_code": 0,
+      "source_check": {
+        "checked": 150,
+        "mismatches": []
+      },
+      "certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+      "signature_verify_exit_code": 0,
+      "signing": "existing registered debug certificate; not a store signing identity"
+    },
+    {
+      "platform": "windows",
+      "file": "local/build/native-candidates-20261019/lc-client-windows-1.1.0+3-candidate.zip",
+      "bytes": 16033055,
+      "sha256": "fd94b74f77431aa4b797eef1500755fe192878c34c1ef45f5065e73ba0949e2e",
+      "bundle_files": {
+        "concrt140.dll": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+        "data/app.so": "cb331fbf7e6e8fe28cdf35f57e2d3c4fb8151aabcc518afb0acc289e19b7889b",
+        "data/flutter_assets/AssetManifest.bin": "00af55ad3d6f21898fe77e0ff092d1a1cda52c941b6860e9928d45c8af8c095d",
+        "data/flutter_assets/FontManifest.json": "cd7e03645bc44b2dd47b7cb626f51c4ecbf55a197ab77241628b47ac165fbe21",
+        "data/flutter_assets/fonts/MaterialIcons-Regular.otf": "a4227a66f85137352da94373977213839ccd410207ad3128ad4300fa2a0a8701",
+        "data/flutter_assets/NativeAssetsManifest.json": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb",
+        "data/flutter_assets/NOTICES.Z": "d01f75828dd9d55c4fc47324286497a38f8214406dc8dbd5031eafcad1c5e08d",
+        "data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "51d25345371e608ecd45e3a14ab239b4be650e9011149201a5b18c404d2469da",
+        "data/flutter_assets/shaders/ink_sparkle.frag": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af",
+        "data/flutter_assets/shaders/stretch_effect.frag": "bc7599dbbbaab310efe41520574138d21fb18a88c8fe4495ed79315309336f6f",
+        "data/icudtl.dat": "325a86063d26334c2eabe1743cea073b612540fbf3d8fc2ef0b5708e3763a8c7",
+        "flutter_secure_storage_windows_plugin.dll": "e4dbe686a60bf7ed036203c9eaf52c841d6b14aa5df258266892251f5419bcb2",
+        "flutter_windows.dll": "7b03815958c49d72385be497fbd0eb1bb2ae27d24989d6c9aee83eafbd93e9d3",
+        "lab_inventory_client.exe": "3c0d65e0123f17590f603f1774eed93ce6abcfeba12cf5601531accde7049b6f",
+        "msvcp140.dll": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+        "msvcp140_1.dll": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+        "msvcp140_2.dll": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+        "msvcp140_atomic_wait.dll": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+        "msvcp140_codecvt_ids.dll": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+        "pdfium.dll": "0c88ebacc0393fd45fc3e7b35e31e72c9e55b633a846a7ecf4085694dba68abd",
+        "printing_plugin.dll": "edf32c5de4be5d3c87d6e22f8ce2adb7eed9da9f6767e9fc757aa0da37dc40f0",
+        "url_launcher_windows_plugin.dll": "0c79ae658745ebc84de44ba8bdf9122f46bfbc8cc00ff9716b77db32bfaee846",
+        "vccorlib140.dll": "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd",
+        "vcruntime140.dll": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+        "vcruntime140_1.dll": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+        "vcruntime140_threads.dll": "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa"
+      },
+      "build_exit_code": 0,
+      "native_signing": "not signed/not notarized",
+      "source_check": {
+        "checked": 150,
+        "mismatches": []
+      },
+      "dependency_adapter": {
+        "adapter": "Private printing CMake: same PDFium archive URL replaced with local copy plus SHA256",
+        "origin": "F:/lc_elc_workspace/lc_elc/build_work/windows-native/src/build/windows/x64/pdfium-download/pdfium-download-prefix/src/pdfium-win-x64.tgz",
+        "archive_sha256": "8e900c3e5103ae9a3aa7800653e804575c687d132fcfb4deda7bb2ce04aca8d2"
+      },
+      "native_check": {
+        "shutdown": "terminated only verified test executable",
+        "ui_interaction": "not tested",
+        "profile": "isolated APPDATA/LOCALAPPDATA",
+        "started": true,
+        "alive": true,
+        "alive_after_seconds": 8
+      }
+    },
+    {
+      "platform": "linux",
+      "file": "local/build/native-candidates-20261019/lc-client-linux-1.1.0+3-candidate.tar.gz",
+      "bytes": 13338232,
+      "sha256": "739700070f6836f5c78650f936a28742c211cd8a0dc3b7e0be9227eb3a14aaec",
+      "bundle_files": {
+        "data/flutter_assets/AssetManifest.bin": "00af55ad3d6f21898fe77e0ff092d1a1cda52c941b6860e9928d45c8af8c095d",
+        "data/flutter_assets/FontManifest.json": "cd7e03645bc44b2dd47b7cb626f51c4ecbf55a197ab77241628b47ac165fbe21",
+        "data/flutter_assets/fonts/MaterialIcons-Regular.otf": "a4227a66f85137352da94373977213839ccd410207ad3128ad4300fa2a0a8701",
+        "data/flutter_assets/NativeAssetsManifest.json": "9548a31e4a048135c1d94f919328bfb62ae2c7bb3cab96557c7941daa97776cb",
+        "data/flutter_assets/NOTICES.Z": "af27c132d0ef7bbc06a910e4da1cc0df58eb1b580a6dbf34b2e17fb6e696f43c",
+        "data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "51d25345371e608ecd45e3a14ab239b4be650e9011149201a5b18c404d2469da",
+        "data/flutter_assets/shaders/ink_sparkle.frag": "1fe8436a743884cb65078fe8c7b38e18f5365f2a2961270916f426fd13c604af",
+        "data/flutter_assets/shaders/stretch_effect.frag": "bc7599dbbbaab310efe41520574138d21fb18a88c8fe4495ed79315309336f6f",
+        "data/flutter_assets/version.json": "93d082adb1cb152a1ca223caac3569c2c582944391e92933f0a41a9a9c491033",
+        "data/icudtl.dat": "325a86063d26334c2eabe1743cea073b612540fbf3d8fc2ef0b5708e3763a8c7",
+        "lab_inventory_client": "bc026fb2f719e4df339dafe32700adbb5eb8e9086493fe070b980ea3944751cf",
+        "lib/libapp.so": "5c2ed7ca35322eb4cf37034e446dfe53269c7732410c76685c87ac770806f4f3",
+        "lib/libflutter_linux_gtk.so": "f16d6efcacd3d2419cda30ac6e2ac30b7c760b0653b434de6449d629a917a948",
+        "lib/libflutter_secure_storage_linux_plugin.so": "998c274fb50bf2e252bb6260cd9a54e90bb13a1f956b4d3cc82ad1f974e4150f",
+        "lib/libpdfium.so": "d585300f4a8ce25cfb3a290fdd16caeedf102bb89194a0d3835f27a9ca09bd24",
+        "lib/libprinting_plugin.so": "5423506ccf197a08286686451f6998509124249c29d6b9fc2d2a8042eb74188c",
+        "lib/liburl_launcher_linux_plugin.so": "bdedeb15e9589e2df2978b0f92eb7fa6115736ba01d5b0e971e12b0d6d6fd601"
+      },
+      "build_exit_code": 0,
+      "native_signing": "not signed/not notarized",
+      "dependency_adapter": {
+        "pdfium_sha256": "0e68e7f0c7619a5b4a91431fad516d665cc52f0c341d701b21aad71a6c6d41d9",
+        "origin": "/var/tmp/lc-elc-wb-linux-20261014-135303/shared_source/build/linux/x64/release/pdfium-download/pdfium-download-prefix/src/pdfium-linux-x64.tgz",
+        "adapter": "Private dependency CMake URL replaced with local archive and SHA256"
+      },
+      "native_check": {
+        "source_check": {
+          "checked": 150,
+          "mismatches": []
+        },
+        "linked_libraries": [
+          {
+            "file": "lab_inventory_client",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/libapp.so",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/libflutter_linux_gtk.so",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/libflutter_secure_storage_linux_plugin.so",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/libpdfium.so",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/libprinting_plugin.so",
+            "exit_code": 0,
+            "missing": []
+          },
+          {
+            "file": "lib/liburl_launcher_linux_plugin.so",
+            "exit_code": 0,
+            "missing": []
+          }
+        ],
+        "executable_mode": "0o755",
+        "flutter_sdk": "/mnt/f/lc_elc_workspace/lc_elc/dependencies/sdk/linux/flutter",
+        "native_launch": "not executed"
+      }
+    }
+  ],
+  "validation": {
+    "maintenance_tests": {
+      "passed": 8,
+      "exit_code": 0
+    },
+    "repo_check": {
+      "passed_checks": 49,
+      "exit_code": 0,
+      "verify_payloads": false
+    },
+    "native_launch": "Windows process smoke only; Linux/Android not tested",
+    "os_secure_storage": "not tested this round",
+    "physical_scan_print": "not tested"
+  },
+  "production": "Tracked separately in server-deploy-20261019.json; client build does not modify production",
+  "log_sha256": {
+    "local/build/native-candidates-20261019/android-signature.log": "074fc3c6d9c6107f19cb8b4ed97bb5cccd4308a85e24a711fd86eb76f574d489",
+    "local/build/native-candidates-20261019/maintenance-tests-final.log": "1807490f295c00a6a6a927b66923a762473430c3172ebd71be986cbb91dc38a2",
+    "local/build/native-candidates-20261019/repo-check.log": "b7e6e8b4d8ff6b7dd73b89cc94ce99e6b26f946a585f9fd9dfc28ce921014895",
+    "local/build/client-android-20261019T151453585941/0-command.log": "d4cb7a3c68b4133b4f6e58c67ff5bfd13725d8021e930388cdc98da8a575919d",
+    "local/build/client-android-20261019T151453585941/1-command.log": "e5d0c258a27d257b1f78da4215539df66965aac3916c8a04cd482434f5052dc2",
+    "local/build/client-windows-20261019T151729709/native-install-final.log": "9a7f54b82341301aceef77e0d6b9bd17a8ccc64e435b22ee16e6e35e67a284b1",
+    "local/build/native-candidates-20261019/linux/pub.log": "6270300527798908f3762333ada830668f0db27930a3b66209d1f1eb9cac86e3",
+    "local/build/native-candidates-20261019/linux/build.log": "fcde1c6995fe294dd3079904b2e6314eab07b6b5dafc76052138cf6748c1da6e"
+  }
+}

@@ -24,6 +24,33 @@ API = '/lab/api'
 POST = ['POST']
 
 
+class LabPendingReceiptController(http.Controller):
+    @http.route(API + '/inventory/pending/list', type='jsonrpc', auth='user', methods=POST, csrf=False)
+    @envelope
+    def pending_list(self, **kwargs):
+        return request.env['lab.workflow.common'].lab_pending_list(params().get('cursor'))
+
+    @http.route(API + '/inventory/pending/create', type='jsonrpc', auth='user', methods=POST, csrf=False)
+    @envelope
+    def pending_create(self, **kwargs):
+        return request.env['lab.workflow.common'].lab_pending_create(params())
+
+    @http.route(API + '/inventory/pending/update', type='jsonrpc', auth='user', methods=POST, csrf=False)
+    @envelope
+    def pending_update(self, **kwargs):
+        return request.env['lab.workflow.common'].lab_pending_update(params())
+
+    @http.route(API + '/inventory/pending/resolve', type='jsonrpc', auth='user', methods=POST, csrf=False)
+    @envelope
+    def pending_resolve(self, **kwargs):
+        return request.env['lab.workflow.common'].lab_pending_resolve(params().get('raw') or '')
+
+    @http.route(API + '/inventory/pending/confirm', type='jsonrpc', auth='user', methods=POST, csrf=False)
+    @envelope
+    def pending_confirm(self, **kwargs):
+        return request.env['lab.workflow.common'].lab_pending_confirm(params())
+
+
 class LabInventoryApi(http.Controller):
 
     # ------------------------------------------------------------------

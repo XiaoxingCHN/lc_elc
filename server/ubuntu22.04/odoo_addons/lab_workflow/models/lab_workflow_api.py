@@ -109,6 +109,11 @@ class LabWorkflowApi(models.AbstractModel):
             }
 
         if kind == inventory_codec.KIND_BAG:
+            pending = self.env['lab.pending.receipt'].search([
+                ('trace_code', '=', parsed['normalized']), ('owner_id', '=', self.env.uid),
+                ('company_id', '=', self.env.company.id)], limit=1)
+            if pending and pending.state != 'done':
+                raise LabApiError.precondition('该袋尚未入库或已取消，请进入“扫码上架”处理。')
             bag = self.lab_bag_by_trace_code(parsed['normalized'])
             data['bag'] = bag._lab_bag_dict()
             data['item_key'] = data['bag']['item_key']
@@ -245,7 +250,7 @@ class LabWorkflowApi(models.AbstractModel):
         return self.lab_run_with_concurrency_retry(
             lambda: self._lab_receipt_once(params))
 
-    def _lab_receipt_once(self, params):
+    def _lab_receipt_once(self, params, prepared=None):
         """入库的一次尝试（被 lab_receipt 的并发重试包裹）。"""
         request_key = self.lab_request_key(params)
         log, replay = self.lab_begin_request(request_key, 'inventory.receipt', params)
@@ -326,6 +331,7 @@ class LabWorkflowApi(models.AbstractModel):
                 # lab.bag / stock.lot 的直接 create 权限（外部 dataset 仍不能建）。
                 bag = bag_model.sudo().create({
                     'trace_code': requested_trace or False,
+                    'pending_receipt_id': prepared.id if prepared else False,
                     'company_id': self.env.company.id,
                     'product_tmpl_id': template.id,
                     'product_id': product.id,

@@ -243,6 +243,11 @@ class _DetailBody extends ConsumerWidget {
           spacing: 8,
           runSpacing: 8,
           children: <Widget>[
+            OutlinedButton.icon(
+              onPressed: () => context.push(Uri(path: UnifiedRoutes.pendingReceipt,
+                queryParameters: {'item_key': itemKey}).toString()),
+              icon: const Icon(Icons.sell_outlined), label: const Text('制袋贴标'),
+            ),
             FilledButton.icon(
               onPressed: () => context.push(
                 UnifiedRoutes.receiptWith(itemKey, item?.title ?? ''),

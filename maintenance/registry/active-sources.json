@@ -1,5 +1,5 @@
 {
-  "client": "maintenance/registry/source-client-archive-final.json",
-  "server": "maintenance/registry/source-server-baseline.json",
+  "client": "maintenance/registry/source-client-two-stage-receipt-20261019.json",
+  "server": "maintenance/registry/source-server-two-stage-receipt-opsfix-20261019.json",
   "eda": "maintenance/registry/source-eda-baseline.json"
 }

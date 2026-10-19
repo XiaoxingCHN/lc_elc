@@ -27,6 +27,7 @@ const List<({String id, String label})> kLabelFields = <({String id, String labe
   (id: 'brand', label: '品牌'),
   (id: 'package', label: '封装'),
   (id: 'parameters', label: '参数'),
+  (id: 'initial_quantity', label: '初始数量'),
 ];
 
 /// Field ids that would mean "print another code": always refused.
@@ -43,19 +44,20 @@ const Set<String> kForbiddenLabelFields = <String>{
 /// bag/batch (with its trace code); a location label identifies the location.
 enum LabelKind {
   bag,
+  pending,
   location;
 
   /// Value sent to `/lab/api/labels/preview`.
   String get wire => name;
 
-  String get displayName => this == LabelKind.bag ? '器件追溯标签' : '库位标签';
+  String get displayName => this == LabelKind.location ? '库位标签' : '器件追溯标签';
 
   /// Payload prefix the label's single QR carries.
-  String get payloadPrefix => this == LabelKind.bag ? 'LABB:' : 'LABL:';
+  String get payloadPrefix => this == LabelKind.location ? 'LABL:' : 'LABB:';
 
   /// Sensible default text fields for this kind.
-  List<String> get defaultFields => this == LabelKind.bag
-      ? const <String>['sn', 'catalog_code', 'mpn', 'parameters', 'location']
+  List<String> get defaultFields => this != LabelKind.location
+      ? const <String>['trace_code', 'name', 'mpn', 'catalog_code', 'package', 'parameters']
       : const <String>['location', 'name'];
 }
 
@@ -194,6 +196,7 @@ LabelLayout planLabels(LabelSpec spec) {
   if (spec.copies < 1) {
     errors.add('份数至少为 1。');
   }
+  if (spec.ids.length > 200) errors.add('一次最多选择 200 袋／库位，请分批打印。');
   if (margin < 0) {
     errors.add('页边距不能为负数。');
   }
@@ -245,6 +248,9 @@ LabelLayout planLabels(LabelSpec spec) {
   }
   if (effectiveFields.isEmpty) {
     warnings.add('未选择文字字段，标签上只有二维码。');
+  }
+  if (spec.kind == LabelKind.pending && !effectiveFields.contains('trace_code')) {
+    errors.add('待入库标签必须保留袋码文字。');
   }
   if (capacity > 0 && labelCount > 0 && pages > 1) {
     warnings.add('$labelCount 张标签需要 $pages 页 A4，将生成多页 PDF。');

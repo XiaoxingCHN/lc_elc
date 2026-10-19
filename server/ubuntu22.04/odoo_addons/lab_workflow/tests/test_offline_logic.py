@@ -27,7 +27,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _TOOLS = os.path.abspath(os.path.join(_HERE, '..', 'tools'))
 
 # 直接按文件加载纯逻辑模块：绕开 tools/__init__.py 里依赖 odoo 的部分
-for _name in ('inventory_codec', 'request_keys', 'label_render'):
+for _name in ('inventory_codec', 'request_keys', 'label_render', 'label_parameters'):
     _spec = importlib.util.spec_from_file_location(
         _name, os.path.join(_TOOLS, '%s.py' % _name))
     _module = importlib.util.module_from_spec(_spec)
@@ -37,6 +37,7 @@ for _name in ('inventory_codec', 'request_keys', 'label_render'):
 inventory_codec = sys.modules['inventory_codec']
 request_keys = sys.modules['request_keys']
 label_render = sys.modules['label_render']
+label_parameters = sys.modules['label_parameters']
 
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
@@ -206,6 +207,25 @@ class TestLabelLayout(unittest.TestCase):
             label_render.validate_spec(self._spec(fields=['sn', 'not_a_field']))
         with self.assertRaises(label_render.LabelSpecError):
             label_render.validate_spec(self._spec(kind='bag', fields=['mpn']))
+
+    def test_pending_label_identity_and_initial_quantity(self):
+        spec = self._spec(kind='pending', fields=['trace_code', 'name', 'mpn', 'package', 'brand', 'initial_quantity'])
+        content = label_render.build_contents(spec, [{
+            'kind': 'pending', 'ref_id': 1, 'payload': 'LABB:TRC-100', 'trace_code': 'TRC-100',
+            'title': 'R-10K', 'mpn': 'R-10K', 'name': '电阻', 'package': '0603',
+            'brand': '测试', 'initial_quantity': 100,
+        }])[0]
+        self.assertEqual(content.payload, 'LABB:TRC-100')
+        self.assertIn('追溯码：TRC-100', content.lines)
+        self.assertIn('封装：0603', content.lines)
+        self.assertIn('初始数量：100', content.lines)
+        with self.assertRaises(label_render.LabelSpecError):
+            label_render.validate_spec(self._spec(kind='pending', fields=['mpn']))
+
+    def test_key_parameters_prioritize_electrical_specs(self):
+        values = [{'name': name, 'value': 'v'} for name in ['包装方式', '阻值', '精度', '功率', '温度系数']]
+        self.assertEqual([p['name'] for p in label_parameters.key_parameters(values)], ['阻值', '精度', '功率'])
+        self.assertEqual(len(values), 5)
 
     def test_parameters_flattening(self):
         spec = self._spec(fields=['sn', 'parameters'])

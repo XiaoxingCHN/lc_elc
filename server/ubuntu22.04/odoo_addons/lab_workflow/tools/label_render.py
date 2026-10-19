@@ -46,12 +46,14 @@ ALLOWED_FIELDS = (
     'item_name',     # 名称
     'trace_code',    # 追溯码正文
     'supplier',      # 来料信息（订单号等）
+    'name', 'brand', 'package', 'initial_quantity',
 )
 
 # 器件标签至少要有 SN 与库位；库位标签至少要显示库码
 REQUIRED_FIELDS = {
-    KIND_BAG: ('sn',),
+    KIND_BAG: (),
     KIND_LOCATION: ('location',),
+    'pending': ('trace_code',),
 }
 
 # 数值边界（业务可配置由 ir.config_parameter 覆盖，这里是硬下限/上限）
@@ -124,7 +126,7 @@ class LabelSpec(object):
         self.margin_mm = float(margin_mm)
         self.gap_mm = float(gap_mm)
         self.copies = int(copies)
-        self.fields = list(fields) if fields else list(REQUIRED_FIELDS.get(kind, ('sn',)))
+        self.fields = list(fields) if fields else list(REQUIRED_FIELDS.get(kind) or ('sn',))
         self.ids = list(ids or [])
 
     @property
@@ -170,7 +172,7 @@ def _check_range(name, value):
 
 def validate_spec(spec):
     """校验标签规格；不合法直接抛 LabelSpecError（中文可执行提示）。"""
-    if spec.kind not in (KIND_BAG, KIND_LOCATION):
+    if spec.kind not in (KIND_BAG, KIND_LOCATION, 'pending'):
         raise LabelSpecError('标签类型只能是 bag（器件袋标签）或 location（库位标签），收到 %r'
                              % (spec.kind,), 'kind')
     _check_range('width_mm', spec.width_mm)
@@ -191,6 +193,8 @@ def validate_spec(spec):
     for required in REQUIRED_FIELDS.get(spec.kind, ()):
         if required not in fields:
             raise LabelSpecError('%s 标签必须包含字段 %s' % (spec.kind, required), 'fields')
+    if spec.kind == KIND_BAG and not {'sn', 'trace_code'}.intersection(fields):
+        raise LabelSpecError('器件标签必须包含内部 SN 或袋码文字。', 'fields')
 
     # 一张标签必须同时装得下「唯一二维码」+ 要求的文字，否则明确拒绝而不是裁切。
     # 先于 A4 范围判断：太小的标签要给出「装不下二维码/文字」这个更有意义的原因。
@@ -313,6 +317,7 @@ def _format_parameters(parameters):
 
 # 打印时给「裸值」字段加中文前缀，避免操作员看不懂（例如 101 -> 数量：101）
 FIELD_PREFIXES = {
+    'name': '名称', 'brand': '品牌', 'package': '封装', 'initial_quantity': '初始数量',
     'quantity': '数量',
     'location': '库码',
     'mpn': '型号',
@@ -340,7 +345,7 @@ def _format_field(field, entry):
         value = _clean(entry.get('location_code') or entry.get('location'))
     elif field == 'catalog_code':
         value = _clean(entry.get('catalog_code'))
-    elif field == 'item_name':
+    elif field in ('item_name', 'name'):
         value = _clean(entry.get('item_name') or entry.get('name'))
     elif field == 'quantity':
         value = _clean(entry.get('quantity'))

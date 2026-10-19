@@ -117,10 +117,10 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisSpacing: 12,
                 children: <Widget>[
                   _ActionCard(
-                    title: '入库',
-                    subtitle: '扫码或输入编码',
+                    title: '采购入库',
+                    subtitle: '制袋贴标 · 扫码上架',
                     icon: Icons.qr_code_scanner,
-                    onTap: () => context.push(UnifiedRoutes.receipt),
+                    onTap: () => context.push(UnifiedRoutes.pendingReceipt),
                   ),
                   _ActionCard(
                     title: '领料',

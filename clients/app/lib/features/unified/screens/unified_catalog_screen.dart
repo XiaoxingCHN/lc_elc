@@ -175,9 +175,9 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
               ? const FilterDrawer(child: FilterPanel())
               : null,
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => context.push(UnifiedRoutes.receipt),
+            onPressed: () => context.push(UnifiedRoutes.pendingReceipt),
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('入库扫码'),
+            label: const Text('采购入库'),
           ),
           body: wide
               ? Row(

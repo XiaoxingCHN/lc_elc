@@ -5,6 +5,7 @@ import '../features/unified/models/catalog_query.dart';
 import '../features/unified/models/inventory.dart';
 import '../features/unified/models/json_read.dart';
 import '../features/unified/models/labels.dart';
+import '../features/unified/models/pending_receipt.dart';
 import '../features/unified/models/unified_item.dart';
 import '../models/lab_api_exception.dart';
 
@@ -50,6 +51,11 @@ class LabApiRoutes {
   static const String inventoryLocationCreate = '/lab/api/inventory/location_create';
   static const String inventoryResolveCode = '/lab/api/inventory/resolve_code';
   static const String inventoryReceipt = '/lab/api/inventory/receipt';
+  static const String pendingList = '/lab/api/inventory/pending/list';
+  static const String pendingCreate = '/lab/api/inventory/pending/create';
+  static const String pendingUpdate = '/lab/api/inventory/pending/update';
+  static const String pendingResolve = '/lab/api/inventory/pending/resolve';
+  static const String pendingConfirm = '/lab/api/inventory/pending/confirm';
   static const String inventoryIssue = '/lab/api/inventory/issue';
   static const String inventoryReturn = '/lab/api/inventory/return';
   static const String inventoryIssues = '/lab/api/inventory/issues';
@@ -233,6 +239,38 @@ class LabApiClient {
     );
     return ResolvedCode.fromJson(text, data);
   }
+
+  /// Restores this account's prepared bags and print selections from the server.
+  Future<List<PendingReceipt>> pendingReceipts() async {
+    final records = <PendingReceipt>[];
+    int? cursor;
+    do {
+      final data = await _invoke(LabApiRoutes.pendingList, {if (cursor != null) 'cursor': cursor});
+      records.addAll(asMapList(data['records']).map(PendingReceipt.fromJson));
+      final next = firstInt(data, const ['cursor']);
+      if (next != null && cursor != null && next >= cursor) {
+        throw StateError('待入库列表分页异常，请重试。');
+      }
+      cursor = next;
+    } while (cursor != null);
+    return records;
+  }
+
+  Future<Map<String, dynamic>> createPending(Map<String, dynamic> submission) =>
+      _invoke(LabApiRoutes.pendingCreate, submission);
+
+  Future<void> updatePending(int id, {bool? selected, bool cancel = false}) async {
+    await _invoke(LabApiRoutes.pendingUpdate, {
+      'pending_id': id, 'action': cancel ? 'cancel' : 'select',
+      if (!cancel) 'selected': selected,
+    });
+  }
+
+  Future<Map<String, dynamic>> resolvePending(String raw) =>
+      _invoke(LabApiRoutes.pendingResolve, {'raw': raw});
+
+  Future<Map<String, dynamic>> confirmPending(Map<String, dynamic> submission) =>
+      _invoke(LabApiRoutes.pendingConfirm, submission);
 
   /// `/lab/api/inventory/receipt` - create REAL bag stock in a location.
   ///

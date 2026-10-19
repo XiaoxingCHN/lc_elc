@@ -493,3 +493,28 @@ class LabWorkflowConcurrencyTest(BaseCase):
         bags = self._search('lab.bag', [('product_tmpl_id', '=', self.template_id)])
         self.assertEqual(len(bags), 1)
         self.assertEqual(self._bag_quantity(bags[0]), 10)
+
+    def test_05_two_keys_confirm_one_prepared_bag(self):
+        cr, env = self._cursor_env()
+        try:
+            record = env['lab.workflow.common'].with_user(self.operator_id).lab_pending_create({
+                'request_key': _key('prepare'), 'item_key': self.item_key,
+                'product_template_id': self.template_id, 'quantity': 12,
+            })['records'][0]
+            cr.commit()
+        finally:
+            cr.close()
+
+        def confirm(key):
+            return lambda env: env['lab.workflow.common'].with_user(self.operator_id).lab_pending_confirm({
+                'request_key': key, 'pending_id': record['id'],
+                'location_id': self.location_id, 'quantity': 12,
+            })
+
+        runners = self._run_concurrent([confirm(_key()), confirm(_key())])
+        self.assertFalse([r.error for r in runners if r.error is not None])
+        ids = {r.result['record']['bag_id'] for r in runners}
+        self.assertEqual(len(ids), 1)
+        bag_id = ids.pop()
+        self.assertEqual(self._bag_quantity(bag_id), 12)
+        self.assertEqual(len(self._search('lab.bag', [('trace_code', '=', record['trace_code'])])), 1)
