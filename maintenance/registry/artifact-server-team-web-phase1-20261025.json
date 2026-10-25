@@ -1,0 +1,29 @@
+{
+  "file": "server/releases/2026-10-25-team-web-phase1/server-team-web-19.0.1.0.0-source.tar.gz",
+  "bytes": 12678545,
+  "sha256": "a464caeeaa6fbcf56670e849ac858c71dd5739442dcd10cb521f9fbebae2a09d",
+  "version": "lab_team_web19.0.1.0.0",
+  "source_manifest": "maintenance/registry/source-server-team-web-phase1-20261025.json",
+  "source_tree_sha256": "9a333b84b161e57efe161d1a81c7e7e24fd84f23888c2c70c8556cacfbae98c4",
+  "validation": {
+    "source_freeze": "175 files match working tree and Git index after LF normalization; zero differences",
+    "archive_members": "175 full-source and 18 module members match frozen raw SHA256; source manifest included separately",
+    "local_checks": "Python3.15.0 repo_check full and staged: exit0, 49 checks each; payload verification not run",
+    "previous_same_source_tests": "65 logical passed +1 skipped; isolated Odoo HTTP 11 passed; core desktop/375px browser passed",
+    "production_evidence": "Separate deployment audit; do not infer all frozen dependency source bytes were deployed"
+  },
+  "source_commit": "08186aa73f0c0a8e88b1a4b5fe1e0c29ed64b58e",
+  "build_environment": {
+    "os": "Windows",
+    "python": "3.12.14",
+    "packaging": "stdlib tarfile/gzip, sorted files, fixed timestamps, no host names"
+  },
+  "signing": "Not applicable: server source archive, no executable signing certificate",
+  "source_file_count": 175,
+  "deployment_artifact": {
+    "path": "server/releases/2026-10-25-team-web-phase1/lab_team_web-19.0.1.0.0.tar.gz",
+    "bytes": 60610,
+    "sha256": "3b4858dffe5e4b0f01b65cf0663f933a6e7fe06c6297d2976d4d18746800f72d",
+    "source_files": 18
+  }
+}

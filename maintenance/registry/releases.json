@@ -126,6 +126,27 @@
       "artifact_manifest": "maintenance/registry/artifact-server-portal-20261024.json",
       "provenance": "Complete frozen source archive; only new lab_portal installed, previous 108 module files unchanged",
       "acceptance": "Isolated install and error login passed; production homepage/native login/13 static asset hashes/authenticated redirect/backend verified; visual and real password login unverified"
+    },
+    {
+      "id": "server-team-web-phase1-20261025",
+      "path": "server/releases/2026-10-25-team-web-phase1/server-team-web-19.0.1.0.0-source.tar.gz",
+      "bytes": 12678545,
+      "sha256": "a464caeeaa6fbcf56670e849ac858c71dd5739442dcd10cb521f9fbebae2a09d",
+      "source_files": 175,
+      "version": "lab_team_web19.0.1.0.0",
+      "component": "server",
+      "source_manifest": "maintenance/registry/source-server-team-web-phase1-20261025.json",
+      "source_commit": "08186aa73f0c0a8e88b1a4b5fe1e0c29ed64b58e",
+      "artifact_manifest": "maintenance/registry/artifact-server-team-web-phase1-20261025.json",
+      "deployment_artifact": {
+        "path": "server/releases/2026-10-25-team-web-phase1/lab_team_web-19.0.1.0.0.tar.gz",
+        "bytes": 60610,
+        "sha256": "3b4858dffe5e4b0f01b65cf0663f933a6e7fe06c6297d2976d4d18746800f72d",
+        "source_files": 18
+      },
+      "provenance": "Complete 175-file source archive; only lab_team_web 18 files installed. Existing production theme/script content differences preserved; no old module upgraded.",
+      "acceptance": "Installed in production after verified full DB/filestore/source backup; new18 raw hashes match, previous133 unchanged, stock baseline unchanged; public/session HTTP and update channel checked. Fresh sessions require existing database-selection login. Real-user production end-to-end, mobile and catalogue performance unverified.",
+      "deployment_audit": "maintenance/audit/team-web-production-20261025.md"
     }
   ]
 }

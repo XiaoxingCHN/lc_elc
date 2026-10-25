@@ -1,6 +1,9 @@
 # 当前状态与已知限制
 
-2026-10-25：**lab_team_web 19.0.1.0.0 为已验收核心只读流程的本地候选，未部署生产**。欢迎/登录/仓库检索/详情由独立布局和自有路径承载；65项逻辑检查通过、1项跳过，11项隔离HTTP检查通过，桌面与375px核心浏览器流程通过。175文件来源清单已激活为当前server源码，**不代表生产版本已切换**。域名/DNS、入库领用新页面、真机、大目录和真实网站编辑器保存仍不在本次已验收范围。见[审查](../../maintenance/audit/team-web-phase1-codex-review.md)、[交接](../../maintenance/handoffs/2026-10-25-team-web-phase1.md)和[来源清单](../../maintenance/registry/source-server-team-web-phase1-20261025.json)。私有预览已关闭，测试数据保留；全仓检查在Python3.15下通过，Python3.12扫描本机Python3.15载荷的30项语法不兼容单独记录，不是本模块回归。
+2026-10-25：**lab_team_web 19.0.1.0.0 已安装生产**。新增独立欢迎、登录、仓库检索和详情；18 个新模块文件与冻结源一致，旧五模块133文件、库存计数与合计保持不变，服务 active。欢迎/登录/匿名保护、静态资源和原入口已做生产HTTP检查；真实账号完整流程、生产大目录和真机未重测。65项逻辑通过+1跳过、11项隔离HTTP通过属于同源候选证据。见[生产审计](../../maintenance/audit/team-web-production-20261025.md)与[发布核验](../../maintenance/audit/team-web-publish-codex-review.md)。
+
+首次使用当前多库服务器，需通过 `/web/login?db=LcHardwareHouse&redirect=/team/lab` 选择生产库；之后使用自有 `/team/*` 页面。全新会话直接 `/team?db=…` 仍404。管理根Host及根别名未启用，域名/DNS未切换；入库/领用新页面仍未接入。
+
 
 2026-10-24：lab_portal 已废弃并从源码移除（生产 uninstalled），**不再是当前能力**；最新方案为 lab_team_web 候选。
 

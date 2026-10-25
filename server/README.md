@@ -1,6 +1,6 @@
 # 最新上线状态
 
-2026-10-25：**lab_team_web 19.0.1.0.0 已完成候选验收，生产发布正在执行**。独立欢迎、登录、仓库检索和详情使用自有布局；本轮仅安装新模块，保留原 API 与旧站。当前结果以[发布任务](../maintenance/tasks/2026-10-25-team-web-publish.md)和后续生产审计为准，尚不代表域名已切换。
+2026-10-25：**lab_team_web 19.0.1.0.0 已安装生产**。仅新增18文件模块，旧五模块133文件及库存基线不变；欢迎/登录/匿名保护和静态资源HTTP通过，原页面及更新通道正常。首次多库入口为 `/web/login?db=LcHardwareHouse&redirect=/team/lab`，之后使用 `/team/*`；管理根Host、根别名和DNS未切换。真实账号完整流程、生产大目录和真机未重测。见[生产审计](../maintenance/audit/team-web-production-20261025.md)和[发布核验](../maintenance/audit/team-web-publish-codex-review.md)。
 
 2026-10-24：lab_portal 方案已废弃、源码已移除，最近生产审计为 uninstalled；[门户交接](../maintenance/handoffs/2026-10-24-portal-deploy.md)仅保留历史安装证据。
 

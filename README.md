@@ -1,6 +1,9 @@
 # LC_ELC 实验室库存系统
 
-2026-10-25：**lab_team_web 19.0.1.0.0 候选已完成核心只读流程验收，未部署生产**。独立欢迎、登录、检索和详情使用自有路径；Odoo继续提供认证、权限和库存。65项逻辑测试通过、1项跳过，11项隔离HTTP测试通过，桌面/375px浏览器核心流程通过。175文件候选源已冻结；见[模块说明](server/ubuntu22.04/odoo_addons/lab_team_web/README.md)、[审查记录](maintenance/audit/team-web-phase1-codex-review.md)和[交接](maintenance/handoffs/2026-10-25-team-web-phase1.md)。未切换域名、未上线入库/领用新页面。
+2026-10-25：**lab_team_web 19.0.1.0.0 已安装生产**。新增独立欢迎、登录、仓库检索和详情；18 个新模块文件与冻结源一致，旧五模块133文件、库存计数与合计保持不变，服务 active。欢迎/登录/匿名保护、静态资源和原入口已做生产HTTP检查；真实账号完整流程、生产大目录和真机未重测。65项逻辑通过+1跳过、11项隔离HTTP通过属于同源候选证据。见[生产审计](maintenance/audit/team-web-production-20261025.md)与[发布核验](maintenance/audit/team-web-publish-codex-review.md)。
+
+首次使用当前多库服务器，需通过 `/web/login?db=LcHardwareHouse&redirect=/team/lab` 选择生产库；之后使用自有 `/team/*` 页面。全新会话直接 `/team?db=…` 仍404。管理根Host及根别名未启用，域名/DNS未切换；入库/领用新页面仍未接入。
+
 
 2026-10-24：lab_portal 方案已废弃并从源码移除（最近生产审计为 uninstalled），不再作为当前能力。替代方案为上述独立Web候选。
 
