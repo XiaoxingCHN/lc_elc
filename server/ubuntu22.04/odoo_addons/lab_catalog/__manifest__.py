@@ -1,6 +1,6 @@
 {
     "name": "实验室立创资料库 (LCSC catalog index)",
-    "version": "19.0.2.0.3",
+    "version": "19.0.2.0.4",
     "summary": "立创商城中文资料库的只读索引镜像，与实验室物料合并为一份统一器件库",
     "description": """
 统一器件库（catalog side）
@@ -29,6 +29,7 @@
     ],
     "assets": {
         "web.assets_backend": [
+            "lab_catalog/static/src/css/lc_theme_dark.css",
             "lab_catalog/static/src/unified/**/*.js",
             "lab_catalog/static/src/unified/**/*.xml",
             "lab_catalog/static/src/unified/**/*.scss",

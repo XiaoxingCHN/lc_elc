@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-24",
+  "status": "deployed; authenticated HTTP assets verified; browser visual acceptance unverified",
+  "authorization": "User requested reading the supplied style changes and deploying them online",
+  "component": "lab_catalog",
+  "version_before": "19.0.2.0.3",
+  "version_after": "19.0.2.0.4",
+  "source_manifest": "maintenance/registry/source-server-dark-theme-final-20261024.json",
+  "source_tree_sha256": "f265ae1e5548023d93a4bd8e22f454a5d2533adb7190f4e59189608967226cb6",
+  "source_files": 132,
+  "changed_production_files": [
+    "lab_catalog/__manifest__.py",
+    "lab_catalog/static/src/css/lc_theme_dark.css",
+    "lab_catalog/static/src/unified/unified_catalog.scss"
+  ],
+  "production_module_files_matched": 108,
+  "repairs": [
+    "Preserved actual XML card, workflow, mobile and detail selectors instead of unmatched replacement selectors",
+    "Scoped dark styles to screen media to avoid applying dark palette to printing",
+    "Removed unsafe restart-only deployment behavior",
+    "Replaced CSS min() expression rejected by production libsass with width and max-width"
+  ],
+  "intermediate_failed_candidate": "maintenance/registry/source-server-dark-theme-20261024.json; SCSS min() compile failed before production changed; preserved, never deployed",
+  "package": {
+    "path": "local/build/dark-theme-20261024/server-dark-theme-19.0.2.0.4-final.tar.gz",
+    "bytes": 11538137,
+    "sha256": "c76c2f8d7e5b5ca31c2940d80749aa66d819c8e84d0377312f92aa0a7d0329d9"
+  },
+  "environment": "Existing Ubuntu22.04 production, Odoo19, Python3.12 venv, existing libsass; no dependencies installed",
+  "backup": {
+    "path": "/var/backups/lc-elc/20261024T115739Z-before-dark-theme",
+    "db_dump": {
+      "bytes": 110509038,
+      "sha256": "ad548b4a93559844d58050b33f23e14a8d7dad08668dff99a69a7755f1bb72ca"
+    },
+    "filestore": {
+      "bytes": 12183435,
+      "sha256": "9457d8bf4f61c972c89f436b21a6ce7cc1ffd021f07c77eac2257c9a07b6d0ba",
+      "files_verified": 134
+    },
+    "pg_restore_list_exit_code": 0,
+    "old_module": "/var/backups/lc-elc/20261024T115739Z-before-dark-theme/module-source-before-upgrade/lab_catalog",
+    "old_source_archive": "/opt/odoo/deployments/dark-theme-20261024-a2/old-source.tar.gz",
+    "old_source_sha256": "551de5c84e91ce7870068f1392cb30e0933ef7cb91015bb6d5664f62f91e8122"
+  },
+  "upgrade": {
+    "exit_code": 0,
+    "selected_modules": [
+      "lab_catalog"
+    ],
+    "service": "active",
+    "error": 0,
+    "critical": 0,
+    "traceback": 0
+  },
+  "verification": {
+    "scss_compiled_bytes": 17113,
+    "http": {
+      "backend_authenticated": 200,
+      "login": 200,
+      "android_manifest": 200,
+      "windows_manifest": 204,
+      "linux_manifest": 204
+    },
+    "css_assets": [
+      {
+        "path": "/web/assets/ce7436c/web.assets_web.min.css",
+        "bytes": 1099293,
+        "sha256": "9f7321092ff0f99ceb5bb25104ff788aebc5055d4d5cd6f17fa78b2de861d010"
+      },
+      {
+        "path": "/web/assets/cae352d/web.assets_web_print.min.css",
+        "bytes": 1104524,
+        "sha256": "6c7c6095bd1a76eeb09136e4b61a5033b42c8cde2083b9de07d9d27c18b9d2be"
+      }
+    ],
+    "theme_selectors_and_palette_in_served_assets": true,
+    "before_after_counts": {
+      "bag": 1,
+      "quant": 2,
+      "move": 1,
+      "operation": 1,
+      "catalog": 695217,
+      "location": 16,
+      "pending": 1,
+      "trace": 2
+    },
+    "quantity_and_reserved_before_after": [
+      0,
+      0
+    ],
+    "stable_pointer_unchanged": true,
+    "temporary_auth_sessions_removed": 1,
+    "runtime_log_lines_checked": 168,
+    "runtime_errors": 0,
+    "maintenance_unit_tests": {
+      "command": "python -m unittest discover -s maintenance/checks -v",
+      "passed": 11,
+      "exit_code": 0
+    },
+    "lan_http": {
+      "login": 200,
+      "theme_css": 200,
+      "android_manifest": 200
+    },
+    "repo_check": {
+      "full_exit_code": 1,
+      "full_passed_checks": 49,
+      "full_error_count": 30,
+      "cause": "Unrelated untracked Python3.15 runtime stdlib cannot parse with Python3.12; retained unchanged",
+      "scoped_exit_code": 0,
+      "scoped_passed_checks": 49,
+      "scope": "Temporary per-process Git exclusion of /Python/ only; no repository ignore changed",
+      "warning": "production-py312-rebuild payload not built",
+      "payload_verification": false
+    },
+    "git_diff_check_exit_code": 0
+  },
+  "not_verified": [
+    "Browser visual and mobile acceptance: IAB initialization timed out",
+    "All-text contrast >=7:1 not measured",
+    "Physical label printing",
+    "Full backup restore drill and off-machine backup",
+    "Complete offline payload validation"
+  ],
+  "production_stage": "/opt/odoo/deployments/dark-theme-20261024-a2",
+  "source_control": "Working tree changes; no GitHub push in this deployment task"
+}

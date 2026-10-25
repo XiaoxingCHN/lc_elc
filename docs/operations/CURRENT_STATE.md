@@ -1,5 +1,11 @@
 # 当前状态与已知限制
 
+2026-10-25：**lab_team_web 19.0.1.0.0 为已验收核心只读流程的本地候选，未部署生产**。欢迎/登录/仓库检索/详情由独立布局和自有路径承载；65项逻辑检查通过、1项跳过，11项隔离HTTP检查通过，桌面与375px核心浏览器流程通过。175文件来源清单已激活为当前server源码，**不代表生产版本已切换**。域名/DNS、入库领用新页面、真机、大目录和真实网站编辑器保存仍不在本次已验收范围。见[审查](../../maintenance/audit/team-web-phase1-codex-review.md)、[交接](../../maintenance/handoffs/2026-10-25-team-web-phase1.md)和[来源清单](../../maintenance/registry/source-server-team-web-phase1-20261025.json)。私有预览已关闭，测试数据保留；全仓检查在Python3.15下通过，Python3.12扫描本机Python3.15载荷的30项语法不兼容单独记录，不是本模块回归。
+
+2026-10-24：lab_portal 已废弃并从源码移除（生产 uninstalled），**不再是当前能力**；最新方案为 lab_team_web 候选。
+
+2026-10-24：**lab_catalog19.0.2.0.4 暗色主题已上线**。仅更新主题与资产配置，服务active、认证后台/主题CSS200、库存计数和更新通道不变；视觉及手机验收尚未完成。备份与验证见[主题交接](../../maintenance/handoffs/2026-10-24-dark-theme-deploy.md)。
+
 **最新Android stable为1.1.3+6（release_sequence2）**，已从冻结166文件构建并核验包签名/内容/来源，LAN清单200及认证完整包/hash通过，Windows/Linux仍204。修正私有缓存合法别名误拒，显示具体安装错误；275 Flutter通过5跳过、9项真实JVM路径检查通过。用户旧安装入口已失败，本次需手动覆盖修复APK一次，不先卸载；手机是否完全解决仍待实测。旧build5及渠道指针备份保留，服务不重启、库存不写入，见[最终安装修复交接](../../maintenance/handoffs/2026-10-19-android-install-fix.md)。
 
 以下为此前发布/诊断时点：

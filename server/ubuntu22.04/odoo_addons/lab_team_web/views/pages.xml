@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 独立布局：不使用 website.layout / web.layout，避免接管旧官网与后台 -->
+    <template id="layout" name="LC Team Layout">
+        <html t-att-lang="lc_lang or 'zh-CN'">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="robots" content="noindex, nofollow"/>
+                <title t-esc="(lc_page_title + ' · ' if lc_page_title else '') + lc_site_title"/>
+                <link rel="stylesheet" t-attf-href="/lab_team_web/static/src/css/team.css?v=#{lc_css_v}"/>
+            </head>
+            <body class="lc-body"
+                  t-att-data-base="lc_base"
+                  t-att-data-authenticated="'0' if lc_anonymous else '1'"
+                  data-api-search="/lab/api/catalog/search">
+                <a class="lc-skip" href="#lc-main">跳到主要内容</a>
+
+                <header class="lc-header">
+                    <div class="lc-header-inner">
+                        <a class="lc-brand" t-att-href="lc_welcome_url">
+                            <span class="lc-brand-text">
+                                <strong>力创实验室</strong>
+                                <span class="lc-brand-sub">TEAM WAREHOUSE</span>
+                            </span>
+                        </a>
+                        <nav class="lc-nav" aria-label="主导航">
+                            <a class="lc-nav-link" t-att-href="lc_lab_url">仓库</a>
+                            <t t-if="lc_anonymous">
+                                <a class="lc-nav-link" t-att-href="lc_login_url">登录</a>
+                            </t>
+                            <t t-else="">
+                                <span class="lc-nav-user">
+                                    <span class="lc-user-name" t-esc="lc_user_name"/>
+                                    <form class="lc-logout-form" t-att-action="lc_logout_url" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                                        <button class="lc-btn lc-btn-ghost" type="submit">退出</button>
+                                    </form>
+                                </span>
+                            </t>
+                        </nav>
+                    </div>
+                </header>
+
+                <main id="lc-main" class="lc-main">
+                    <t t-out="0"/>
+                </main>
+
+                <footer class="lc-footer">
+                    <span t-esc="lc_site_title"/>
+                </footer>
+
+                <script t-attf-src="/lab_team_web/static/src/js/team.js?v=#{lc_js_v}" defer="defer"></script>
+            </body>
+        </html>
+    </template>
+
+    <!-- 欢迎页 -->
+    <template id="page_welcome" name="LC Team Welcome">
+        <t t-call="lab_team_web.layout">
+            <section class="lc-hero">
+                <p class="lc-kicker">TEAM WAREHOUSE</p>
+                <h1 class="lc-title">热爱我的<span class="lc-accent">热爱</span></h1>
+                <p class="lc-lead">力创实验室仓库管理入口：查看器件资料、实验室库存与存放位置。</p>
+                <div class="lc-actions">
+                    <t t-if="lc_anonymous">
+                        <a class="lc-btn lc-btn-primary" t-att-href="lc_login_url">登录</a>
+                    </t>
+                    <t t-else="">
+                        <a class="lc-btn lc-btn-primary" t-att-href="lc_lab_url">进入仓库</a>
+                    </t>
+                </div>
+            </section>
+
+            <section class="lc-entries" aria-label="功能入口">
+                <div class="lc-card-grid">
+                    <t t-foreach="lc_entries" t-as="entry">
+                        <article t-attf-class="lc-card lc-card-#{entry.get('state') or 'available'}">
+                            <h2 class="lc-card-title" t-esc="entry.get('title')"/>
+                            <p class="lc-card-desc" t-esc="entry.get('desc')"/>
+                            <t t-if="entry.get('href')">
+                                <a class="lc-card-link" t-att-href="entry.get('href')">打开</a>
+                            </t>
+                            <t t-else="">
+                                <span class="lc-card-link is-disabled" t-esc="'未开放' if entry.get('state') == 'planned' else '无权限'"/>
+                            </t>
+                        </article>
+                    </t>
+                </div>
+            </section>
+
+            <p class="lc-note">采购入库、领用归还、库位与操作记录暂未开放。</p>
+        </t>
+    </template>
+
+    <!-- 登录页（复用 Odoo 原生 /web/session/authenticate） -->
+    <template id="page_login" name="LC Team Login">
+        <t t-call="lab_team_web.layout">
+            <section class="lc-auth">
+                <div class="lc-auth-card">
+                    <h1 class="lc-auth-title">登录</h1>
+                    <p class="lc-auth-desc">使用实验室系统账号登录，登录后回到刚才要访问的页面。</p>
+                    <!-- method 必须显式 POST：默认 GET 会把账号密码写进 URL 和访问日志。
+                         无 JS 时提交回本页（POST body），页面只重新渲染，不回显任何字段。 -->
+                    <form id="lc-login-form" class="lc-form" method="post"
+                          t-att-action="lc_login_action"
+                          t-att-data-db="lc_db"
+                          t-att-data-next="lc_next"
+                          t-att-data-endpoint="lc_auth_endpoint">
+                        <input type="hidden" name="next" t-att-value="lc_next"/>
+                        <label class="lc-field">
+                            <span class="lc-field-label">账号</span>
+                            <input class="lc-input" type="text" name="login"
+                                   autocomplete="username" required="required" autofocus="autofocus"/>
+                        </label>
+                        <label class="lc-field">
+                            <span class="lc-field-label">密码</span>
+                            <input class="lc-input" type="password" name="password"
+                                   autocomplete="current-password" required="required"/>
+                        </label>
+                        <p class="lc-form-error" role="alert" t-att-hidden="not lc_error" t-esc="lc_error"/>
+                        <noscript>
+                            <p class="lc-alert lc-alert-error">登录需要启用 JavaScript。当前不会提交账号密码。</p>
+                        </noscript>
+                        <button class="lc-btn lc-btn-primary" type="submit">登录</button>
+                    </form>
+                    <p class="lc-note">日常流程使用本页面；管理员维护入口另行提供。</p>
+                </div>
+                <aside class="lc-auth-side">
+                    <h2 class="lc-side-title">说明</h2>
+                    <ul class="lc-side-list">
+                        <li>使用实验室系统账号登录，本页不保存任何密码。</li>
+                        <li>没有仓库权限的账号可以登录，但看不到器件资料。</li>
+                        <li>入库、领用与归还暂未开放。</li>
+                    </ul>
+                </aside>
+            </section>
+        </t>
+    </template>
+
+    <!-- 仓库列表 -->
+    <template id="page_lab" name="LC Team Warehouse">
+        <t t-call="lab_team_web.layout">
+            <div class="lc-lab">
+                <aside class="lc-sidebar" aria-label="分类">
+                    <div class="lc-sidebar-title">分类</div>
+                    <ul class="lc-cats">
+                        <li>
+                            <a t-attf-class="lc-cat #{'is-active' if not lc_category_id else ''}"
+                               t-att-href="lc_all_url" data-category-id="">
+                                <span class="lc-cat-name">全部分类</span>
+                            </a>
+                        </li>
+                        <t t-foreach="lc_categories" t-as="cat">
+                            <li>
+                                <a t-attf-class="lc-cat #{'is-active' if lc_category_id == cat.get('id') else ''}"
+                                   t-att-href="cat.get('href')"
+                                   t-att-data-category-id="cat.get('id')"
+                                   t-att-style="'padding-left:%dpx' % (10 + (cat.get('level') or 0) * 10)">
+                                    <span class="lc-cat-name" t-esc="cat.get('name')"/>
+                                    <span class="lc-cat-count" t-esc="cat.get('product_count') or ''"/>
+                                </a>
+                            </li>
+                        </t>
+                    </ul>
+                </aside>
+
+                <section class="lc-results" id="lc-results" t-att-data-total="lc_total">
+                    <form class="lc-searchbar" id="lc-search-form" role="search" method="get" t-att-action="lc_all_url">
+                        <input id="lc-q" class="lc-input lc-search-input" type="search" name="q"
+                               t-att-value="lc_query"
+                               placeholder="C 编号 / 型号 (MPN) / 名称 / 品牌，回车检索"
+                               aria-label="检索器件"/>
+                        <label class="lc-check">
+                            <input id="lc-stock-only" type="checkbox" name="stock_only" value="1"
+                                   t-att-checked="lc_stock_only"/>
+                            <span>只看有库存</span>
+                        </label>
+                        <input type="hidden" name="category_id" t-att-value="lc_category_id or ''"/>
+                        <button class="lc-btn lc-btn-primary" type="submit">检索</button>
+                    </form>
+
+                    <div class="lc-results-meta">
+                        共 <b t-esc="lc_total"/> 件
+                        <t t-if="lc_stock_only"><span> · 只看有库存</span></t>
+                        <t t-if="lc_query"><span> · 关键词：<span t-esc="lc_query"/></span></t>
+                    </div>
+
+                    <t t-if="lc_error">
+                        <div class="lc-alert lc-alert-error" role="alert" t-esc="lc_error"/>
+                    </t>
+
+                    <div class="lc-grid" id="lc-grid">
+                        <t t-foreach="lc_items" t-as="item">
+                            <article class="lc-item" t-att-data-item-key="item.get('item_key')">
+                                <a class="lc-item-link" t-att-href="item.get('href')">
+                                    <div class="lc-item-media">
+                                        <t t-if="item.get('image_src')">
+                                            <img class="lc-item-img" t-att-src="item.get('image_src')"
+                                                 t-att-alt="item.get('name') or '器件图片'" loading="lazy"/>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="lc-item-noimg" aria-hidden="true">无图</div>
+                                        </t>
+                                    </div>
+                                    <div class="lc-item-body">
+                                        <div class="lc-item-code" t-esc="item.get('catalog_code') or item.get('item_key')"/>
+                                        <h3 class="lc-item-name" t-esc="item.get('name') or '—'"/>
+                                        <div class="lc-item-meta">
+                                            <t t-if="item.get('mpn')"><span t-esc="item.get('mpn')"/></t>
+                                            <t t-if="item.get('brand')"><span t-esc="item.get('brand')"/></t>
+                                            <t t-if="item.get('package')"><span t-esc="item.get('package')"/></t>
+                                        </div>
+                                        <div class="lc-item-foot">
+                                            <t t-if="item.get('has_stock')">
+                                                <span class="lc-stock lc-in-stock" t-esc="'库存 ' + item.get('lab_quantity_display')"/>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="lc-stock lc-no-stock">无库存</span>
+                                            </t>
+                                            <span class="lc-item-price" t-esc="item.get('price_display')"/>
+                                        </div>
+                                    </div>
+                                </a>
+                            </article>
+                        </t>
+                    </div>
+
+                    <t t-if="lc_is_empty">
+                        <div class="lc-empty">没有匹配的器件，试试其他关键词或调整筛选条件。</div>
+                    </t>
+
+                    <t t-if="lc_next_url">
+                        <button class="lc-btn lc-load-more" id="lc-more" type="button"
+                                t-att-data-cursor="lc_next_cursor">加载更多</button>
+                    </t>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- 器件详情 -->
+    <template id="page_detail" name="LC Team Item Detail">
+        <t t-call="lab_team_web.layout">
+            <article class="lc-detail">
+                <div class="lc-detail-head">
+                    <a class="lc-back" t-att-href="lc_lab_url">← 返回仓库</a>
+                    <span class="lc-detail-code" t-esc="lc_item.get('catalog_code') or lc_item.get('item_key')"/>
+                </div>
+
+                <div class="lc-detail-main">
+                    <div class="lc-detail-media">
+                        <t t-if="lc_image_src">
+                            <img t-att-src="lc_image_src" t-att-alt="lc_item.get('name') or '器件图片'"/>
+                        </t>
+                        <t t-else="">
+                            <div class="lc-item-noimg" aria-hidden="true">无图</div>
+                        </t>
+                    </div>
+                    <div class="lc-detail-info">
+                        <h1 class="lc-detail-title" t-esc="lc_item.get('name') or '—'"/>
+                        <p class="lc-detail-sub">
+                            <t t-if="lc_item.get('mpn')"><span t-esc="lc_item.get('mpn')"/></t>
+                            <t t-if="lc_item.get('brand')"><span> · <span t-esc="lc_item.get('brand')"/></span></t>
+                            <t t-if="lc_item.get('package')"><span> · <span t-esc="lc_item.get('package')"/></span></t>
+                        </p>
+                        <p class="lc-stock-badge">
+                            实验室库存：<b t-esc="lc_quantity_display"/>（可用 <span t-esc="lc_available_display"/>）
+                        </p>
+                        <t t-if="lc_item.get('catalog_stock') is not None and lc_item.get('catalog_stock') != False">
+                            <p class="lc-note">商城库存（仅参考，不计入实验室库存）：<span t-esc="lc_item.get('catalog_stock')"/></p>
+                        </t>
+                    </div>
+                </div>
+
+                <section class="lc-section">
+                    <h2 class="lc-section-title">参数</h2>
+                    <t t-if="lc_parameters">
+                        <dl class="lc-kv">
+                            <t t-foreach="lc_parameters" t-as="param">
+                                <dt t-esc="param.get('name') or param.get('code')"/>
+                                <dd t-esc="param.get('value')"/>
+                            </t>
+                        </dl>
+                    </t>
+                    <t t-else="">
+                        <p class="lc-note">该器件没有已导入的参数。</p>
+                    </t>
+                </section>
+
+                <section class="lc-section">
+                    <h2 class="lc-section-title">实验室库存分布</h2>
+                    <t t-if="lc_locations">
+                        <table class="lc-table">
+                            <thead><tr><th>库位</th><th>数量</th><th>可用</th></tr></thead>
+                            <tbody>
+                                <t t-foreach="lc_locations" t-as="loc">
+                                    <tr>
+                                        <td t-esc="loc.get('location')"/>
+                                        <td t-esc="format_qty(loc.get('quantity'))"/>
+                                        <td t-esc="format_qty(loc.get('available_quantity'))"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                    <t t-else="">
+                        <p class="lc-note">当前没有内部库位库存。</p>
+                    </t>
+                </section>
+
+                <section class="lc-section">
+                    <h2 class="lc-section-title">实物袋</h2>
+                    <t t-if="lc_bags">
+                        <table class="lc-table">
+                            <thead><tr><th>追溯码</th><th>数量</th><th>未归还</th><th>入库日期</th></tr></thead>
+                            <tbody>
+                                <t t-foreach="lc_bags" t-as="bag">
+                                    <tr>
+                                        <td class="lc-mono" t-esc="bag.get('trace_code') or bag.get('name') or bag.get('id')"/>
+                                        <td t-esc="format_qty(bag.get('quantity'))"/>
+                                        <td t-esc="format_qty(bag.get('outstanding_quantity'))"/>
+                                        <td t-esc="(bag.get('receipt_date') or '')[:10]"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                    <t t-else="">
+                        <p class="lc-note">没有实物袋记录。</p>
+                    </t>
+                </section>
+
+                <section class="lc-section">
+                    <h2 class="lc-section-title">未归还领用</h2>
+                    <t t-if="lc_issues">
+                        <table class="lc-table">
+                            <thead><tr><th>领用单</th><th>数量</th><th>已还</th><th>未还</th><th>领用人</th></tr></thead>
+                            <tbody>
+                                <t t-foreach="lc_issues" t-as="issue">
+                                    <tr>
+                                        <td t-esc="issue.get('id')"/>
+                                        <td t-esc="format_qty(issue.get('quantity'))"/>
+                                        <td t-esc="format_qty(issue.get('returned_quantity'))"/>
+                                        <td t-esc="format_qty(issue.get('outstanding_quantity'))"/>
+                                        <td t-esc="(issue.get('borrower_id') or [0, '—'])[1] if issue.get('borrower_id') else '—'"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                    <t t-else="">
+                        <p class="lc-note">没有未归还领用。</p>
+                    </t>
+                </section>
+
+                <section class="lc-section">
+                    <h2 class="lc-section-title">资料</h2>
+                    <t t-if="lc_files">
+                        <ul class="lc-files">
+                            <t t-foreach="lc_files" t-as="doc">
+                                <li>
+                                    <t t-if="doc.get('href')">
+                                        <a t-att-href="doc.get('href')" rel="noopener noreferrer"
+                                           t-att-target="'_blank' if (doc.get('href') or '').startswith('http') else None"
+                                           t-esc="doc.get('name') or doc.get('label') or '资料'"/>
+                                    </t>
+                                    <t t-else="">
+                                        <span t-esc="doc.get('name') or doc.get('label') or '资料'"/>
+                                    </t>
+                                </li>
+                            </t>
+                        </ul>
+                    </t>
+                    <t t-else="">
+                        <p class="lc-note">没有已登记的资料文件。</p>
+                    </t>
+                </section>
+            </article>
+        </t>
+    </template>
+
+    <!-- 详情加载失败（服务端可渲染的状态页，不是空白） -->
+    <template id="page_detail_error" name="LC Team Detail Error">
+        <t t-call="lab_team_web.layout">
+            <section class="lc-error-page">
+                <h1 class="lc-title-sm">暂时无法显示器件</h1>
+                <p class="lc-alert lc-alert-error" role="alert" t-esc="lc_error"/>
+                <p class="lc-note">器件标识：<span class="lc-mono" t-esc="lc_item_key"/></p>
+                <a class="lc-btn lc-btn-primary" t-att-href="lc_lab_url">返回仓库</a>
+            </section>
+        </t>
+    </template>
+
+    <!-- 无权限 / 找不到 -->
+    <template id="page_denied" name="LC Team Denied">
+        <t t-call="lab_team_web.layout">
+            <section class="lc-error-page">
+                <t t-if="lc_denied_code == 'FORBIDDEN'">
+                    <h1 class="lc-title-sm">没有访问权限</h1>
+                    <p class="lc-lead">当前账号没有实验室库存或器件库权限。请联系库存管理员分配角色后重试。</p>
+                </t>
+                <t t-elif="lc_denied_code == 'INVALID_REQUEST'">
+                    <h1 class="lc-title-sm">器件标识不合法</h1>
+                    <p class="lc-lead">合法形式为 lcsc:C123（C 加数字）或 lab:42（本地档案 id）。</p>
+                </t>
+                <t t-else="">
+                    <h1 class="lc-title-sm">页面不存在</h1>
+                    <p class="lc-lead">链接可能已失效，或者该器件已经不在资料库中。</p>
+                </t>
+                <div class="lc-actions">
+                    <a class="lc-btn lc-btn-primary" t-att-href="lc_lab_url">返回仓库</a>
+                    <a class="lc-btn lc-btn-outline" t-att-href="lc_welcome_url">回到首页</a>
+                </div>
+            </section>
+        </t>
+    </template>
+
+</odoo>

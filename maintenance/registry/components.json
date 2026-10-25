@@ -26,14 +26,20 @@
       "id": "odoo",
       "version": {
         "lab_inventory": "19.0.1.0.0",
-        "lab_catalog": "19.0.2.0.3",
-        "lab_workflow": "19.0.1.2.0"
+        "lab_catalog": "19.0.2.0.4",
+        "lab_workflow": "19.0.1.2.0",
+        "lab_theme": "19.0.1.0.2",
+        "lab_site": "19.0.1.0.0",
+        "lab_team_web": "19.0.1.0.0"
       },
       "source_root": "server/ubuntu22.04/odoo_addons",
       "required_files": [
         "server/ubuntu22.04/odoo_addons/lab_inventory/__manifest__.py",
         "server/ubuntu22.04/odoo_addons/lab_catalog/__manifest__.py",
-        "server/ubuntu22.04/odoo_addons/lab_workflow/__manifest__.py"
+        "server/ubuntu22.04/odoo_addons/lab_workflow/__manifest__.py",
+        "server/ubuntu22.04/odoo_addons/lab_theme/__manifest__.py",
+        "server/ubuntu22.04/odoo_addons/lab_site/__manifest__.py",
+        "server/ubuntu22.04/odoo_addons/lab_team_web/__manifest__.py"
       ],
       "guide": "docs/development/SERVER.md"
     },

@@ -1,6 +1,12 @@
 # LC_ELC 实验室库存系统
 
-这个仓库是后续人工和AI共同维护的唯一入口，归档基线日期为 **2026-10-19**。当前业务版本：客户端 **1.0.1+2**，EDA插件 **3.0.3**；Odoo三个模块分别独立版本管理。
+2026-10-25：**lab_team_web 19.0.1.0.0 候选已完成核心只读流程验收，未部署生产**。独立欢迎、登录、检索和详情使用自有路径；Odoo继续提供认证、权限和库存。65项逻辑测试通过、1项跳过，11项隔离HTTP测试通过，桌面/375px浏览器核心流程通过。175文件候选源已冻结；见[模块说明](server/ubuntu22.04/odoo_addons/lab_team_web/README.md)、[审查记录](maintenance/audit/team-web-phase1-codex-review.md)和[交接](maintenance/handoffs/2026-10-25-team-web-phase1.md)。未切换域名、未上线入库/领用新页面。
+
+2026-10-24：lab_portal 方案已废弃并从源码移除（最近生产审计为 uninstalled），不再作为当前能力。替代方案为上述独立Web候选。
+
+2026-10-24：**lab_catalog19.0.2.0.4 暗色主题已上线**。仅更新主题与资产配置，服务active、认证后台/主题CSS200、库存计数和更新通道不变；视觉及手机验收尚未完成。备份与验证见[主题交接](maintenance/handoffs/2026-10-24-dark-theme-deploy.md)。
+
+这个仓库是后续人工和AI共同维护的唯一入口，归档基线日期为 **2026-10-19**。组件当前源码版本见[组件登记](maintenance/registry/components.json)，已发布成品按各端发布登记查询；Odoo模块分别独立版本管理。
 
 生产更新接口 **lab_workflow 19.0.1.2.0 已上线**；Android **1.1.3+6已发布stable**，清单200、完整包下载/哈希核验通过，Windows/Linux仍204。用户反馈旧安装入口已授权仍失败，已发布[1.1.3+6安装入口修复](maintenance/handoffs/2026-10-19-android-install-fix.md)，见[部署交接](maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。
 

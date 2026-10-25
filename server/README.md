@@ -1,5 +1,11 @@
 # 最新上线状态
 
+2026-10-25：**lab_team_web 19.0.1.0.0 已完成候选验收，生产发布正在执行**。独立欢迎、登录、仓库检索和详情使用自有布局；本轮仅安装新模块，保留原 API 与旧站。当前结果以[发布任务](../maintenance/tasks/2026-10-25-team-web-publish.md)和后续生产审计为准，尚不代表域名已切换。
+
+2026-10-24：lab_portal 方案已废弃、源码已移除，最近生产审计为 uninstalled；[门户交接](../maintenance/handoffs/2026-10-24-portal-deploy.md)仅保留历史安装证据。
+
+2026-10-24：**lab_catalog19.0.2.0.4 暗色主题已上线**。仅更新主题与资产配置，服务active、认证后台/主题CSS200、库存计数和更新通道不变；视觉及手机验收尚未完成。备份与验证见[主题交接](../maintenance/handoffs/2026-10-24-dark-theme-deploy.md)。
+
 lab_workflow19.0.1.2.0更新接口已按本轮明确授权上线，服务active，Android manifest200（1.1.3+6 stable）、Windows/Linux204；备份、权限和库存不变证据见[交接](../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。以下此前候选/部署说明为各自时点。
 
 # Odoo服务端唯一维护入口

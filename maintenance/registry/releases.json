@@ -102,6 +102,30 @@
       "artifact_manifest": "maintenance/registry/artifact-client-android-1.1.3-build6.json",
       "provenance": "All 166 frozen files match source commit and build copy; exact source manifest bytes archived.",
       "acceptance": "Published within current explicit update publication request; manifest/HTTP integrity passed. Old installer failed on user phone; physical hotfix install still unverified."
+    },
+    {
+      "id": "server-dark-theme-20261024",
+      "path": "server/releases/2026-10-24/server-dark-theme-19.0.2.0.4.tar.gz",
+      "bytes": 11538137,
+      "sha256": "c76c2f8d7e5b5ca31c2940d80749aa66d819c8e84d0377312f92aa0a7d0329d9",
+      "version": "lab_catalog19.0.2.0.4",
+      "component": "server",
+      "source_manifest": "maintenance/registry/source-server-dark-theme-final-20261024.json",
+      "artifact_manifest": "maintenance/registry/artifact-server-dark-theme-20261024.json",
+      "provenance": "Frozen complete source archive; only lab_catalog replaced/upgraded on production",
+      "acceptance": "Deployed lab_catalog only; production SCSS compile, authenticated backend/CSS HTTP200, 108 source matches, unchanged inventory/update channel; visual/mobile/printing unverified"
+    },
+    {
+      "id": "server-portal-20261024",
+      "path": "server/releases/2026-10-24-portal/server-portal-19.0.1.0.0.tar.gz",
+      "bytes": 12611497,
+      "sha256": "8e54e2e1e51c63ca792ab8888010f958ba4feaa0baea0b09f48228b1af2c77e7",
+      "version": "lab_portal19.0.1.0.0",
+      "component": "server",
+      "source_manifest": "maintenance/registry/source-server-portal-final-20261024.json",
+      "artifact_manifest": "maintenance/registry/artifact-server-portal-20261024.json",
+      "provenance": "Complete frozen source archive; only new lab_portal installed, previous 108 module files unchanged",
+      "acceptance": "Isolated install and error login passed; production homepage/native login/13 static asset hashes/authenticated redirect/backend verified; visual and real password login unverified"
     }
   ]
 }

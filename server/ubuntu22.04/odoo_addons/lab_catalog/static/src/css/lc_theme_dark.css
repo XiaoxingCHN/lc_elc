@@ -1,0 +1,615 @@
+/* 力创实验室库存系统 - 增强版全局暗色主题
+ * 与官网 l-creation.club 风格完全统一
+ * 修复版本：解决表格、文字可读性、菜单颜色问题
+ * 日期：2026-10-24
+ */
+
+:root {
+  /* 核心配色 - 与官网完全一致 */
+  --lc-bg: #070809;
+  --lc-bg-soft: #0b0d10;
+  --lc-panel: #111418;
+  --lc-panel-2: #161a20;
+  --lc-line: rgba(242, 244, 238, 0.12);
+  --lc-line-strong: rgba(242, 244, 238, 0.26);
+  
+  /* 文字色彩 - 确保高对比度 */
+  --lc-text: #f2f4ee;
+  --lc-text-soft: rgba(242, 244, 238, 0.82);
+  --lc-muted: #9aa199;
+  --lc-muted-2: #6f766f;
+  
+  /* 品牌强调色 */
+  --lc-lime: #c9ff3f;
+  --lc-lime-soft: rgba(201, 255, 63, 0.14);
+  --lc-lime-hover: #ddff7d;
+  --lc-gold: #d9b46a;
+  --lc-red: #ff4b3e;
+  
+  /* 状态色彩 */
+  --lc-success: #4ade80;
+  --lc-warning: var(--lc-gold);
+  --lc-danger: var(--lc-red);
+  --lc-info: #60a5fa;
+  
+  /* 字体体系 */
+  --lc-font-display: "Arial Black", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --lc-font-body: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --lc-font-mono: "Cascadia Mono", "Consolas", "Liberation Mono", monospace;
+  
+  /* 动画曲线 */
+  --lc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  
+  /* 间距 */
+  --lc-radius: 8px;
+  --lc-radius-sm: 4px;
+  --lc-radius-lg: 12px;
+}
+
+/* ========== 全局基础样式 ========== */
+
+html {
+  background: var(--lc-bg) !important;
+}
+
+body {
+  background: var(--lc-bg) !important;
+  color: var(--lc-text) !important;
+  font-family: var(--lc-font-body) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ========== Odoo 顶部导航 ========== */
+
+.o_main_navbar,
+.o_navbar_apps_menu {
+  background: rgba(7, 8, 9, 0.96) !important;
+  border-bottom: 1px solid var(--lc-line) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.o_main_navbar .o_menu_brand,
+.o_main_navbar .o_menu_sections,
+.o_main_navbar .o_menu_systray,
+.o_main_navbar .o_navbar_apps_menu {
+  background: transparent !important;
+}
+
+/* 修复顶部菜单紫色问题 */
+.o_main_navbar a,
+.o_main_navbar button,
+.o_main_navbar .dropdown-toggle,
+.o_menu_sections .dropdown-toggle,
+.o_navbar_apps_menu button {
+  color: var(--lc-text-soft) !important;
+  transition: color 0.2s ease;
+}
+
+.o_main_navbar a:hover,
+.o_main_navbar button:hover,
+.o_main_navbar .dropdown-toggle:hover {
+  color: var(--lc-lime) !important;
+  background: transparent !important;
+}
+
+/* 移除紫色背景 */
+.o_menu_sections .dropdown-toggle.show,
+.o_menu_sections .dropdown-toggle:focus,
+.o_menu_sections .dropdown-toggle:active {
+  background: rgba(201, 255, 63, 0.1) !important;
+  color: var(--lc-lime) !important;
+}
+
+/* ========== Odoo 内容区域 ========== */
+
+.o_web_client,
+.o_action_manager,
+.o_content {
+  background: var(--lc-bg) !important;
+  color: var(--lc-text) !important;
+}
+
+/* ========== 表单视图 ========== */
+
+.o_form_view,
+.o_form_sheet_bg {
+  background: var(--lc-bg) !important;
+}
+
+.o_form_sheet,
+.o_form_statusbar {
+  background: var(--lc-panel) !important;
+  border: 1px solid var(--lc-line) !important;
+  border-radius: var(--lc-radius) !important;
+  color: var(--lc-text) !important;
+}
+
+.o_form_label {
+  color: var(--lc-muted) !important;
+  font-weight: 600;
+}
+
+/* ========== 列表/表格视图（核心修复） ========== */
+
+.o_list_view,
+.o_list_table,
+.table {
+  background: var(--lc-panel) !important;
+  color: var(--lc-text) !important;
+  border: 1px solid var(--lc-line) !important;
+}
+
+/* 表头 - 深色背景 + 高对比度文字 */
+.o_list_table thead,
+.o_list_table thead th,
+.table thead,
+.table thead th {
+  background: var(--lc-panel-2) !important;
+  border-bottom: 2px solid var(--lc-line-strong) !important;
+  color: var(--lc-text) !important;
+  font-family: var(--lc-font-mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  font-weight: 700 !important;
+  padding: 12px 8px !important;
+}
+
+/* 表格单元格 - 深色背景 + 清晰文字 */
+.o_list_table tbody td,
+.o_list_table tbody th,
+.table tbody td,
+.table tbody th,
+.o_data_cell {
+  background: var(--lc-panel) !important;
+  color: var(--lc-text) !important;
+  border-bottom: 1px solid var(--lc-line) !important;
+  border-right: none !important;
+  border-left: none !important;
+  padding: 10px 8px !important;
+}
+
+/* 表格行悬停 */
+.o_list_table tbody tr:hover,
+.o_list_table tbody tr:hover td,
+.table tbody tr:hover,
+.table tbody tr:hover td {
+  background: rgba(201, 255, 63, 0.08) !important;
+  color: var(--lc-text) !important;
+}
+
+/* 选中行 */
+.o_data_row.o_selected_row,
+.o_data_row.o_selected_row td,
+.table tbody tr.table-active,
+.table tbody tr.table-active td {
+  background: var(--lc-lime-soft) !important;
+  color: var(--lc-lime) !important;
+  font-weight: 600;
+}
+
+/* 表格内的链接 */
+.o_list_table a,
+.table a {
+  color: var(--lc-lime) !important;
+}
+
+.o_list_table a:hover,
+.table a:hover {
+  color: var(--lc-lime-hover) !important;
+  text-decoration: underline;
+}
+
+/* 表格内的徽章 */
+.o_list_table .badge,
+.table .badge {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line) !important;
+  color: var(--lc-text) !important;
+}
+
+/* ========== 看板视图 ========== */
+
+.o_kanban_view {
+  background: var(--lc-bg) !important;
+}
+
+.o_kanban_record {
+  background: var(--lc-panel) !important;
+  border: 1px solid var(--lc-line) !important;
+  color: var(--lc-text) !important;
+  border-radius: var(--lc-radius) !important;
+}
+
+.o_kanban_record:hover {
+  border-color: var(--lc-lime) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ========== 按钮系统 ========== */
+
+.btn-primary,
+.o_form_button_create,
+.o_list_button_add,
+.btn.btn-primary {
+  background: var(--lc-lime) !important;
+  border-color: var(--lc-lime) !important;
+  color: #070809 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  transition: all 0.22s var(--lc-ease) !important;
+}
+
+.btn-primary:hover,
+.o_form_button_create:hover,
+.o_list_button_add:hover {
+  background: var(--lc-lime-hover) !important;
+  border-color: var(--lc-lime-hover) !important;
+  color: #070809 !important;
+  transform: translateY(-2px);
+}
+
+.btn-secondary,
+.btn-light,
+.btn.btn-secondary {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--lc-line-strong) !important;
+  color: var(--lc-text) !important;
+}
+
+.btn-secondary:hover,
+.btn-light:hover {
+  border-color: var(--lc-lime) !important;
+  color: var(--lc-lime) !important;
+  background: rgba(201, 255, 63, 0.05) !important;
+}
+
+.btn-danger {
+  background: var(--lc-red) !important;
+  border-color: var(--lc-red) !important;
+  color: white !important;
+}
+
+/* ========== 输入框/表单控件 ========== */
+
+.o_input,
+.o_field_widget input,
+.o_field_widget textarea,
+.o_field_widget select,
+input.form-control,
+textarea.form-control,
+select.form-control,
+.o_field_char input,
+.o_field_text textarea {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line) !important;
+  color: var(--lc-text) !important;
+  border-radius: var(--lc-radius-sm) !important;
+}
+
+.o_input::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: var(--lc-muted-2) !important;
+}
+
+.o_input:focus,
+.o_field_widget input:focus,
+.o_field_widget textarea:focus,
+input.form-control:focus,
+textarea.form-control:focus,
+select.form-control:focus {
+  border-color: var(--lc-lime) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--lc-lime-soft) !important;
+  background: var(--lc-panel-2) !important;
+  color: var(--lc-text) !important;
+}
+
+/* ========== 下拉菜单 ========== */
+
+.dropdown-menu {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line-strong) !important;
+  border-radius: var(--lc-radius) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dropdown-item,
+.dropdown-menu a {
+  color: var(--lc-text) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus,
+.dropdown-menu a:hover {
+  background: var(--lc-lime-soft) !important;
+  color: var(--lc-lime) !important;
+}
+
+/* ========== 模态框 ========== */
+
+.modal-content {
+  background: var(--lc-panel) !important;
+  border: 1px solid var(--lc-line-strong) !important;
+  border-radius: var(--lc-radius-lg) !important;
+  color: var(--lc-text) !important;
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--lc-line) !important;
+  background: var(--lc-panel-2) !important;
+}
+
+.modal-title {
+  color: var(--lc-text) !important;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--lc-line) !important;
+  background: var(--lc-panel-2) !important;
+}
+
+/* ========== 卡片/面板 ========== */
+
+.card,
+.o_web_client .o_action .o_xxl_form_view .o_form_sheet_bg {
+  background: var(--lc-panel) !important;
+  border: 1px solid var(--lc-line) !important;
+  border-radius: var(--lc-radius) !important;
+  color: var(--lc-text) !important;
+}
+
+.card-header,
+.card-footer {
+  background: var(--lc-panel-2) !important;
+  border-color: var(--lc-line) !important;
+}
+
+/* ========== 标签/徽章 ========== */
+
+.badge,
+.o_tag,
+.o_field_badge .badge {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line) !important;
+  color: var(--lc-text) !important;
+  font-family: var(--lc-font-mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.badge-primary,
+.o_tag.o_tag_color_1 {
+  background: var(--lc-lime-soft) !important;
+  border-color: var(--lc-lime) !important;
+  color: var(--lc-lime) !important;
+}
+
+/* ========== 分页器 ========== */
+
+.o_pager {
+  color: var(--lc-muted) !important;
+}
+
+.o_pager button,
+.o_pager .o_pager_value {
+  color: var(--lc-text) !important;
+  background: transparent !important;
+}
+
+.o_pager button:hover:not(:disabled) {
+  color: var(--lc-lime) !important;
+  background: var(--lc-lime-soft) !important;
+}
+
+/* ========== 搜索框 ========== */
+
+.o_searchview,
+.o_searchview_input_container {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line) !important;
+  border-radius: 20px !important;
+}
+
+.o_searchview .o_searchview_input,
+.o_searchview input {
+  color: var(--lc-text) !important;
+  background: transparent !important;
+}
+
+.o_searchview .o_searchview_input::placeholder {
+  color: var(--lc-muted-2) !important;
+}
+
+.o_searchview_facet {
+  background: var(--lc-lime-soft) !important;
+  border-color: var(--lc-lime) !important;
+  color: var(--lc-lime) !important;
+}
+
+/* ========== 选项卡 ========== */
+
+.nav-tabs {
+  border-bottom: 1px solid var(--lc-line) !important;
+}
+
+.nav-tabs .nav-link {
+  color: var(--lc-muted) !important;
+  border: none !important;
+  background: transparent !important;
+  position: relative;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--lc-lime) !important;
+  background: transparent !important;
+}
+
+.nav-tabs .nav-link.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--lc-lime);
+}
+
+/* ========== 通知/提示 ========== */
+
+.alert {
+  border-radius: var(--lc-radius) !important;
+}
+
+.alert-success {
+  background: rgba(74, 222, 128, 0.14) !important;
+  border-color: var(--lc-success) !important;
+  color: var(--lc-success) !important;
+}
+
+.alert-warning {
+  background: rgba(217, 180, 106, 0.14) !important;
+  border-color: var(--lc-gold) !important;
+  color: var(--lc-gold) !important;
+}
+
+.alert-danger {
+  background: rgba(255, 75, 62, 0.14) !important;
+  border-color: var(--lc-red) !important;
+  color: var(--lc-red) !important;
+}
+
+.alert-info {
+  background: rgba(96, 165, 250, 0.14) !important;
+  border-color: var(--lc-info) !important;
+  color: var(--lc-info) !important;
+}
+
+/* ========== 侧边栏 ========== */
+
+.o_cp_sidebar {
+  background: var(--lc-panel) !important;
+  border-left: 1px solid var(--lc-line) !important;
+}
+
+/* ========== 状态栏 ========== */
+
+.o_statusbar_status {
+  background: var(--lc-panel-2) !important;
+}
+
+.o_statusbar_status button {
+  color: var(--lc-muted) !important;
+}
+
+.o_statusbar_status button.btn-primary {
+  background: var(--lc-lime) !important;
+  color: #070809 !important;
+}
+
+/* ========== 滚动条美化 ========== */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--lc-bg-soft);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lc-panel-2);
+  border-radius: 5px;
+  border: 2px solid var(--lc-bg-soft);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lc-line-strong);
+}
+
+/* ========== 选择高亮 ========== */
+
+::selection {
+  background: var(--lc-lime);
+  color: #070809;
+}
+
+/* ========== 特殊组件修复 ========== */
+
+/* 日期选择器 */
+.o_datepicker,
+.bootstrap-datetimepicker-widget {
+  background: var(--lc-panel-2) !important;
+  border: 1px solid var(--lc-line-strong) !important;
+  color: var(--lc-text) !important;
+}
+
+.bootstrap-datetimepicker-widget table td.day {
+  color: var(--lc-text) !important;
+}
+
+.bootstrap-datetimepicker-widget table td.active {
+  background: var(--lc-lime) !important;
+  color: #070809 !important;
+}
+
+/* 复选框和单选按钮 */
+.custom-checkbox .custom-control-input:checked ~ .custom-control-label::before,
+.custom-radio .custom-control-input:checked ~ .custom-control-label::before {
+  background-color: var(--lc-lime) !important;
+  border-color: var(--lc-lime) !important;
+}
+
+/* 进度条 */
+.progress {
+  background-color: var(--lc-panel-2) !important;
+}
+
+.progress-bar {
+  background-color: var(--lc-lime) !important;
+}
+
+/* 面包屑 */
+.breadcrumb {
+  background: transparent !important;
+}
+
+.breadcrumb-item {
+  color: var(--lc-muted) !important;
+}
+
+.breadcrumb-item.active {
+  color: var(--lc-text) !important;
+}
+
+/* 加载动画 */
+.o_loading {
+  background: var(--lc-bg) !important;
+}
+
+/* ========== 打印样式保持浅色 ========== */
+
+@media print {
+  :root {
+    --lc-bg: #ffffff;
+    --lc-panel: #ffffff;
+    --lc-text: #000000;
+    --lc-line: #cccccc;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .o_list_table,
+  .table {
+    background: white !important;
+    color: black !important;
+  }
+}
