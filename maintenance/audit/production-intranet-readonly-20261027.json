@@ -1,0 +1,68 @@
+{
+  "scope": "intranet-readonly",
+  "checked_at_local": "2026-10-27T14:19:00+08:00/2026-10-27T14:26:00+08:00",
+  "executor_model": {
+    "provider": "magpie",
+    "model": "qoder-cn/dfmodel"
+  },
+  "host_alias": "lc-nas",
+  "production_changes": false,
+  "authenticated_user_flows": false,
+  "database_queries": false,
+  "services": {
+    "odoo": "active",
+    "nginx": "active"
+  },
+  "runtime": {
+    "os": "Ubuntu 22.04.5 LTS",
+    "nginx": "1.18.0",
+    "odoo": "19.0",
+    "python": "3.12.15"
+  },
+  "deployed_source": {
+    "module": "lab_team_web",
+    "manifest_version": "19.0.1.0.0",
+    "manifest_sha256": "3ea8375d8f34a876978c531bf748875bcb1cb8939360f1edd0b10b88c9716227",
+    "database_installed_version": "not-checked",
+    "files_count": 18,
+    "p2_sanitizer_and_hooks_present": false
+  },
+  "https": {
+    "hostname": "team.l-creation.club",
+    "network": "private-intranet",
+    "certificate_verification": true,
+    "san": [
+      "team.l-creation.club"
+    ],
+    "not_after": "2027-01-23T21:22:47+08:00",
+    "https_anonymous_requests": 32,
+    "http_anonymous_requests": 16,
+    "public_reachability": "not-checked"
+  },
+  "http": {
+    "anonymous_welcome": 200,
+    "anonymous_login": 200,
+    "anonymous_lab": 303,
+    "anonymous_team_lab": 303,
+    "http_to_https": 308,
+    "android_universal_manifest_status": 200,
+    "android_universal_manifest_bytes": 1826,
+    "candidate_default_deny_deployed": false,
+    "candidate_csp_deployed": false,
+    "candidate_xfo_deployed": false,
+    "candidate_referrer_policy_deployed": false
+  },
+  "limits": [
+    "Disk manifest version is not database installation state.",
+    "No real-account login/session Cookie verification.",
+    "nginx -t returned 1 due unprivileged log/certificate access; configuration validity not established by this command.",
+    "Certificate directory listing returned 2 due permissions; public certificate obtained only through TLS.",
+    "No public exposure or cross-network claim.",
+    "Production nginx 1.18.0 does not support proxy_cookie_flags."
+  ],
+  "followups": [
+    "Keep production deployment separately authorized with version/runtime compatibility and rollback evidence.",
+    "Clarify legacy IP access: catchall returns404; legacy host lc.rm.com remains distinct.",
+    "Record missing dedicated team-web deployment archive as an operational gap."
+  ]
+}

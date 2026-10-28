@@ -912,6 +912,9 @@
     }
     initImageFallbacks();
     initLogin();
+    // 退出刻意不接管：表单是原生 POST + CSRF 隐藏域（模板 t-att-action 已带基址），
+    // 浏览器自己完成 303 跳转。用 fetch 代提交会吞掉 303/网络错误并硬编码跳转目标，
+    // 既绕过 CSRF 语义，也会掩盖服务端 origin 问题。
     initWarehouse();
   }
 

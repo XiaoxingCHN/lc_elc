@@ -1737,3 +1737,418 @@ body.lc-body .lc-footer a:hover {
     display: block;
   }
 }
+
+/* ==========================================================================
+   P3 业务页面外壳（T0）
+   --------------------------------------------------------------------------
+   这一段的类由 views/team_templates.xml + workflow_core.js 使用，也是三路
+   UI 子任务可以直接复用的公共组件：
+     .lc-workflow / .lc-page-head / .lc-status / .lc-toolbar / .lc-panel /
+     .lc-tabs / .lc-table-wrap / .lc-badge / .lc-field-error / .lc-form-grid
+   子任务只在自己的 static/src/css/workflow_<domain>.css 里加页面专属样式，
+   不要改本文件。所有规则仍以 body.lc-body 开头，避免影响 Odoo 其它页面。
+   ========================================================================== */
+
+body.lc-body .lc-workflow {
+  display: block;
+}
+
+body.lc-body .lc-workflow-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --------------------------------------------------------------------------
+   页面头
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-page-head {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+body.lc-body .lc-page-title {
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+body.lc-body .lc-page-desc {
+  max-width: 78ch;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   状态区（六态：loading / empty / denied / error / unknown / success）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-status-region:empty {
+  display: none;
+}
+
+body.lc-body .lc-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-status-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.lc-body .lc-status-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-status-detail {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-status-action {
+  flex: 0 0 auto;
+}
+
+body.lc-body .lc-status[data-kind="loading"] {
+  border-left-color: var(--muted);
+}
+
+body.lc-body .lc-status[data-kind="empty"] {
+  border-left-color: var(--line-strong);
+  color: var(--muted);
+}
+
+body.lc-body .lc-status[data-kind="denied"] {
+  border-left-color: var(--gold);
+  background: rgba(217, 180, 106, 0.1);
+  color: #f0dfb8;
+}
+
+body.lc-body .lc-status[data-kind="denied"] .lc-status-mark {
+  color: var(--gold);
+}
+
+body.lc-body .lc-status[data-kind="error"] {
+  border-left-color: var(--red);
+  background: rgba(255, 75, 62, 0.1);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-status[data-kind="error"] .lc-status-mark {
+  color: var(--red);
+}
+
+body.lc-body .lc-status[data-kind="unknown"] {
+  border-left-color: var(--gold);
+  background: rgba(217, 180, 106, 0.08);
+  color: #f0dfb8;
+}
+
+body.lc-body .lc-status[data-kind="success"] {
+  border-left-color: var(--lime);
+  background: var(--lime-soft);
+  color: var(--text);
+}
+
+body.lc-body .lc-status[data-kind="success"] .lc-status-mark {
+  background: var(--lime);
+  color: #070809;
+}
+
+/* 页面级提交中：只降透明与禁用指针，不隐藏内容（用户要能看到自己在等什么） */
+body.lc-body .lc-workflow.is-busy .lc-workflow-body {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   工具条 / 两栏 / 面板
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+body.lc-body .lc-toolbar-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+body.lc-body .lc-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+body.lc-body .lc-split-main,
+body.lc-body .lc-split-side {
+  min-width: 0;
+}
+
+body.lc-body .lc-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+body.lc-body .lc-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+body.lc-body .lc-panel-head .lc-section-title {
+  margin: 0;
+  padding-left: 12px;
+  font-size: 15px;
+}
+
+body.lc-body .lc-panel-body {
+  padding: 18px;
+}
+
+body.lc-body .lc-panel-body > * + * {
+  margin-top: 14px;
+}
+
+body.lc-body .lc-panel .lc-empty {
+  margin-top: 0;
+  padding: 28px 16px;
+}
+
+/* --------------------------------------------------------------------------
+   页签
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.lc-body .lc-tab:hover {
+  color: var(--lime);
+  background: var(--lime-soft);
+}
+
+body.lc-body .lc-tab.is-active,
+body.lc-body .lc-tab[aria-selected="true"] {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   表格包装（窄屏横向滚动，不撑破页面）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.lc-body .lc-table-wrap .lc-table {
+  min-width: 560px;
+}
+
+/* --------------------------------------------------------------------------
+   徽章 / 提示 / 表单网格 / 字段错误
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+body.lc-body .lc-badge[data-tone="ok"] {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+body.lc-body .lc-badge[data-tone="warn"] {
+  border-color: rgba(217, 180, 106, 0.5);
+  background: rgba(217, 180, 106, 0.12);
+  color: var(--gold);
+}
+
+body.lc-body .lc-badge[data-tone="bad"] {
+  border-color: rgba(255, 75, 62, 0.5);
+  background: rgba(255, 75, 62, 0.12);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-hint {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+}
+
+body.lc-body .lc-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+body.lc-body .lc-field.is-invalid .lc-field-label {
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-input[data-lc-invalid="true"],
+body.lc-body select[data-lc-invalid="true"],
+body.lc-body textarea[data-lc-invalid="true"] {
+  border-color: rgba(255, 75, 62, 0.7);
+  background: rgba(255, 75, 62, 0.06);
+}
+
+body.lc-body .lc-field-error {
+  margin-top: 6px;
+  color: #ffd0cb;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-btn-danger {
+  border-color: rgba(255, 75, 62, 0.6);
+  background: rgba(255, 75, 62, 0.12);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-btn-danger:hover {
+  border-color: var(--red);
+  color: #ffd0cb;
+  background: rgba(255, 75, 62, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   窄屏：两栏改单列、工具条换行（375px 不横向溢出）
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  body.lc-body .lc-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-page-head {
+    margin-bottom: 16px;
+  }
+
+  body.lc-body .lc-toolbar {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-toolbar .lc-btn {
+    flex: 1 1 auto;
+  }
+
+  body.lc-body .lc-panel-body {
+    padding: 14px;
+  }
+
+  body.lc-body .lc-status {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-tabs {
+    border-radius: 14px;
+  }
+
+  body.lc-body .lc-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* 打印：状态区与工具条不进入纸面 */
+@media print {
+  body.lc-body .lc-status-region,
+  body.lc-body .lc-toolbar,
+  body.lc-body .lc-page-actions {
+    display: none !important;
+  }
+}

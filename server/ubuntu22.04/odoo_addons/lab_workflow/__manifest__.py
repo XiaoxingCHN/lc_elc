@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': '实验室库存作业与追溯 (Lab Workflow)',
-    'version': '19.0.1.2.0',
+    'version': '19.0.2.0.0',
     'category': 'Inventory/Inventory',
     'summary': '物料/库位/袋追溯码、扫码入库领用归还、A4 批量标签、JSON-RPC 业务接口',
     'description': """

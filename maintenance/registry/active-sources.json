@@ -1,5 +1,5 @@
 {
   "client": "maintenance/registry/source-client-android-install-fix-final-20261019.json",
-  "server": "maintenance/registry/source-server-team-web-phase1-20261025.json",
+  "server": "maintenance/registry/source-server-p3-web-20261028.json",
   "eda": "maintenance/registry/source-eda-baseline.json"
 }

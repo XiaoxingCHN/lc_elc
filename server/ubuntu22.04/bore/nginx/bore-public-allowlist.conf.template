@@ -1,0 +1,215 @@
+# 公网入口 allowlist（模板，默认拒绝）
+# 占位符：@LISTEN_LINE@ @SSL_LINES@ @REALIP_LINES@ @UPSTREAM@ @DB_HEADER@
+# 端点依据 lab_team_web 实际源码（controllers/pages.py、controllers/api.py、static/src/js/team.js）：
+#   GET  /  /login  /team  /team/  /team/login  /lab  /team/lab  /lab/items/<key>  /team/lab/items/<key>
+#   POST /login  /team/login（表单回退）  /team/logout  /logout（CSRF）
+#   POST /web/session/authenticate（清 DB 头）  /web/session/get_session_info  /web/session/destroy
+#   POST /team/api/session  /api/team/session
+#   POST /lab/api/catalog/{search,detail,categories,facets}
+#   GET  /lab/api/asset  /lab/client/updates/manifest  /lab/client/updates/assets/<...>
+#   GET  /lab_team_web/static/...（仅本模块）
+# P3 业务页面（controllers/workflow_pages.py 实际注册，规范 /team/** 与根级别别名成对）：
+#   GET  /team/scan  /scan  /team/account  /account
+#   GET  /team/lab/{receipts,bags,labels,issues,issues/new,history,locations,location-mappings,settings,materials}
+#        /lab/{receipts,bags,labels,issues,issues/new,history,locations,location-mappings,settings,materials}
+#   GET  /team/lab/bags/<int:bag_id>  /lab/bags/<int:bag_id>（动态，仅十进制单段）
+# P3 业务 JSON-RPC（lab_workflow，全部 POST + 统一信封；逐条精确，禁止 /lab/api/.* 通配）：
+#   /lab/api/inventory/{bootstrap,locations,location_create,location_update,resolve_code,
+#                       receipt,issue,return,issues,history,bags,bag,
+#                       pending/list,pending/create,pending/update,pending/resolve,pending/confirm,
+#                       mapping_list,mapping_set,mapping_remove,members,member_set_role}
+#   /lab/api/labels/{plan,preview}
+# P3 标签 PDF（operator，表单 POST + CSRF，浏览器直出 application/pdf + no-store）：
+#   POST /lab/labels/pdf
+# 目录 API（lab_catalog，POST + 统一信封）：只读 4 条 + 写 2 条
+#   /lab/api/catalog/{search,detail,categories,facets}
+#   /lab/api/catalog/{bind,create_material}（materials 页使用；角色仍由后端 catalog 权限校验）
+# 旧 /lab/scan 兼容：只做站内相对 303 迁移，**没有** proxy_pass，旧 inline 控制台永不可达
+#   GET/HEAD /lab/scan[?raw=...]  ->  303 /team/scan$is_args$args
+# 明确不开放（有端点但无 P3 UI / 写历史库存高风险 / 通用入口）：
+#   /lab/api/inventory/adopt_stock、/lab/api/inventory/legacy_stock、
+#   旧表单端点（/lab/scan/resolve、/lab/scan/submit、/lab/labels/plan、/lab/labels/download）
+# 其余（/web/dataset、/jsonrpc、/odoo、/website、/web/login、/web/database、/report、/web/image、/longpolling、/websocket 等）一律 404，不回退旧网站。
+
+server {
+    @LISTEN_LINE@
+    @SSL_LINES@
+    @REALIP_LINES@
+    server_name team.l-creation.club;
+    server_tokens off;
+    client_max_body_size 16m;
+
+    # 安全响应头（P2）：无内联脚本/样式依赖；禁止被嵌入
+    # 会话 Cookie 安全标志：仅 Nginx>=1.19.3 的 proxy_cookie_flags 可用；旧运行时留空
+    @COOKIE_FLAGS@
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "same-origin" always;
+    # connect-src/form-action/script-src 一律严格 'self'：不再存在额外 connect 来源占位，
+    # 跨来源问题只能由"同源 authority 不丢端口"解决，不能靠放宽 CSP 掩盖。
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+    # 公开 authority 严格校验（校验对象是原始 $http_host，**保留端口**）：
+    #   只接受域名、:443 与显式渲染的 :@PUBLIC_PORT@；生产通常渲染 443，测试渲染测试入口端口。
+    #   空 Host、大小写变体、其它端口、带逗号/空白/路径等异常值一律 444 断开，
+    #   不猜测也不回退到 $host（$host 会去掉非标准端口，见 bore-proxy-headers.conf）。
+    if ($http_host !~ ^team\.l-creation\.club(?::(?:443|@PUBLIC_PORT@))?$) { return 444; }
+
+    # 跨站 Origin 防护：POST 必须同源（含非标准端口）或缺失 Origin（原生客户端）；
+    # Origin:null / 恶意来源一律 403。map 由运行脚本的 http 段提供。
+    if ($p2_reject_post) { return 403; }
+
+    # ---------- 页面（GET/HEAD） ----------
+    location = /            { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /login       { limit_except GET HEAD POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team        { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/       { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/login  { limit_except GET HEAD POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/logout { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /logout      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab    { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab         { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 动态 key 边界与 Odoo 路由 <string:item_key> 一致：只允许单段，不允许 '/' 或空段
+    location ~ ^/(?:team/)?lab/items/[^/]+$ { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location ^~ /lab_team_web/static/ { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- P3 业务页面（GET/HEAD） ----------
+    # 依据 lab_team_web/controllers/workflow_pages.py 的实际注册（每条都成对：规范 + 根级别）。
+    # 页面本身只读渲染：写操作全部走下面"P3 业务 JSON-RPC"的精确 POST 端点。
+    # 代理层**不判断角色**：匿名由应用层 303 /login，无角色 403；页面永远不因权限返回 5xx。
+    # root_aliases=0 时根级别别名由应用层 404（这里不重复实现，也不放宽到 /lab/.* 通配）。
+    location = /team/scan                    { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /scan                         { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/account                 { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /account                      { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/receipts            { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/receipts                 { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/bags                { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/bags                     { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/labels              { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/labels                   { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/issues              { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/issues                   { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/issues/new          { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/issues/new               { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/history             { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/history                  { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/locations           { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/locations                { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/location-mappings   { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/location-mappings        { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/settings            { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/settings                 { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/lab/materials           { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/materials                { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 动态 bag_id 边界与 Odoo <int:bag_id> + DB 正整数 id 一致：
+    #   只允许十进制、单段、**正整数**（首位非 0）、最多 19 位（int8/bigserial 宽度，已覆盖 int4）。
+    #   拒绝：空段 "/lab/bags/"、字母、负号、小数点、"/1/x"、前导零 "0123"、超长数字。
+    # 注意：正则里含 "{" / "}"（`{0,18}`）**必须用双引号包裹**，否则 nginx 词法
+    #   会把 "{" 当成块起始而报 config 语法错误；引号只是定界符，PCRE 语义不变。
+    location ~ "^/(?:team/)?lab/bags/[1-9][0-9]{0,18}$"  { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- 旧 /lab/scan 兼容：站内相对 303，绝不转发旧控制台 ----------
+    # 旧书签 /lab/scan（含 ?raw= / ?scan=）迁移到新扫码页，**保留 query**。
+    # 三条硬约束：
+    #   1) 本 location 没有 proxy_pass / 任何转发头：lab_workflow 的旧 inline 控制台
+    #      （team_web 未安装时的 legacy 页面）在这里**永远不可达**；若 /team/scan
+    #      未注册，由应用层 404 —— 失败关闭，不回退旧网站。
+    #   2) 方法限制必须用 rewrite 阶段的 if。location 内的 return 先于 limit_except
+    #      的 deny 执行，若只写 limit_except GET HEAD，POST 也会被 303 掉。
+    #   3) absolute_redirect off + 相对 Location：不拼 scheme+host，避免在非标准端口/
+    #      反代场景生成丢端口的绝对 URL（浏览器按新 origin 跳转会丢会话与 CSP 同源）。
+    location = /lab/scan {
+        if ($request_method !~ ^(?:GET|HEAD)$) { return 403; }
+        absolute_redirect off;
+        return 303 /team/scan$is_args$args;
+    }
+
+    # ---------- 认证/会话 ----------
+    # 本 location 必须独立写头（唯一差异：清空 X-Odoo-Database 以保留 Odoo 冷会话），
+    # 其余行与 bore-proxy-headers.conf 逐行一致，由 tests/test_config_contract.py 防漂移。
+    location = /web/session/authenticate {
+        limit_except POST { deny all; }
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Team-Gateway lab-team-web;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Forwarded "";
+        proxy_set_header X-Forwarded-Port "";
+        proxy_set_header X-Odoo-Database "";
+        @RATE_LIMIT@
+        proxy_pass @UPSTREAM@;
+    }
+    location = /web/session/get_session_info { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /web/session/destroy         { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /team/api/session            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /api/team/session            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- 目录 API（只读 4 条 + 写 2 条，全部精确 POST） ----------
+    # 依据 lab_catalog/controllers/catalog_api.py 的实际 @http.route：type='jsonrpc' + auth='user'
+    # + methods=['POST']。bind/create_material 给 materials 页用；**代理层不判断角色**，
+    # 目录权限仍由后端 lab_catalog 角色校验（无目录角色 → FORBIDDEN），网关只放行路径与方法。
+    location = /lab/api/catalog/search     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/detail     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/categories { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/facets     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/bind            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/create_material { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/asset              { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- P3 业务 JSON-RPC（POST，逐条精确；禁止 /lab/api/.* 通配） ----------
+    # 依据 lab_workflow/controllers/{lab_inventory_api,lab_p3_api,lab_labels_api}.py 的
+    # 实际 @http.route：type='jsonrpc' + auth='user' + methods=['POST'] + csrf=False。
+    # 角色与参数边界由 Odoo 侧判定（lab 角色门槛、manager 门槛、request_key 幂等）；
+    # 代理层只做"存在性 + 方法"白名单，不做角色判断，也不放宽成前缀。
+    # 明确**不**登记的端点：
+    #   /lab/api/inventory/adopt_stock  —— 无 P3 UI、写历史库存、失败回滚仍在验证中，默认不公开；
+    #   /lab/api/inventory/legacy_stock —— 同上，仅管理端内部使用；
+    #   /web/dataset/call_kw、/jsonrpc、/web/database/*、/websocket、/longpolling 等通用入口。
+    # 只读/引导（lab 角色）
+    location = /lab/api/inventory/bootstrap      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/locations      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/resolve_code   { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/bags           { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/bag            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/issues         { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/history        { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 两阶段入库 / 直连入库 / 领用 / 归还（operator，全部要求 request_key）
+    location = /lab/api/inventory/pending/list    { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/pending/create  { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/pending/update  { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/pending/resolve { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/pending/confirm { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/receipt        { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/issue          { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/return         { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 库位 / 类别映射 / 成员库存角色（manager）
+    location = /lab/api/inventory/location_create  { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/location_update  { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/mapping_list     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/mapping_set      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/mapping_remove   { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/members          { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/inventory/member_set_role  { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 标签排版试算 / base64 预览（operator，只读；上限由 Odoo 校验）
+    location = /lab/api/labels/plan              { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/labels/preview           { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- P3 标签 PDF（operator；表单 POST + CSRF，浏览器直出） ----------
+    # 不是 JSON-RPC：浏览器 <form method="post" target="_blank"> 直出 application/pdf。
+    # 只允许 POST（GET 一律 403，避免被当作可缓存的下载地址）；CSRF 由 Odoo 校验，
+    # 响应必须自带 Cache-Control: no-store + X-Content-Type-Options: nosniff。
+    # 本 location 刻意不写 add_header：location 内出现任何 add_header 会整体丢弃
+    # server 级继承的 CSP/X-Frame-Options/nosniff，等于悄悄削弱安全头。
+    location = /lab/labels/pdf                   { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- 客户端更新清单（匿名 GET） ----------
+    location = /lab/client/updates/manifest { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location ^~ /lab/client/updates/assets/  { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+
+    # ---------- 默认拒绝 ----------
+    location / { return 404; }
+}

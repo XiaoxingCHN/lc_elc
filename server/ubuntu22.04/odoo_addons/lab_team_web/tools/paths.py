@@ -20,7 +20,28 @@ from urllib.parse import quote, unquote, urlencode, urlsplit
 CANONICAL_BASE = '/team'
 
 #: 根级别别名前缀（只属于本项目自己的命名空间，不接管 /）
-ROOT_ALIASES = ('/login', '/logout', '/lab')
+ROOT_ALIASES = ('/login', '/logout', '/lab', '/scan', '/account')
+
+#: 业务页面的根级别入口（P3）。必须**精确**列出 /lab/* 页面：/lab 前缀只用于
+#: 判断基址，绝不能用它把所有 /lab/** 都当成"自有页面"——那会把 /lab/api、
+#: /lab/scan（旧控制台）、/lab/labels/plan（旧表单端点）、/lab/client/updates
+#: 一起卷进 root_aliases 开关，破坏既有路由语义（见 tests/test_paths.py）。
+WORKFLOW_ROOT_PATHS = (
+    '/scan',
+    '/account',
+    '/lab/receipts',
+    '/lab/bags',
+    '/lab/labels',
+    '/lab/issues',
+    '/lab/locations',
+    '/lab/location-mappings',
+    '/lab/history',
+    '/lab/materials',
+    '/lab/settings',
+)
+
+#: 带子路径的业务页面（/lab/bags/<id>、/lab/issues/new）。
+WORKFLOW_ROOT_PREFIXES = ('/lab/bags/', '/lab/issues/')
 
 #: 分页
 DEFAULT_LIMIT = 24
@@ -109,16 +130,25 @@ def resolve_base(path, root_aliases_enabled=True):
 
 
 def is_root_alias_path(path):
-    """该路径是否属于根级别别名（/login、/logout、/lab、/lab/items/...）。
+    """该路径是否属于本模块的根级别入口。
 
-    刻意只认本模块自己的这几个精确形态，绝不匹配 /lab/api、/lab/scan、
-    /lab/labels、/lab/client 等其它控制器已占用的前缀。
+    覆盖两类：
+      1) 旧只读批次的别名：/login、/logout、/lab、/lab/items/...；
+      2) P3 业务页面：/scan、/account 与全部 /lab/<page>（精确匹配）及其子路径。
+
+    刻意**不**匹配 /lab/api、/lab/scan、/lab/labels/plan、/lab/labels/download、
+    /lab/client/updates/*：这些是其它控制器（lab_workflow / lab_catalog）的路由，
+    它们不受 root_aliases 开关影响，也不能被本模块的 404 逻辑误伤。
     """
     if not isinstance(path, str):
         return False
     if path in ('/login', '/logout', '/lab'):
         return True
-    return path.startswith('/lab/items/')
+    if path.startswith('/lab/items/'):
+        return True
+    if path in WORKFLOW_ROOT_PATHS:
+        return True
+    return any(path.startswith(prefix) for prefix in WORKFLOW_ROOT_PREFIXES)
 
 
 def welcome_url(base):

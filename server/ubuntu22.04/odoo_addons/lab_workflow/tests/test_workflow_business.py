@@ -1003,7 +1003,26 @@ class LabWorkflowTransactionTest(TransactionCase):
 
 @tagged('at_install', '-post_install', 'lab_workflow')
 class LabWorkflowHttpTest(HttpCase):
-    """HTTP/JSON-RPC 真接口测试（同 cookie、非匿名）。"""
+    """HTTP/JSON-RPC 真接口测试（同 cookie、非匿名）。
+
+    账号自建：不再依赖 ``LabWorkflowTransactionTest``（另一个类的数据会在
+    class 结束时回滚，HttpCase 里搜不到 → 旧实现只能 skip）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.http_login = 'lab_http_op'
+        cls.http_password = 'lab-http-op-2026'
+        cls.env['res.users'].with_context(no_reset_password=True).create({
+            'name': cls.http_login,
+            'login': cls.http_login,
+            'email': 'lab_http_op@example.invalid',
+            'password': cls.http_password,
+            'company_id': cls.env.company.id,
+            'company_ids': [(6, 0, [cls.env.company.id])],
+            'group_ids': [(4, cls.env.ref('lab_workflow.group_lab_operator').id)],
+        })
 
     def test_01_jsonrpc_requires_login(self):
         response = self.url_open(
@@ -1015,10 +1034,7 @@ class LabWorkflowHttpTest(HttpCase):
         self.assertIn(response.status_code, (200, 401, 404, 500))
 
     def test_02_authenticated_operator_bootstrap(self):
-        operator = self.env['res.users'].search([('login', '=', 'lab_op')], limit=1)
-        if not operator:
-            self.skipTest('需要先运行 TransactionCase 创建测试账号')
-        self.authenticate('lab_op', 'lab_op')
+        self.authenticate(self.http_login, self.http_password)
         response = self.url_open(
             '/lab/api/inventory/bootstrap',
             data='{}',
@@ -1030,3 +1046,7 @@ class LabWorkflowHttpTest(HttpCase):
         self.assertIn('result', payload)
         self.assertTrue(payload['result']['ok'], payload)
         self.assertIn('borrowers', payload['result']['data'])
+        # 身份必须来自会话：bootstrap 里 is_self 的那一项就是本次登录账号
+        borrowers = payload['result']['data']['borrowers']
+        self.assertTrue([row for row in borrowers if row.get('is_self')])
+        self.assertTrue(payload['result']['data']['permissions']['can_issue'])

@@ -1,5 +1,11 @@
 # 最新上线状态
 
+2026-10-25 HTTPS更新：**https://team.l-creation.club/**已可用，HTTP308跳转、正常证书验证及页面/旧更新接口12项独立检查通过。自动续期未配置，HTTPS真实登录待复验；离开内网后的DSH最终审计待恢复核验。见[最新交接](../maintenance/handoffs/2026-10-25-team-https-current.md)。
+
+2026-10-25 登录补修：team认证代理已单独清除选库请求头，修复首次会话不能保存Cookie的问题；隔离断言通过，Nginx校验/reload成功。用户随后确认登录可用，刷新保持会话及退出未追加实测，见[登录审计](../maintenance/audit/team-login-cold-session-20261025.md)。
+
+2026-10-25：管理域名 **http://team.l-creation.club/** 的HTTP阶段已接通，欢迎/登录/仓库保护使用根业务路径并自动选生产库。服务器自身DNS已指向路由器，旧dnsmasq已停用并取消自启。HTTPS/LE账号协议及自动续期待处理；旧站与API保留。见[域名审计](../maintenance/audit/team-domain-http-deploy-20261025.md)与[DNS审计](../maintenance/audit/team-domain-dns-repair-20261025.md)。
+
 2026-10-25：**lab_team_web 19.0.1.0.0 已安装生产**。仅新增18文件模块，旧五模块133文件及库存基线不变；欢迎/登录/匿名保护和静态资源HTTP通过，原页面及更新通道正常。首次多库入口为 `/web/login?db=LcHardwareHouse&redirect=/team/lab`，之后使用 `/team/*`；管理根Host、根别名和DNS未切换。真实账号完整流程、生产大目录和真机未重测。见[生产审计](../maintenance/audit/team-web-production-20261025.md)和[发布核验](../maintenance/audit/team-web-publish-codex-review.md)。
 
 2026-10-24：lab_portal 方案已废弃、源码已移除，最近生产审计为 uninstalled；[门户交接](../maintenance/handoffs/2026-10-24-portal-deploy.md)仅保留历史安装证据。

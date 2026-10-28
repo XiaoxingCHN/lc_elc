@@ -140,6 +140,37 @@ def datas_root(conf):
     return pathlib.Path(conf['data_dir']).expanduser().resolve(strict=False) / 'filestore'
 
 
+def filestore_candidates(conf, dbname):
+    """返回按可信度排序的 filestore 候选路径（已存在的优先）。
+
+    Odoo 未显式配置 ``data_dir`` 时使用 ``~/.local/share/Odoo``（按运行用户解析），
+    而 DEFAULTS 里的 ``/var/lib/odoo`` 只是打包默认值。只信默认值会让备份
+    静默产出空的 filestore 归档，因此这里同时给出两个候选，由调用方按存在性
+    和附件数量交叉校验。
+    """
+    validate_db_identifier(dbname)
+    roots = [pathlib.Path(conf['data_dir']).expanduser(),
+             pathlib.Path.home() / '.local' / 'share' / 'Odoo']
+    # Odoo 常以独立系统用户运行；用其真实 home 解析默认 data_dir，
+    # 否则 root 执行备份时 Path.home() 会指向 /root 而再次漏备附件。
+    for user in (conf.get('odoo_user'), 'odoo'):
+        if not user:
+            continue
+        try:
+            import pwd
+            roots.append(pathlib.Path(pwd.getpwnam(user).pw_dir) / '.local' / 'share' / 'Odoo')
+        except (ImportError, KeyError):
+            continue
+    seen, out = set(), []
+    for root in roots:
+        path = safe_child_path(root.resolve(strict=False) / 'filestore', dbname,
+                              what='filestore 路径')
+        if path not in seen:
+            seen.add(path)
+            out.append(path)
+    return out
+
+
 def filestore_path(conf, dbname):
     """``<data_dir>/filestore/<dbname>``，并强制校验不逃出 ``<data_dir>/filestore``。"""
     validate_db_identifier(dbname)

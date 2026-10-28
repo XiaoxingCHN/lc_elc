@@ -428,6 +428,53 @@
         ]
       },
       "limitations": "662768 cn records historical local snapshot, not the latest production database."
+    },
+    {
+      "id": "bore-p1-local-runtime",
+      "path": "local/build/bore-p1-20261026/runtime/PROVENANCE.json",
+      "type": "file",
+      "acquisition": {
+        "method": "script-download-verified",
+        "commands": [
+          "bash server/ubuntu22.04/bore/scripts/fetch-runtime.sh --dest local/build/bore-p1-20261026/runtime"
+        ],
+        "metadata": "local/build/bore-p1-20261026/runtime/PROVENANCE.json"
+      },
+      "sha256": "5ce4606e61cf37398a3924d1bbbcd507e0945d3c6bd350cc1300be6b3d390c92",
+      "version": "1"
+    },
+    {
+      "id": "bore-p2-nginx1306",
+      "path": "local/build/bore-p2-20261026/runtime1306/PROVENANCE.json",
+      "type": "file",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "url": "https://nginx.org/packages/ubuntu/pool/nginx/n/nginx/nginx_1.30.6-1~jammy_amd64.deb",
+        "commands": [
+          "curl -fsSLO https://nginx.org/packages/ubuntu/pool/nginx/n/nginx/nginx_1.30.6-1~jammy_amd64.deb"
+        ],
+        "metadata": "local/build/bore-p2-20261026/runtime1306/PROVENANCE.json"
+      },
+      "sha256": "72ce3456167c4508d1c3e5eae6e65b1bbb00bd693515b1ff414e771e66d9867c",
+      "version": "1.30.6-1~jammy"
+    },
+    {
+      "id": "bore-p2-noto-cjk",
+      "path": "local/build/p2-fonts-20261027/payload/fonts-noto-cjk_20220127+repack1-1_all.deb",
+      "type": "file",
+      "version": "1:20220127+repack1-1",
+      "sha256": "e804b3474a79bd70d5f03f590e2d06dbc5ce17f48be7cfaf6c48086471edd5be",
+      "size_bytes": 61220346,
+      "license": "OFL-1.1",
+      "acquisition": {
+        "method": "pinned-upstream-download",
+        "commands": [
+          "python tools/fetch_payload.py --id bore-p2-noto-cjk --download"
+        ],
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-noto-cjk/fonts-noto-cjk_20220127+repack1-1_all.deb",
+        "metadata": "maintenance/registry/bore-p2-fonts-20261027.json"
+      },
+      "notes": "Isolated browser test environment only; extract privately and supply FONTCONFIG_FILE/FONTCONFIG_PATH. Never install into system font directories."
     }
   ]
 }

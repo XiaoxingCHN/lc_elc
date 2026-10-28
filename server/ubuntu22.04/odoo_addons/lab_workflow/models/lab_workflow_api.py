@@ -7,7 +7,7 @@ import uuid
 
 from odoo import _, api, fields, models
 
-from ..tools import inventory_codec
+from ..tools import inventory_codec, p3_rules
 from .lab_workflow_common import (
     CODE_INTERNAL, PG_CONCURRENCY_ERRORS, LabApiError, LabConcurrencyRetry,
     internal_only,
@@ -206,12 +206,22 @@ class LabWorkflowApi(models.AbstractModel):
         }
 
     @api.model
-    def lab_locations(self):
+    def lab_locations(self, with_stats=False):
+        """``/lab/api/inventory/locations``；``with_stats`` 时追加袋数/数量。
+
+        统计只算本库位（不含子库位），便于列表直接展示；停用校验用子树口径。
+        """
         locations = self.env['stock.location'].search([
             ('usage', '=', 'internal'),
             '|', ('company_id', '=', False), ('company_id', '=', self.env.company.id),
         ]).sorted(lambda loc: loc.complete_name or '')
-        return {'locations': [location._lab_location_dict() for location in locations]}
+        rows = [location._lab_location_dict() for location in locations]
+        if p3_rules.parse_bool(with_stats, False):
+            stats = self._lab_location_stats_map(locations)
+            for row in rows:
+                row.update(stats.get(row['id'], {'bag_count': 0, 'bag_quantity': 0.0,
+                                                 'quantity': 0.0}))
+        return {'locations': rows}
 
     @api.model
     def lab_location_create(self, name, parent_id=None):
@@ -219,7 +229,8 @@ class LabWorkflowApi(models.AbstractModel):
             raise LabApiError.validation('库位名称不能为空', {'name': 'required'})
         parent = False
         if parent_id:
-            parent = self.env['stock.location'].browse(int(parent_id)).exists()
+            parent = self.env['stock.location'].browse(
+                self.lab_int(parent_id, 'parent_id', minimum=1)).exists()
             if not parent:
                 raise LabApiError.not_found('父库位不存在：%s' % parent_id,
                                             {'parent_id': 'not_found'})
@@ -483,7 +494,7 @@ class LabWorkflowApi(models.AbstractModel):
                     if not entry.get('bag_id'):
                         raise LabApiError.validation('每条领用明细都要有 bag_id',
                                                      {'lines': 'bag_id_required'})
-                    bag_ids.append(int(entry['bag_id']))
+                    bag_ids.append(self.lab_int(entry.get('bag_id'), 'bag_id', minimum=1))
                 if len(set(bag_ids)) != len(bag_ids):
                     raise LabApiError.validation(
                         '同一袋不能在一次领用中重复出现，请合并数量',
@@ -507,7 +518,8 @@ class LabWorkflowApi(models.AbstractModel):
 
                 issue_lines_data = []
                 for entry in lines:
-                    bag = bags.filtered(lambda b: b.id == int(entry['bag_id']))
+                    line_bag_id = self.lab_int(entry.get('bag_id'), 'bag_id', minimum=1)
+                    bag = bags.filtered(lambda b: b.id == line_bag_id)
                     quantity = self.lab_check_quantity(bag.product_id, entry.get('quantity'))
                     _mark('check_quantity bag=%s' % bag.id)
                     if bag.company_id != self.env.company:
@@ -638,14 +650,27 @@ class LabWorkflowApi(models.AbstractModel):
                 if not issue_line_id:
                     raise LabApiError.validation('必须选择原领用记录（issue_line_id）',
                                                  {'issue_line_id': 'required'})
-                self.lab_sql_lock('lab_issue_line', 'id = %s', (int(issue_line_id),))
-                issue_line = self.env['lab.issue.line'].browse(int(issue_line_id)).exists()
+                issue_line_id = self.lab_int(issue_line_id, 'issue_line_id', minimum=1)
+                self.lab_sql_lock('lab_issue_line', 'id = %s', (issue_line_id,))
+                # security-round2 S2-4：用 search（显式 domain）取代 browse().exists()，
+                # 不再依赖"Odoo 读时是否复核记录规则"这一未验证语义。
+                # 公司条件写进 domain：不存在/跨公司统一 NOT_FOUND（不泄露存在性）。
+                issue_line = self.env['lab.issue.line'].sudo().search([
+                    ('id', '=', issue_line_id),
+                    ('company_id', '=', self.env.company.id),
+                ], limit=1)
                 if not issue_line:
-                    raise LabApiError.not_found('原领用记录不存在：%s' % issue_line_id,
+                    raise LabApiError.not_found('原领用记录不存在或无权访问：%s'
+                                                % issue_line_id,
                                                 {'issue_line_id': 'not_found'})
-                if issue_line.company_id != self.env.company:
-                    raise LabApiError.forbidden('该领用记录属于其他公司',
-                                                {'issue_line_id': 'wrong_company'})
+                # security-review S1：跨账号归还必须有服务端校验。
+                # 列表接口对非 manager 强制"只看自己"（lab_issues.viewer_only_self），
+                # 但归还是写操作，不能只靠"界面看不到"。代他人归还需库存管理员权限。
+                if (not self.lab_can_issue_for_others()
+                        and issue_line.borrower_id.id != self.env.uid):
+                    raise LabApiError.forbidden(
+                        '只能归还自己的领用记录；代他人归还需要库存管理员权限',
+                        {'issue_line_id': 'not_owner'})
                 # 行锁后丢弃缓存：returned_quantity / outstanding_quantity 必须重新计算
                 issue_line.invalidate_recordset(['quantity', 'returned_quantity',
                                                  'outstanding_quantity'])
@@ -751,7 +776,7 @@ class LabWorkflowApi(models.AbstractModel):
     @api.model
     def lab_issues(self, query='', outstanding_only=True, cursor=None, limit=50,
                    viewer_only_self=False):
-        limit = max(1, min(int(limit or 50), 200))
+        limit = max(1, min(self.lab_int(limit, 'limit', default=50), 200))
         domain = [('company_id', '=', self.env.company.id)]
         if query:
             domain += ['|', ('bag_id.trace_code', 'ilike', query),
@@ -777,12 +802,39 @@ class LabWorkflowApi(models.AbstractModel):
         }
 
     @api.model
-    def lab_history(self, item_key=None, bag_id=None, cursor=None, limit=50):
-        limit = max(1, min(int(limit or 50), 200))
+    def lab_history(self, item_key=None, bag_id=None, cursor=None, limit=50,
+                    operation_type=None, date_from=None, date_to=None,
+                    actor_id=None, borrower_id=None):
+        """``/lab/api/inventory/history``：作业流水（只读）。
+
+        P3 新增可选过滤：``operation_type`` / ``date_from`` / ``date_to`` /
+        ``actor_id`` / ``borrower_id``；不传时行为与旧版完全一致。
+        """
+        limit = max(1, min(self.lab_int(limit, 'limit', default=50), 200))
         Move = self.env['stock.move']
         domain = [('state', '=', 'done'),
                   ('company_id', '=', self.env.company.id),
                   ('lab_operation_id', '!=', False)]
+        try:
+            filters = p3_rules.history_filters({
+                'operation_type': operation_type,
+                'date_from': date_from,
+                'date_to': date_to,
+                'actor_id': actor_id,
+                'borrower_id': borrower_id,
+            })
+        except p3_rules.RuleError as error:
+            raise LabApiError.validation(error.message, error.fields())
+        if filters.get('operation_type'):
+            domain.append(('lab_operation_id.operation_type', '=', filters['operation_type']))
+        if filters.get('date_start'):
+            domain.append(('date', '>=', filters['date_start']))
+        if filters.get('date_end'):
+            domain.append(('date', '<', filters['date_end']))
+        if filters.get('actor_id'):
+            domain.append(('lab_operation_id.actor_id', '=', filters['actor_id']))
+        if filters.get('borrower_id'):
+            domain.append(('lab_operation_id.borrower_id', '=', filters['borrower_id']))
         if item_key:
             template = self.lab_search_template(item_key)
             domain.append(('product_id', '=', template.product_variant_id.id))

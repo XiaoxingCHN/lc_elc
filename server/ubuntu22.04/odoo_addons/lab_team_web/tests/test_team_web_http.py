@@ -230,21 +230,45 @@ class LabTeamWebHttpTest(HttpCase):
     # ------------------------------------------------------------------
     def test_07_anonymous_session_api(self):
         """验证契约：POST /team/api/session 匿名返回 ok=True、
-        authenticated=False、三个权限位全 False，且 base=/team。"""
+        authenticated=False、**全部**权限位 False、无身份信息，且 base=/team。
+
+        P3 起该接口合法增加了库存权限位（frontend-contract.md §5.1），
+        因此不能再断言 permissions 等于旧的三键字典；但绝不允许"新增字段变成 True"
+        或"匿名泄露身份"。这里同时校验：旧键仍在、新键在、所有值一律 False。
+        """
         payload = self._jsonrpc('/team/api/session')
         result = payload['result']
         self.assertTrue(result['ok'])
         self.assertIsNone(result['error'])
         data = result['data']
         self.assertFalse(data['authenticated'])
-        self.assertEqual(data['permissions'], {
-            'can_catalog': False,
-            'can_lab': False,
-            'is_manager': False,
-        })
+
+        permissions = data['permissions']
+        # 1) 旧只读批次的三个位必须仍然存在且为 False（不回退 API shape）
+        for name in ('can_catalog', 'can_lab', 'is_manager'):
+            self.assertIn(name, permissions, '匿名响应缺少旧权限位 %s' % name)
+            self.assertFalse(permissions[name], '匿名不得拥有 %s' % name)
+        # 2) P3 新增的库存权限位必须存在（前端按位渲染菜单）
+        for name in ('can_receipt', 'can_issue', 'can_return',
+                     'can_manage_labels', 'can_issue_for_others',
+                     'can_manage_locations', 'can_manage_mappings',
+                     'can_manage_members'):
+            self.assertIn(name, permissions, '匿名响应缺少权限位 %s' % name)
+        # 3) 任何一个权限位为 True 都是缺陷
+        granted = sorted(name for name, value in permissions.items() if value)
+        self.assertEqual(granted, [], '匿名会话不得拥有任何权限：%r' % permissions)
+
+        # 4) 匿名不得泄露身份（新增字段不能变成身份泄漏）
+        self.assertIsNone(data['uid'])
+        self.assertEqual(data['name'], '')
+        self.assertEqual(data['login'], '')
+        self.assertEqual(data.get('company'), {'id': None, 'name': ''})
+
         self.assertEqual(data['base'], '/team')
-        self.assertEqual(
-            set(data['urls']), {'welcome', 'login', 'logout', 'lab'})
+        # 5) urls 只增不减：旧的四个入口必须还在（P3 增加了业务页地址）
+        self.assertTrue(
+            {'welcome', 'login', 'logout', 'lab'} <= set(data['urls']),
+            'urls 缺少既有入口：%r' % sorted(data['urls']))
 
     # ------------------------------------------------------------------
     # 8. 已登录访问登录页 -> 回跳

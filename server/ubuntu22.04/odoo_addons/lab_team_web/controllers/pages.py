@@ -149,6 +149,8 @@ class LabTeamPages(http.Controller):
             'lc_next': target,
             'lc_db': getattr(request.session, 'db', None) or getattr(request, 'db', None) or '',
             'lc_error': '',
+            # 表单 action 必须是站内相对路径且尊重当前基址（/team/login 或 /login），
+            # 不能是绝对 URL：绝对 URL 由代理层推导 origin 时会丢非标准端口。
             'lc_login_action': (base + '/login') if base else '/login',
             'lc_auth_endpoint': '/web/session/authenticate',
         })
@@ -164,6 +166,10 @@ class LabTeamPages(http.Controller):
             request.session.logout(keep_db=True)
         except TypeError:                    # 兼容不同小版本的签名
             request.session.logout()
+        # 相对跳转 + 尊重当前基址：/team/** 回 /team/login，管理 Host 根级回 /login。
+        # 只用站内相对路径（不含 scheme/host）：一旦写成绝对 URL，origin 由代理层推导，
+        # 非标准端口（如 9500）会被丢掉，303 落到另一个 origin，浏览器按
+        # CSP form-action 'self' 拒绝，表现为"退出后页面不动/被拦"。
         base = current_base()
         return redirect((base + '/login') if base else '/login', code=303)
 

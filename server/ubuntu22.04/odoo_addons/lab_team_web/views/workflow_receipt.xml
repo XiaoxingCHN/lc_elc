@@ -1,0 +1,1030 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================================================================
+         P3 · 入库 / 扫码 / 袋追溯 / 标签（receipt 子任务写域）
+         ==================================================================
+         模板 id 由 controllers/workflow_pages.py 的 PAGE_SPECS 固定，不可改名：
+
+           workflow_receipt_receipts    page_id=receipts  /lab/receipts
+           workflow_receipt_scan        page_id=scan      /team/scan
+           workflow_receipt_bags        page_id=bags      /lab/bags
+           workflow_receipt_bag_detail  page_id=bag       /lab/bags/<id>
+           workflow_receipt_labels      page_id=labels    /lab/labels
+
+         写作约束（frontend-contract.md §4 / §9）：
+         * 只有外链脚本：workflow_core.js（window.LC）+ pages/<page_id>.js；
+           无内联 script / onclick / style 里的 JS；无 eval。
+         * 模板不做业务查询：数据一律由 pages/*.js 用 LC.rpc / LC.submit 取；
+           API 全失败时本文件的骨架、空态与错误位仍然可读。
+         * 数据属性只用契约 §4.5 的 data-lc-*（其余用普通 data-*，如 data-slot/data-id）。
+         * 标签 PDF 走真实表单 POST（csrf_token + target=_blank），不用 iframe/blob。
+         * 只读角色：写操作容器带 data-lc-write，由页面 JS 按 can_receipt /
+           can_manage_labels 决定显示；模板本身不猜权限。
+
+         PDF 表单的 action 固定为站内根路径 /lab/labels/pdf：该路由由 lab_workflow
+         在根前缀注册（backend-contract.md §3.7），不加 lc_base 前缀 —— 在 /team/**
+         下 lc_base='/team'，拼成 /team/lab/labels/pdf 会命中不存在的路由。
+         ================================================================== -->
+
+    <!-- ==============================================================
+         页面 1/5：采购入库（两阶段：建袋打印，然后扫码上架确认）
+         ============================================================== -->
+    <template id="workflow_receipt_receipts" name="P3 采购入库">
+        <t t-call="lab_team_web.workflow_page">
+
+            <p class="lc-note lc-receipt-intro">
+                <strong>两阶段入库：</strong>建袋与打印标签<strong>不增加库存</strong>；
+                只有「扫码上架 → 选择库位 → 确认入库」才产生真实入库移动。
+                页面上的数量全部来自 Odoo 实时库存，本页不存任何本地台账。
+            </p>
+
+            <div class="lc-tabs" role="tablist" aria-label="入库步骤">
+                <button class="lc-tab is-active" type="button" role="tab" aria-selected="true"
+                        data-lc-action="tab" data-tab="prepare">① 建袋与打印</button>
+                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                        data-lc-action="tab" data-tab="shelve">② 扫码上架</button>
+            </div>
+
+            <!-- 只读角色说明位：data-readonly-note 是本页自有钩子（非 data-lc-*，
+                 避免占用契约 §4.5 的属性名集合），值必须显式给出——XML 不接受裸属性。 -->
+            <p class="lc-hint" data-readonly-note="1" hidden="hidden">
+                当前账号是只读库存角色：可以查看待入库袋，但建袋、打印、取消与确认入库
+                按钮不会显示（服务端也会拒绝这些写操作）。
+            </p>
+
+            <noscript>
+                <p class="lc-alert lc-alert-error" role="alert">
+                    本页需要启用 JavaScript：建袋、扫码解析与确认入库都通过页面脚本调用接口完成。
+                </p>
+            </noscript>
+
+            <!-- 面板 A：建袋与打印（不增库存） -->
+            <section class="lc-panel" data-lc-panel="prepare">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">待入库袋</h2>
+                    <span class="lc-toolbar-note" data-lc-count="pending">—</span>
+                </div>
+                <div class="lc-panel-body">
+
+                    <div class="lc-loading" data-lc-loading="pending" hidden="hidden">加载待入库袋…</div>
+                    <p class="lc-alert lc-alert-error" role="alert" data-lc-error="pending" hidden="hidden"></p>
+
+                    <div class="lc-receipt-write" data-lc-write="prepare" hidden="hidden">
+
+                        <!-- 未决提交横幅（scope = receipts/create）：结果未知时禁止改内容再提交，
+                             只能"用原内容重试"或"核对流水后显式解除"。 -->
+                        <div class="lc-lock" data-lc-lock="create"
+                             data-lc-lock-scope="receipts/create"
+                             data-lc-lock-endpoint="pendingCreate" hidden="hidden">
+                            <p class="lc-alert lc-alert-error" role="alert">
+                                上一次「建待入库袋」的结果未知（服务端<strong>可能已经建好</strong>，袋码也已分配）。
+                                核对前不能改料号/数量/袋数再次提交，也不要按原内容重复打印标签。
+                            </p>
+                            <p class="lc-hint" data-lc-lock-meta=""></p>
+                            <div class="lc-actions">
+                                <button class="lc-btn lc-btn-primary" type="button"
+                                        data-lc-action="lock-retry">用原内容重试</button>
+                                <button class="lc-btn lc-btn-outline" type="button"
+                                        data-lc-action="lock-absent">已核对：上次没有建袋</button>
+                                <button class="lc-btn lc-btn-ghost" type="button"
+                                        data-lc-action="lock-present">已核对：上次已建袋</button>
+                            </div>
+                        </div>
+
+                        <h3 class="lc-section-title">选择统一料号（本地档案优先）</h3>
+                        <p class="lc-hint">
+                            扫码枪或粘贴统一料号后点「解析」：<span class="lc-mono">lcsc:C123</span>
+                            为立创编号、<span class="lc-mono">lab:42</span> 为本地档案。
+                            同一 C 编号有多个本地档案时<strong>不会替你选</strong>，必须在下拉里明确选择。
+                        </p>
+
+                        <div class="lc-scanrow">
+                            <label class="lc-field lc-scanrow-field">
+                                <span class="lc-field-label">统一料号</span>
+                                <input class="lc-input lc-mono" type="text" name="item_key"
+                                       data-lc-field="item_key" autocomplete="off" inputmode="text"
+                                       placeholder="lcsc:C123 / lab:42 / 扫码"/>
+                            </label>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="resolve-item">解析料号</button>
+                        </div>
+
+                        <div class="lc-material-picked" data-lc-selected="material" hidden="hidden">
+                            <p class="lc-toolbar-note">已选物料</p>
+                            <p class="lc-material-line">
+                                <span class="lc-mono" data-slot="material-key">—</span>
+                                <span data-slot="material-name">—</span>
+                            </p>
+                            <p class="lc-hint" data-slot="material-meta"></p>
+                            <label class="lc-field">
+                                <span class="lc-field-label">本地档案（product_template_id）</span>
+                                <select class="lc-input" name="product_template_id"
+                                        data-slot="material-select"></select>
+                            </label>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="clear-item">重新选择</button>
+                        </div>
+
+                        <p class="lc-alert lc-alert-error" role="alert"
+                           data-lc-error="resolve" hidden="hidden"></p>
+                        <div class="lc-loading" data-lc-loading="resolve" hidden="hidden">解析料号…</div>
+
+                        <form class="lc-form lc-form-grid" data-lc-form="pending-create">
+                            <label class="lc-field">
+                                <span class="lc-field-label">每袋数量</span>
+                                <input class="lc-input" type="text" name="quantity"
+                                       data-lc-field="quantity" inputmode="decimal"
+                                       placeholder="例如 100" autocomplete="off"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">袋数（1~100）</span>
+                                <input class="lc-input" type="text" name="count"
+                                       data-lc-field="count" inputmode="numeric" value="1"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">备注（可选）</span>
+                                <input class="lc-input" type="text" name="note"
+                                       data-lc-field="note" maxlength="200" autocomplete="off"/>
+                            </label>
+                            <div class="lc-field lc-actions">
+                                <button class="lc-btn lc-btn-primary" type="submit">
+                                    建待入库袋（不增库存）
+                                </button>
+                            </div>
+                        </form>
+
+                        <details class="lc-receipt-new">
+                            <summary>料号还没有本地档案？新建器件档案</summary>
+                            <p class="lc-hint">
+                                建档只登记名称/型号/封装/品牌/规格，<strong>不写库存</strong>；
+                                建好后仍需建待入库袋并扫码上架。
+                            </p>
+
+                            <div class="lc-lock" data-lc-lock="material"
+                                 data-lc-lock-scope="receipts/create-material"
+                                 data-lc-lock-endpoint="pendingCreate" hidden="hidden">
+                                <p class="lc-alert lc-alert-error" role="alert">
+                                    上一次「建档并建待入库袋」的结果未知（档案<strong>可能已经建好</strong>，
+                                    待入库袋也可能已分配袋码）。核对前不要重复建档。
+                                </p>
+                                <p class="lc-hint" data-lc-lock-meta=""></p>
+                                <div class="lc-actions">
+                                    <button class="lc-btn lc-btn-primary" type="button"
+                                            data-lc-action="lock-retry">用原内容重试</button>
+                                    <button class="lc-btn lc-btn-outline" type="button"
+                                            data-lc-action="lock-absent">已核对：上次没有建</button>
+                                    <button class="lc-btn lc-btn-ghost" type="button"
+                                            data-lc-action="lock-present">已核对：上次已建</button>
+                                </div>
+                            </div>
+
+                            <form class="lc-form lc-form-grid" data-lc-form="material-create">
+                                <label class="lc-field">
+                                    <span class="lc-field-label">器件名称</span>
+                                    <input class="lc-input" type="text" name="material_name"
+                                           data-lc-field="material_name" required="required"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">型号 MPN</span>
+                                    <input class="lc-input" type="text" name="material_mpn"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">封装</span>
+                                    <input class="lc-input" type="text" name="material_package"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">品牌</span>
+                                    <input class="lc-input" type="text" name="material_brand"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">规格</span>
+                                    <input class="lc-input" type="text" name="material_specification"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">每袋数量</span>
+                                    <input class="lc-input" type="text" name="quantity"
+                                           data-lc-field="quantity" inputmode="decimal"/>
+                                </label>
+                                <div class="lc-field lc-actions">
+                                    <button class="lc-btn lc-btn-outline" type="submit">
+                                        建档并建待入库袋（不增库存）
+                                    </button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <h3 class="lc-section-title">打印待入库标签</h3>
+                        <p class="lc-hint">
+                            打印不改变库存状态。待入库标签必须包含追溯码；每袋只有<strong>一个</strong>
+                            追溯二维码，库码另用库位标签。
+                        </p>
+                        <div class="lc-toolbar">
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="select-all">全选可打印</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="select-none">清空选择</button>
+                            <label class="lc-field lc-meter">
+                                <span class="lc-field-label">每袋份数</span>
+                                <input class="lc-input" type="text" data-lc-copies="pending"
+                                       inputmode="numeric" value="1" aria-label="每袋打印份数"/>
+                            </label>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="plan-pending">试算排版</button>
+                            <button class="lc-btn lc-btn-primary" type="button"
+                                    data-lc-action="print-pending">下载 A4 标签 PDF</button>
+                        </div>
+                        <div class="lc-label-plan" data-lc-plan="pending" hidden="hidden"></div>
+                        <p class="lc-alert lc-alert-error" role="alert"
+                           data-lc-error="print" hidden="hidden"></p>
+                    </div>
+
+                    <div class="lc-table-wrap">
+                        <table class="lc-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">打印</th>
+                                    <th scope="col">追溯码</th>
+                                    <th scope="col">器件</th>
+                                    <th scope="col">数量</th>
+                                    <th scope="col">状态</th>
+                                    <th scope="col">已入库袋</th>
+                                    <th scope="col">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="pending"></tbody>
+                        </table>
+                    </div>
+                    <p class="lc-empty" data-lc-empty="pending" hidden="hidden">
+                        还没有待入库袋。先在上方选择料号并建袋；建袋不会增加库存。
+                    </p>
+
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="pending-more" hidden="hidden">加载更多待入库袋</button>
+                    </div>
+
+                    <!-- 打印队列写操作（pending/update）的未决提交横幅：
+                         后端 pending/update 无 request_key，网络结果未知时无法用服务端幂等兜底，
+                         只能靠本地未决锁 + 人工核对。 -->
+                    <div class="lc-lock" data-lc-lock="update"
+                         data-lc-lock-scope="receipts/pending-update"
+                         data-lc-lock-endpoint="pendingUpdate" hidden="hidden">
+                        <p class="lc-alert lc-alert-error" role="alert">
+                            上一次「打印选择 / 取消」的结果未知（服务端可能已经改过状态）。
+                            核对前不要继续改其它行，也不要用同一结果再点一次。
+                        </p>
+                        <p class="lc-hint" data-lc-lock-meta=""></p>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="button"
+                                    data-lc-action="lock-retry">用原内容重试</button>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="lock-absent">已核对：那次没有生效</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="lock-present">已核对：那次已生效</button>
+                        </div>
+                    </div>
+
+                    <!-- 改草稿（改数量）说明：后端 pending/update 只支持 select / cancel，
+                         没有「编辑数量」的 action；前端**不得**用「新建 + 取消旧记录」绕过，
+                         否则已经打印出去的追溯码会指向一条已取消记录、标签作废。 -->
+                    <div class="lc-receipt-rewrite">
+                        <h3 class="lc-section-title">待入库袋改数量</h3>
+                        <p class="lc-hint">
+                            追溯码在建袋时分配、标签印的就是它，因此<strong>不能靠新建一条袋来改数量</strong>
+                            （那样旧码会指向已取消记录，已打印的标签全部作废）。
+                            当前后端 <span class="lc-mono">pending/update</span> 只支持「打印选择」与「取消」，
+                            <strong>没有编辑数量/备注的接口</strong>；需要改数量时：
+                        </p>
+                        <ol class="lc-hint lc-receipt-steps">
+                            <li>如该袋标签还没打印：直接<strong>取消</strong>该袋，再按新数量重新建袋（新码随新标签一起打印）。</li>
+                            <li>如标签已打印：先与库存管理员确认是否补一条新袋并<strong>作废旧标签实物</strong>；
+                                系统不会替你换码，也不会自动新建。</li>
+                            <li>需要「原地改数量（保留原追溯码）」时，请由后端补
+                                <span class="lc-mono">pending/update action=edit</span>（窄路由已存在，缺 action）。</li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 面板 B：扫码上架（确认后才增加库存） -->
+            <section class="lc-panel" data-lc-panel="shelve" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">扫码上架（确认后才增加库存）</h2>
+                </div>
+                <div class="lc-panel-body">
+
+                    <div class="lc-scanrow">
+                        <label class="lc-field lc-scanrow-field">
+                            <span class="lc-field-label">扫描待入库袋追溯码</span>
+                            <input class="lc-input lc-mono" type="text" data-lc-scan="shelve"
+                                   data-lc-field="raw" autocomplete="off" inputmode="text"
+                                   aria-label="扫描待入库袋追溯码" placeholder="LABB:…"/>
+                        </label>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="resolve-pending">解析待入库袋</button>
+                    </div>
+                    <p class="lc-hint">
+                        扫码枪回车即解析；也可以手工粘贴编码。扫到别的账号的待入库袋、已入库或已取消的袋
+                        会明确提示，不会猜测。
+                    </p>
+
+                    <div class="lc-loading" data-lc-loading="confirm" hidden="hidden">解析待入库袋…</div>
+                    <p class="lc-alert lc-alert-error" role="alert" data-lc-error="confirm" hidden="hidden"></p>
+
+                    <div class="lc-receipt-shelve" data-lc-result="shelve" hidden="hidden">
+                        <h3 class="lc-section-title">待入库袋事实</h3>
+                        <dl class="lc-kv">
+                            <dt>追溯码</dt>
+                            <dd class="lc-mono" data-slot="pending-trace">—</dd>
+                            <dt>器件</dt>
+                            <dd data-slot="pending-item">—</dd>
+                            <dt>待入库数量</dt>
+                            <dd data-slot="pending-quantity">—</dd>
+                            <dt>状态</dt>
+                            <dd data-slot="pending-state">—</dd>
+                        </dl>
+
+                        <div class="lc-receipt-write" data-lc-write="confirm" hidden="hidden">
+                            <h3 class="lc-section-title">库位推荐（只是顺序，不会自动选中）</h3>
+                            <p class="lc-hint">
+                                推荐依据：相同器件 → 类别映射 → 同类器件；必须由你选定库位再确认。
+                                库位停用或不属于本公司会被服务端拒绝。
+                            </p>
+                            <div data-lc-recommend="shelve">
+                                <ul class="lc-recommend" data-lc-rows="recommend"></ul>
+                                <p class="lc-hint" data-lc-empty="recommend" hidden="hidden">
+                                    没有可推荐库位，请在下拉里手动选择。
+                                </p>
+                            </div>
+
+                            <form class="lc-form lc-form-grid" data-lc-form="pending-confirm">
+                                <label class="lc-field">
+                                    <span class="lc-field-label">入库库位</span>
+                                    <select class="lc-input" name="location_id"
+                                            data-lc-field="location_id"
+                                            data-slot="location-select"></select>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">实收数量</span>
+                                    <input class="lc-input" type="text" name="quantity"
+                                           data-lc-field="quantity" inputmode="decimal"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">SN（可选，同 C 多档案时用）</span>
+                                    <input class="lc-input lc-mono" type="text" name="sn"
+                                           data-lc-field="sn" autocomplete="off"/>
+                                </label>
+                                <label class="lc-field">
+                                    <span class="lc-field-label">立创原厂袋二维码（可选）</span>
+                                    <input class="lc-input lc-mono" type="text" name="supplier_qr"
+                                           data-lc-field="supplier_qr" autocomplete="off"
+                                           placeholder="扫原厂袋二维码后提交，落库为供应商订单/型号"/>
+                                </label>
+                                <div class="lc-field lc-actions">
+                                    <button class="lc-btn lc-btn-primary" type="submit">
+                                        确认入库（增加库存）
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="lc-lock" data-lc-lock="confirm"
+                             data-lc-lock-scope="receipts/confirm"
+                             data-lc-lock-endpoint="pendingConfirm" hidden="hidden">
+                            <p class="lc-alert lc-alert-error" role="alert">
+                                上一次「确认入库」的结果未知（服务端<strong>可能已经入库</strong>）。
+                                核对前不能改库位/数量再提交，也不要重复确认。
+                            </p>
+                            <p class="lc-hint" data-lc-lock-meta=""></p>
+                            <div class="lc-actions">
+                                <button class="lc-btn lc-btn-primary" type="button"
+                                        data-lc-action="lock-retry">用原内容重试</button>
+                                <button class="lc-btn lc-btn-outline" type="button"
+                                        data-lc-action="lock-absent">已核对：上次没有入库</button>
+                                <button class="lc-btn lc-btn-ghost" type="button"
+                                        data-lc-action="lock-present">已核对：上次已入库</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lc-receipt-done" data-lc-success="shelve" hidden="hidden">
+                        <h3 class="lc-section-title">入库结果</h3>
+                        <dl class="lc-kv">
+                            <dt>追溯码</dt>
+                            <dd class="lc-mono" data-slot="success-trace">—</dd>
+                            <dt>库位</dt>
+                            <dd data-slot="success-location">—</dd>
+                            <dt>本次入库数量</dt>
+                            <dd data-slot="success-quantity">—</dd>
+                            <dt>该物料实验室库存合计</dt>
+                            <dd data-slot="success-total">—</dd>
+                        </dl>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="scan-next">继续扫码上架</button>
+                            <a class="lc-btn lc-btn-outline" data-slot="success-bag-link" hidden="hidden">
+                                查看袋追溯
+                            </a>
+                            <button class="lc-btn lc-btn-primary" type="button"
+                                    data-lc-action="print-last">打印该袋标签</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 标签 PDF 表单：真实 POST，浏览器自己打开 PDF -->
+            <form class="lc-label-pdf" method="post" action="/lab/labels/pdf"
+                  target="_blank" rel="noopener" data-lc-pdf-form="labels" hidden="hidden"
+                  aria-hidden="true">
+                <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                <input type="hidden" name="kind" value="pending"/>
+                <input type="hidden" name="ids" value=""/>
+                <input type="hidden" name="copies" value="1"/>
+                <input type="hidden" name="width_mm" value="60"/>
+                <input type="hidden" name="height_mm" value="40"/>
+                <input type="hidden" name="margin_mm" value="10"/>
+                <input type="hidden" name="gap_mm" value="2"/>
+                <input type="hidden" name="fields" value="trace_code,name,mpn"/>
+            </form>
+
+            <p class="lc-hint">
+                相关页面：
+                <a t-att-href="lc_entry_urls['scan']">扫码</a> ·
+                <a t-att-href="lc_entry_urls['bags']">实物袋</a> ·
+                <a t-att-href="lc_entry_urls['labels']">标签中心</a>
+            </p>
+        </t>
+    </template>
+
+    <!-- ==============================================================
+         页面 2/5：扫码（袋 / 库位 / 立创原厂袋 / SN / C 编号，含歧义候选）
+         ============================================================== -->
+    <template id="workflow_receipt_scan" name="P3 扫码">
+        <t t-call="lab_team_web.workflow_page">
+
+            <p class="lc-note lc-receipt-intro">
+                扫到袋追溯码（<span class="lc-mono">LABB:</span>）、库位库码
+                （<span class="lc-mono">LABL:</span>）、立创 C 编号、物料 SN 或立创原厂物料袋
+                二维码后按结果进入对应操作。本页只读，不直接改库存。
+            </p>
+
+            <div class="lc-scanrow">
+                <label class="lc-field lc-scanrow-field">
+                    <span class="lc-field-label">扫码 / 输入编码（回车即解析）</span>
+                    <input class="lc-input lc-mono" type="text" data-lc-scan="scan"
+                           data-lc-field="raw" autocomplete="off" inputmode="text"
+                           aria-label="扫码或输入编码"
+                           t-att-value="lc_scan_raw or ''"
+                           placeholder="LABB:… / LABL:… / C123456 / SN"/>
+                </label>
+                <button class="lc-btn lc-btn-primary" type="button"
+                        data-lc-action="resolve">解析</button>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="camera-toggle">打开摄像头</button>
+            </div>
+
+            <p class="lc-hint" data-lc-camera-note="scan">
+                摄像头识码需要浏览器支持 BarcodeDetector（Chromium / Android）且页面运行在
+                安全来源（https 或 localhost）。不支持的浏览器会明确提示，扫码枪与手工输入照常可用。
+            </p>
+
+            <div class="lc-camera" data-lc-camera="scan" hidden="hidden">
+                <video class="lc-camera-video" playsinline="playsinline" muted="muted"
+                       aria-label="摄像头预览"></video>
+                <div class="lc-actions">
+                    <button class="lc-btn lc-btn-outline" type="button"
+                            data-lc-action="camera-stop">关闭摄像头</button>
+                </div>
+                <p class="lc-hint" data-lc-camera-status="scan"></p>
+            </div>
+
+            <div class="lc-loading" data-lc-loading="resolve" hidden="hidden">解析中…</div>
+            <p class="lc-alert lc-alert-error" role="alert" data-lc-error="resolve" hidden="hidden"></p>
+
+            <p class="lc-empty" data-lc-empty="result" hidden="hidden">
+                还没有扫码结果。扫一个袋追溯码、库位库码或料号即可看到对应操作。
+            </p>
+
+            <div class="lc-scan-result" data-lc-result="scan" hidden="hidden">
+                <div class="lc-panel">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">解析结果</h2>
+                        <span class="lc-badge" data-slot="kind-badge">—</span>
+                    </div>
+                    <div class="lc-panel-body">
+                        <dl class="lc-kv">
+                            <dt>原始内容</dt>
+                            <dd class="lc-mono" data-slot="raw">—</dd>
+                            <dt>规范结果</dt>
+                            <dd class="lc-mono" data-slot="normalized">—</dd>
+                            <dt>说明</dt>
+                            <dd data-slot="summary">—</dd>
+                        </dl>
+                        <div class="lc-actions" data-lc-actions="scan"></div>
+                    </div>
+                </div>
+
+                <!-- 歧义候选：同一 C 编号多个本地档案，必须选，不取 first -->
+                <div class="lc-panel" data-lc-candidates="scan" hidden="hidden">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">同一编号的本地档案</h2>
+                    </div>
+                    <div class="lc-panel-body">
+                        <p class="lc-hint">
+                            系统不会替你选择档案。请选择要操作的 SN 档案；选中后按「用所选档案去建待入库袋」。
+                        </p>
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">选择</th>
+                                        <th scope="col">SN</th>
+                                        <th scope="col">名称</th>
+                                        <th scope="col">型号</th>
+                                        <th scope="col">封装</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="candidates"></tbody>
+                            </table>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="candidate-receipt" disabled="disabled">
+                                用所选档案去建待入库袋
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lc-panel" data-lc-location-bags="scan" hidden="hidden">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">该库位的实物袋</h2>
+                        <span class="lc-toolbar-note" data-lc-count="location-bags">—</span>
+                    </div>
+                    <div class="lc-panel-body">
+                        <div class="lc-loading" data-lc-loading="location-bags" hidden="hidden">加载库位袋…</div>
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">追溯码</th>
+                                        <th scope="col">器件</th>
+                                        <th scope="col">在库</th>
+                                        <th scope="col">可用</th>
+                                        <th scope="col">未还</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="location-bags"></tbody>
+                            </table>
+                        </div>
+                        <p class="lc-empty" data-lc-empty="location-bags" hidden="hidden">
+                            该库位目前没有在库实物袋。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="lc-panel" data-lc-item-bags="scan" hidden="hidden">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">该器件在库的袋</h2>
+                    </div>
+                    <div class="lc-panel-body">
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">追溯码</th>
+                                        <th scope="col">库位</th>
+                                        <th scope="col">在库</th>
+                                        <th scope="col">可用</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="item-bags"></tbody>
+                            </table>
+                        </div>
+                        <p class="lc-empty" data-lc-empty="item-bags" hidden="hidden">
+                            该器件目前没有在库实物袋。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="lc-hint">
+                可识别的前缀：<span class="lc-mono">LABB:</span> 袋追溯码、
+                <span class="lc-mono">LABL:</span> 库位库码、<span class="lc-mono">C</span> 开头的立创编号、
+                物料 SN（形如 <span class="lc-mono">LAB-000123</span>）、立创原厂物料袋二维码（JSON 文本）。
+            </p>
+        </t>
+    </template>
+
+    <!-- ==============================================================
+         页面 3/5：实物袋列表（只读）
+         ============================================================== -->
+    <template id="workflow_receipt_bags" name="P3 实物袋">
+        <t t-call="lab_team_web.workflow_page">
+
+            <form class="lc-searchbar" data-lc-form="bags-filter">
+                <label class="lc-field lc-scanrow-field">
+                    <span class="lc-field-label">搜索</span>
+                    <input class="lc-input" type="search" name="query"
+                           data-lc-field="query" autocomplete="off"
+                           placeholder="追溯码 / 器件名 / 型号 / C 编号"/>
+                </label>
+                <label class="lc-field">
+                    <span class="lc-field-label">库位</span>
+                    <select class="lc-input" name="location_id" data-lc-field="location_id"
+                            data-slot="location-filter">
+                        <option value="">全部库位</option>
+                    </select>
+                </label>
+                <label class="lc-check">
+                    <input type="checkbox" name="has_stock" value="1" checked="checked"/>
+                    <span>只看在库</span>
+                </label>
+                <label class="lc-check">
+                    <input type="checkbox" name="outstanding_only" value="1"/>
+                    <span>只看有未还</span>
+                </label>
+                <button class="lc-btn lc-btn-primary" type="submit">查询</button>
+            </form>
+
+            <div class="lc-loading" data-lc-loading="bags" hidden="hidden">加载实物袋…</div>
+            <p class="lc-alert lc-alert-error" role="alert" data-lc-error="bags" hidden="hidden"></p>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">实物袋</h2>
+                    <span class="lc-toolbar-note" data-lc-count="bags">—</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-hint" data-lc-filter-note="bags" hidden="hidden">
+                        「只看有未还」由服务端按未归还领用行过滤（最多覆盖前 2000 条未还袋）；
+                        需要精确清单请到「领用记录」页。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">追溯码</th>
+                                    <th scope="col">器件</th>
+                                    <th scope="col">库位</th>
+                                    <th scope="col">在库</th>
+                                    <th scope="col">可用</th>
+                                    <th scope="col">未还</th>
+                                    <th scope="col">入库日期</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="bags"></tbody>
+                        </table>
+                    </div>
+                    <p class="lc-empty" data-lc-empty="bags" hidden="hidden">
+                        没有匹配的实物袋。可以放宽筛选条件，或先到「采购入库」建袋并确认入库。
+                    </p>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="load-more" hidden="hidden">加载更多</button>
+                    </div>
+                </div>
+            </section>
+
+            <p class="lc-hint">
+                在库 / 可用数量来自 Odoo 实时 stock.quant；袋上的缓存数量只用于列表筛选，
+                详情页以实时值为准。
+            </p>
+        </t>
+    </template>
+
+    <!-- ==============================================================
+         页面 4/5：袋追溯（单袋，只读）
+         ============================================================== -->
+    <template id="workflow_receipt_bag_detail" name="P3 袋追溯">
+        <t t-call="lab_team_web.workflow_page">
+
+            <div class="lc-bag" t-att-data-bag-id="lc_bag_id or 0">
+                <div class="lc-detail-head">
+                    <a class="lc-back" t-att-href="lc_entry_urls['bags']">← 返回实物袋</a>
+                    <span class="lc-detail-code lc-mono" data-slot="trace-code">—</span>
+                </div>
+
+                <div class="lc-loading" data-lc-loading="bag" hidden="hidden">加载袋追溯…</div>
+                <p class="lc-alert lc-alert-error" role="alert" data-lc-error="bag" hidden="hidden"></p>
+
+                <div data-lc-result="bag" hidden="hidden">
+                    <section class="lc-section">
+                        <h2 class="lc-section-title">袋事实</h2>
+                        <dl class="lc-kv">
+                            <dt>追溯码</dt>
+                            <dd class="lc-mono" data-slot="bag-trace">—</dd>
+                            <dt>二维码载荷</dt>
+                            <dd class="lc-mono" data-slot="bag-payload">—</dd>
+                            <dt>器件</dt>
+                            <dd data-slot="bag-item">—</dd>
+                            <dt>SN</dt>
+                            <dd class="lc-mono" data-slot="bag-sn">—</dd>
+                            <dt>库位</dt>
+                            <dd data-slot="bag-location">—</dd>
+                            <dt>在库 / 可用 / 预留</dt>
+                            <dd data-slot="bag-quantity">—</dd>
+                            <dt>未归还</dt>
+                            <dd data-slot="bag-outstanding">—</dd>
+                            <dt>入库日期</dt>
+                            <dd data-slot="bag-receipt-date">—</dd>
+                            <dt>供应商订单 / 型号</dt>
+                            <dd data-slot="bag-supplier">—</dd>
+                            <dt>备注</dt>
+                            <dd data-slot="bag-note">—</dd>
+                        </dl>
+                    </section>
+
+                    <section class="lc-section" data-lc-item="bag">
+                        <h2 class="lc-section-title">器件档案</h2>
+                        <dl class="lc-kv">
+                            <dt>统一料号</dt>
+                            <dd class="lc-mono" data-slot="item-key">—</dd>
+                            <dt>名称</dt>
+                            <dd data-slot="item-name">—</dd>
+                            <dt>型号 / 品牌 / 封装</dt>
+                            <dd data-slot="item-meta">—</dd>
+                            <dt>实验室库存合计</dt>
+                            <dd data-slot="item-quantity">—</dd>
+                            <dt>袋数 / 库位数</dt>
+                            <dd data-slot="item-counts">—</dd>
+                        </dl>
+                        <div data-lc-params="bag" hidden="hidden">
+                            <h3 class="lc-section-title">参数</h3>
+                            <dl class="lc-kv" data-lc-rows="params"></dl>
+                        </div>
+                        <p class="lc-hint" data-lc-empty="params" hidden="hidden">该器件没有已导入的参数。</p>
+                    </section>
+
+                    <section class="lc-section">
+                        <h2 class="lc-section-title">未归还领用</h2>
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">领用单</th>
+                                        <th scope="col">领用人</th>
+                                        <th scope="col">项目</th>
+                                        <th scope="col">数量</th>
+                                        <th scope="col">已还</th>
+                                        <th scope="col">未还</th>
+                                        <th scope="col">日期</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="open-issues"></tbody>
+                            </table>
+                        </div>
+                        <p class="lc-empty" data-lc-empty="open-issues" hidden="hidden">
+                            该袋没有未归还的领用。
+                        </p>
+                    </section>
+
+                    <section class="lc-section">
+                        <h2 class="lc-section-title">作业流水（最近 20 条）</h2>
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">时间</th>
+                                        <th scope="col">类型</th>
+                                        <th scope="col">单号</th>
+                                        <th scope="col">数量</th>
+                                        <th scope="col">源 → 目标</th>
+                                        <th scope="col">操作人</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="history"></tbody>
+                            </table>
+                        </div>
+                        <p class="lc-empty" data-lc-empty="history" hidden="hidden">
+                            该袋还没有作业流水。
+                        </p>
+                    </section>
+
+                    <section class="lc-section">
+                        <h2 class="lc-section-title">标签事实</h2>
+                        <p class="lc-hint" data-lc-label-note="bag" hidden="hidden">
+                            当前账号没有标签打印权限，标签事实不返回。
+                        </p>
+                        <div data-lc-label="bag" hidden="hidden">
+                            <dl class="lc-kv">
+                                <dt>标签标题</dt>
+                                <dd data-slot="label-title">—</dd>
+                                <dt>库码</dt>
+                                <dd class="lc-mono" data-slot="label-location-code">—</dd>
+                                <dt>初始数量</dt>
+                                <dd data-slot="label-initial">—</dd>
+                                <dt>二维码数量</dt>
+                                <dd>每袋 1 个（追溯码）</dd>
+                            </dl>
+                            <div class="lc-label-plan" data-lc-plan="bag" hidden="hidden"></div>
+                            <div class="lc-actions">
+                                <button class="lc-btn lc-btn-primary" type="button"
+                                        data-lc-action="print-bag">重打该袋标签（A4 PDF）</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <form class="lc-label-pdf" method="post" action="/lab/labels/pdf"
+                  target="_blank" rel="noopener" data-lc-pdf-form="labels" hidden="hidden"
+                  aria-hidden="true">
+                <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                <input type="hidden" name="kind" value="bag"/>
+                <input type="hidden" name="ids" value=""/>
+                <input type="hidden" name="copies" value="1"/>
+                <input type="hidden" name="width_mm" value="60"/>
+                <input type="hidden" name="height_mm" value="40"/>
+                <input type="hidden" name="margin_mm" value="10"/>
+                <input type="hidden" name="gap_mm" value="2"/>
+                <input type="hidden" name="fields" value="trace_code,name,mpn,location"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ==============================================================
+         页面 5/5：标签中心（工作台）
+         ============================================================== -->
+    <template id="workflow_receipt_labels" name="P3 标签中心">
+        <t t-call="lab_team_web.workflow_page">
+
+            <p class="lc-note lc-receipt-intro">
+                标签只做排版与打印，<strong>不改库存</strong>。每袋一个追溯二维码；
+                库位另用库码标签，两者不混印。生成的是真实 A4 PDF（服务端直出，浏览器自己打开）。
+            </p>
+
+            <p class="lc-hint" data-readonly-note="1" hidden="hidden">
+                当前账号没有标签打印权限：可以查看页面说明，但选题、试算与下载按钮不会显示。
+            </p>
+
+            <div class="lc-tabs" role="tablist" aria-label="标签对象">
+                <button class="lc-tab is-active" type="button" role="tab" aria-selected="true"
+                        data-lc-action="kind" data-kind="pending">待入库标签</button>
+                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                        data-lc-action="kind" data-kind="bag">器件袋标签</button>
+                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                        data-lc-action="kind" data-kind="location">库位标签</button>
+            </div>
+
+            <p class="lc-hint" data-lc-kind-note="labels">
+                待入库标签打印本人尚未入库（或已入库保留）的袋；器件袋标签用于重打在库袋；
+                库位标签只印库码。
+            </p>
+
+            <p class="lc-alert lc-alert-error" role="alert" data-lc-error="labels" hidden="hidden"></p>
+            <div class="lc-loading" data-lc-loading="labels" hidden="hidden">加载可打印对象…</div>
+
+            <div class="lc-label-workbench" data-lc-workbench="labels" hidden="hidden">
+                <section class="lc-panel">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">选择打印对象</h2>
+                        <span class="lc-toolbar-note" data-lc-count="source">—</span>
+                    </div>
+                    <div class="lc-panel-body">
+                        <div class="lc-scanrow" data-lc-source-search="labels" hidden="hidden">
+                            <label class="lc-field lc-scanrow-field">
+                                <span class="lc-field-label">搜索（袋码 / 器件 / 型号）</span>
+                                <input class="lc-input" type="search" data-lc-field="source-query"
+                                       autocomplete="off"/>
+                            </label>
+                        </div>
+                        <div class="lc-table-wrap">
+                            <table class="lc-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">选择</th>
+                                        <th scope="col">对象</th>
+                                        <th scope="col">器件 / 说明</th>
+                                        <th scope="col">库位</th>
+                                        <th scope="col">数量</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-lc-rows="source"></tbody>
+                            </table>
+                        </div>
+                        <p class="lc-empty" data-lc-empty="source" hidden="hidden">
+                            没有可打印的对象。先去「采购入库」建待入库袋，或到「实物袋」查看在库袋。
+                        </p>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="source-all">全选本页</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="source-none">清空选择</button>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="source-more" hidden="hidden">加载更多</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="lc-panel">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">毫米排版参数</h2>
+                    </div>
+                    <div class="lc-panel-body">
+                        <div class="lc-form-grid">
+                            <label class="lc-field">
+                                <span class="lc-field-label">宽 mm（20~200）</span>
+                                <input class="lc-input" type="text" data-lc-label-field="width_mm"
+                                       inputmode="decimal" value="60"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">高 mm（12~200）</span>
+                                <input class="lc-input" type="text" data-lc-label-field="height_mm"
+                                       inputmode="decimal" value="40"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">页边距 mm</span>
+                                <input class="lc-input" type="text" data-lc-label-field="margin_mm"
+                                       inputmode="decimal" value="10"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">间距 mm</span>
+                                <input class="lc-input" type="text" data-lc-label-field="gap_mm"
+                                       inputmode="decimal" value="2"/>
+                            </label>
+                            <label class="lc-field">
+                                <span class="lc-field-label">每张份数（1~200）</span>
+                                <input class="lc-input" type="text" data-lc-label-field="copies"
+                                       inputmode="numeric" value="1"/>
+                            </label>
+                        </div>
+
+                        <div class="lc-field lc-label-fields" data-lc-field="fields">
+                            <span class="lc-field-label">标签文字字段（不提供二维码类字段）</span>
+                            <div class="lc-inline">
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="trace_code" checked="checked"/><span>追溯码</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="sn"/><span>SN</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="name" checked="checked"/><span>名称</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="mpn" checked="checked"/><span>型号</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="location"/><span>库码/库位</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="catalog_code"/><span>C 编号</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="brand"/><span>品牌</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="package"/><span>封装</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="parameters"/><span>参数</span></label>
+                                <label class="lc-check"><input type="checkbox" name="label_fields"
+                                       value="initial_quantity"/><span>初始数量</span></label>
+                            </div>
+                            <p class="lc-hint" data-lc-kind-rule="labels">
+                                待入库 / 器件袋标签必须包含追溯码；库位标签必须包含库码/库位。
+                            </p>
+                        </div>
+
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="plan">试算排版（不生成 PDF）</button>
+                            <button class="lc-btn lc-btn-primary" type="button"
+                                    data-lc-action="print">下载 A4 标签 PDF</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="lc-panel">
+                    <div class="lc-panel-head">
+                        <h2 class="lc-section-title">排版试算结果</h2>
+                    </div>
+                    <div class="lc-panel-body">
+                        <p class="lc-hint" data-lc-empty="plan">
+                            还没有试算结果。选好对象与参数后点「试算排版」。
+                        </p>
+                        <dl class="lc-kv" data-lc-plan="labels" hidden="hidden">
+                            <dt>标签张数</dt>
+                            <dd data-slot="plan-count">—</dd>
+                            <dt>每页张数 / 总页数</dt>
+                            <dd data-slot="plan-pages">—</dd>
+                            <dt>预览字号（标题 / 正文 pt）</dt>
+                            <dd data-slot="plan-font">—</dd>
+                            <dt>可读性</dt>
+                            <dd data-slot="plan-ready">—</dd>
+                        </dl>
+                    </div>
+                </section>
+            </div>
+
+            <form class="lc-label-pdf" method="post" action="/lab/labels/pdf"
+                  target="_blank" rel="noopener" data-lc-pdf-form="labels" hidden="hidden"
+                  aria-hidden="true">
+                <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                <input type="hidden" name="kind" value="pending"/>
+                <input type="hidden" name="ids" value=""/>
+                <input type="hidden" name="copies" value="1"/>
+                <input type="hidden" name="width_mm" value="60"/>
+                <input type="hidden" name="height_mm" value="40"/>
+                <input type="hidden" name="margin_mm" value="10"/>
+                <input type="hidden" name="gap_mm" value="2"/>
+                <input type="hidden" name="fields" value="trace_code,name,mpn"/>
+            </form>
+        </t>
+    </template>
+
+</odoo>

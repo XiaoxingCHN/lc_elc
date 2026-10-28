@@ -2,6 +2,10 @@
 
 初始归档只建立本地Git维护仓库。后续用户已配置既有origin并授权上传；2026-10-19两阶段入库与服务端部署交接已提交到 `codex/two-stage-receipt-plan` 分支，主功能提交0716829。源码在Git，安装包/私有数据仍按载荷登记保留在Git之外；不改变仓库可见性、不强推main、不把凭据写入脚本。目录名不是GitHub仓库地址。
 
+## 2026-10-28 P3 更新
+
+用户已明确授权推送，目标为既有 `origin` 的 `feat/p3-web-workflows-20261028`，不改 main、不强推。提交包括完整冻结服务器源码、所需运维与验收记录；源清单为 `maintenance/registry/source-server-p3-web-20261028.json`（250 文件）。本地 repo_check 52 项通过；API 与浏览器未执行场景继续按正式交接记录，不代表云端 CI 或生产验收通过。源码候选 ZIP 与本机载荷仍在 Git 之外，生产仍 P2。
+
 ## 第一次推送
 
 1. 在GitHub账号下新建Private仓库，不预建README以免与本地冲突。复制其SSH或HTTPS地址。账号认证使用Git Credential Manager/SSH agent，不能把token写进URL或脚本。

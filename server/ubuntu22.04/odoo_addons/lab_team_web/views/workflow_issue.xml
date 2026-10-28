@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================================================================
+         P3 · 领用 / 归还 / 作业流水（issue 子任务写域）
+         ==================================================================
+         模板 id 与前端契约一致（controllers/workflow_pages.py 按 id 选模板）：
+           workflow_issue_new      /lab/issues/new
+           workflow_issue_issues   /lab/issues
+           workflow_issue_history  /lab/history
+
+         约束（frontend-contract §4/§9、backend-contract §5）：
+         * 只有外链脚本（pages/*.js），没有内联 <script>/onclick/eval；
+         * 模板里不做业务数据查询，全部数据由 JS 走 window.LC 拿；
+         * API 全失败时页面仍渲染出可读骨架 + 空状态（不白屏）；
+         * 归还只提交 issue_line_id + quantity，未还数量一律用服务端
+           outstanding_quantity；列表不按领用人过滤冒充权限（服务端已强制
+           "非管理员只看本人"）。
+         * 本文件是 XML：注释体内不得出现连续两个减号，属性一律带引号值。
+         ================================================================== -->
+
+    <!-- ==================================================================
+         领用（/lab/issues/new）
+         扫码 / 选袋 → 实时可用数量 → 领用人（系统账号）→ 项目 → 提交领用
+         ================================================================== -->
+    <template id="workflow_issue_new" name="P3 领用">
+        <t t-call="lab_team_web.workflow_page">
+
+            <div class="lc-toolbar lc-issue-toolbar"
+                 t-att-data-lc-prefill-bag="lc_prefill_bag or ''"
+                 t-att-data-lc-prefill-item="lc_prefill_item or ''">
+                <div class="lc-field lc-issue-scan-field">
+                    <label class="lc-field-label" for="lc-issue-scan">扫码或输入编码</label>
+                    <input id="lc-issue-scan" class="lc-input lc-issue-scan" type="text"
+                           data-lc-scan="" data-lc-field="raw" autocomplete="off"
+                           inputmode="text" enterkeyhint="go" maxlength="200"
+                           placeholder="袋码 LABB:… / 库位码 LABL:… / C 编号 / SN"
+                           aria-label="扫码或输入袋码、库位码、立创编号或 SN"/>
+                </div>
+                <button class="lc-btn lc-btn-primary" type="button"
+                        data-lc-action="resolve">解析</button>
+                <span class="lc-toolbar-spacer"></span>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="refresh-live">刷新实时数量</button>
+            </div>
+
+            <p class="lc-hint">
+                可用数量一律取服务端实时库存（stock.quant）；扫到无法识别的编码时只做中性提示，
+                不会自动当成袋处理。一次最多 100 条明细，同一袋不重复。
+            </p>
+
+            <!-- 只读账号说明：没有 can_issue 时由 JS 显示，且不渲染提交按钮 -->
+            <section class="lc-panel" data-lc-panel="readonly" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">当前账号只读</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        当前账号没有领用权限（需要「实验室库存 / 操作员」），本页不提供提交入口。
+                    </p>
+                    <p class="lc-hint">
+                        仍可扫码查看袋与器件事实；需要领用请联系库存管理员开通权限。
+                        服务端同样会拒绝无权限的领用请求。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 扫码结果 -->
+            <section class="lc-panel" data-lc-panel="scan" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">扫码结果</h2>
+                    <button class="lc-btn lc-btn-ghost" type="button"
+                            data-lc-action="scan-clear">清空</button>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-empty" data-lc-empty="scan" hidden="hidden">还没有扫码结果。</p>
+                    <div class="lc-issue-results" data-lc-rows="scan"></div>
+                </div>
+            </section>
+
+            <!-- 领用明细（前端草稿，提交前不写库存） -->
+            <section class="lc-panel" data-lc-panel="cart">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">领用明细</h2>
+                    <span class="lc-toolbar-note">
+                        <span data-lc-count="cart">0</span> / 100 条
+                    </span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-empty" data-lc-empty="cart" hidden="hidden">
+                        还没有明细：先扫码或从扫码结果里选择袋。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="cart">
+                            <thead>
+                                <tr>
+                                    <th scope="col">袋码</th>
+                                    <th scope="col">器件</th>
+                                    <th scope="col">库位</th>
+                                    <th scope="col">实时可用</th>
+                                    <th scope="col">领用数量</th>
+                                    <th scope="col">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="cart"></tbody>
+                        </table>
+                    </div>
+                    <p class="lc-hint">
+                        「实时可用」是服务端 stock.quant 的可用量（已扣预留）；提交时服务端会再校验一次。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 领用信息与提交 -->
+            <section class="lc-panel" data-lc-panel="form">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">领用信息</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <form class="lc-issue-form" data-lc-form="issue" novalidate="novalidate">
+                        <div class="lc-form-grid">
+                            <div class="lc-field">
+                                <label class="lc-field-label" for="lc-issue-borrower">
+                                    领用人（必须是系统账号）
+                                </label>
+                                <select id="lc-issue-borrower" class="lc-input" name="borrower_id"
+                                        data-lc-field="borrower_id">
+                                    <option value="">正在读取领用人…</option>
+                                </select>
+                                <p class="lc-hint" data-lc-borrower-note="" hidden="hidden"></p>
+                            </div>
+                            <div class="lc-field">
+                                <label class="lc-field-label" for="lc-issue-project">领用项目</label>
+                                <input id="lc-issue-project" class="lc-input" type="text"
+                                       name="project" data-lc-field="project" maxlength="120"
+                                       required="required" placeholder="例如：2026 电赛主控板"/>
+                            </div>
+                            <div class="lc-field">
+                                <label class="lc-field-label" for="lc-issue-note">备注（可选）</label>
+                                <input id="lc-issue-note" class="lc-input" type="text"
+                                       name="note" maxlength="200"/>
+                            </div>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit"
+                                    data-lc-action="submit-issue">提交领用</button>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="reset-cart">清空明细</button>
+                        </div>
+                    </form>
+                    <p class="lc-hint">
+                        提交前不增加任何库存变动；成功后服务端返回每行的领用明细 ID 与未归还数量。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 未决锁（S2-1）：只有"同一份内容"可重发；解除需用户核对后显式确认 -->
+            <section class="lc-panel" data-lc-panel="unknown" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">上一次提交结果未知</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        网络中断、超时或服务器 5xx 时，领用是否已入账不确定。请不要改动输入，
+                        先二选一：
+                    </p>
+                    <p class="lc-hint" data-lc-unknown-detail="">
+                        重试会用<strong>完全相同</strong>的明细、领用人、项目与备注，并复用同一个 request_key；
+                        服务端若已处理会返回「已处理过（未重复入账）」，不会重复扣库存。
+                    </p>
+                    <p class="lc-hint" data-lc-pending-info=""></p>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="retry-unknown">用同一请求重试（同一份内容）</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="verify-absent">已核对流水：上次未入账，允许重新提交</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="verify-present">已核对流水：上次已入账，不再重发</button>
+                    </div>
+                    <p class="lc-hint">
+                        未决期间本页会锁定输入与提交：改动数量或换袋都不会发出新请求
+                        （核心按「逻辑表单 scope」锁定，不按内容换 key）。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 成功回执 -->
+            <section class="lc-panel" data-lc-panel="success" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">领用成功</h2>
+                    <span class="lc-toolbar-note" data-lc-replay-note="" hidden="hidden">
+                        该请求此前已处理过，本次未重复入账。
+                    </span>
+                </div>
+                <div class="lc-panel-body">
+                    <dl class="lc-kv" data-lc-summary="success"></dl>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="success">
+                            <thead>
+                                <tr>
+                                    <th scope="col">袋码</th>
+                                    <th scope="col">领用数量</th>
+                                    <th scope="col">未归还（可归还）</th>
+                                    <th scope="col">领用明细 ID</th>
+                                    <th scope="col">领用后实时在库</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="success"></tbody>
+                        </table>
+                    </div>
+                    <div class="lc-actions">
+                        <a class="lc-btn lc-btn-primary" data-lc-link="issues">去归还 / 查看领用记录</a>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="scan-focus">继续扫码</button>
+                    </div>
+                    <p class="lc-hint">
+                        「未归还（可归还）」来自服务端 outstanding_quantity；「领用后实时在库」是重新读取的
+                        stock.quant 实值，两者含义不同。
+                    </p>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+    <!-- ==================================================================
+         领用记录与归还（/lab/issues）
+         列表（服务端已按权限过滤）+ 部分/全量归还（关联原 issue_line_id）
+         ================================================================== -->
+    <template id="workflow_issue_issues" name="P3 领用记录">
+        <t t-call="lab_team_web.workflow_page">
+
+            <form class="lc-toolbar lc-issue-filter" data-lc-form="issues-filter">
+                <div class="lc-field lc-issue-filter-q">
+                    <label class="lc-field-label" for="lc-issues-q">搜索</label>
+                    <input id="lc-issues-q" class="lc-input" type="search" name="query"
+                           data-lc-field="query" maxlength="64"
+                           t-att-value="lc_query.get('q') or ''"
+                           placeholder="袋码或项目"/>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-issues-scope">范围</label>
+                    <select id="lc-issues-scope" class="lc-input" name="outstanding_only"
+                            data-lc-field="outstanding_only">
+                        <option value="1"
+                                t-att-selected="(lc_query.get('outstanding_only') or '1') != '0'">只看未归还</option>
+                        <option value="0"
+                                t-att-selected="(lc_query.get('outstanding_only') or '1') == '0'">全部领用记录</option>
+                    </select>
+                </div>
+                <button class="lc-btn lc-btn-primary" type="submit"
+                        data-lc-action="search">查询</button>
+                <span class="lc-toolbar-spacer"></span>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="reload">刷新</button>
+            </form>
+
+            <p class="lc-hint" data-lc-own-note="" hidden="hidden">
+                当前账号不是库存管理员：列表只显示我自己的领用记录（由服务端过滤，不是前端筛选）。
+            </p>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">领用记录</h2>
+                    <span class="lc-toolbar-note">可归还量＝原领用未还数量；物理库存另算，不混用</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-loading" data-lc-loading="issues" hidden="hidden">加载中…</div>
+                    <p class="lc-empty" data-lc-empty="issues" hidden="hidden">
+                        没有符合条件的领用记录。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="issues">
+                            <thead>
+                                <tr>
+                                    <th scope="col">日期</th>
+                                    <th scope="col">袋码</th>
+                                    <th scope="col">器件</th>
+                                    <th scope="col">库位</th>
+                                    <th scope="col">领用</th>
+                                    <th scope="col">已还</th>
+                                    <th scope="col">可归还</th>
+                                    <th scope="col">领用人</th>
+                                    <th scope="col">项目</th>
+                                    <th scope="col">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="issues"></tbody>
+                        </table>
+                    </div>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="more" hidden="hidden">加载更多</button>
+                    </div>
+                    <p class="lc-hint">
+                        本页不提供修改或删除领用记录的入口：历史流水必须可追溯，纠正请做归还。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 归还面板：可归还量 与 物理库存 分开展示 -->
+            <section class="lc-panel" data-lc-panel="return" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">归还（关联原领用行）</h2>
+                    <button class="lc-btn lc-btn-ghost" type="button"
+                            data-lc-action="return-close">收起</button>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-issue-metrics">
+                        <div class="lc-issue-metric" data-tone="ok">
+                            <span class="lc-issue-metric-label">可归还（原领用未还）</span>
+                            <strong class="lc-issue-metric-value" data-lc-metric="outstanding">—</strong>
+                            <span class="lc-hint">服务端 outstanding_quantity，归还上限</span>
+                        </div>
+                        <div class="lc-issue-metric">
+                            <span class="lc-issue-metric-label">袋当前物理库存</span>
+                            <strong class="lc-issue-metric-value" data-lc-metric="stock">—</strong>
+                            <span class="lc-hint" data-lc-metric="stock-detail">
+                                在库 / 可用 / 已预留（stock.quant 实值）
+                            </span>
+                        </div>
+                    </div>
+                    <dl class="lc-kv" data-lc-summary="return"></dl>
+                    <form class="lc-issue-return-form" data-lc-form="return" novalidate="novalidate">
+                        <div class="lc-form-grid">
+                            <div class="lc-field">
+                                <label class="lc-field-label" for="lc-return-qty">归还数量</label>
+                                <input id="lc-return-qty" class="lc-input" type="number" name="quantity"
+                                       data-lc-field="quantity" min="0" step="any"
+                                       inputmode="decimal"/>
+                                <p class="lc-hint">
+                                    上限＝可归还量；超过未还数量会被服务端拒绝并回滚。
+                                </p>
+                            </div>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit"
+                                    data-lc-action="submit-return">提交归还</button>
+                            <button class="lc-btn lc-btn-outline" type="button"
+                                    data-lc-action="return-full">全量归还</button>
+                        </div>
+                    </form>
+                    <p class="lc-hint">
+                        归还只能关联原领用行（issue_line_id）；跨账号归还由服务端拒绝，本页不冒用他人领用 ID。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 未决锁（S2-1）：只有"同一份内容"可重发；解除需用户核对后显式确认 -->
+            <section class="lc-panel" data-lc-panel="unknown" hidden="hidden">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">上一次归还是否入账未知</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        网络中断、超时或服务器 5xx 时，本次归还是否入账不确定。请不要改动数量，
+                        先二选一：
+                    </p>
+                    <p class="lc-hint" data-lc-unknown-detail="">
+                        重试会用<strong>完全相同</strong>的领用行与数量，并复用同一个 request_key；
+                        服务端若已处理会返回「已处理过（未重复入账）」，不会重复归还。
+                    </p>
+                    <p class="lc-hint" data-lc-pending-info=""></p>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="retry-unknown">用同一请求重试（同一份内容）</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="verify-absent">已核对流水：上次未入账，允许重新提交</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="verify-present">已核对流水：上次已入账，不再重发</button>
+                    </div>
+                    <p class="lc-hint">
+                        未决期间本页会锁定归还表单与所有「归还」按钮：改数量或换领用行都不会发出新请求。
+                    </p>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+    <!-- ==================================================================
+         作业流水（/lab/history）：只读，按类型/日期/操作人/领用人/器件/袋筛选
+         ================================================================== -->
+    <template id="workflow_issue_history" name="P3 作业流水">
+        <t t-call="lab_team_web.workflow_page">
+
+            <form class="lc-toolbar lc-history-filter" data-lc-form="history-filter">
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-type">作业类型</label>
+                    <select id="lc-history-type" class="lc-input" name="operation_type"
+                            data-lc-field="operation_type">
+                        <option value="">全部</option>
+                        <option value="receipt">入库</option>
+                        <option value="issue">领用</option>
+                        <option value="return">归还</option>
+                        <option value="adopt">历史适配</option>
+                    </select>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-from">开始日期</label>
+                    <input id="lc-history-from" class="lc-input" type="date"
+                           name="date_from" data-lc-field="date_from"/>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-to">结束日期</label>
+                    <input id="lc-history-to" class="lc-input" type="date"
+                           name="date_to" data-lc-field="date_to"/>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-actor">操作人</label>
+                    <select id="lc-history-actor" class="lc-input" name="actor_id"
+                            data-lc-field="actor_id">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-borrower">领用人</label>
+                    <select id="lc-history-borrower" class="lc-input" name="borrower_id"
+                            data-lc-field="borrower_id">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-item">器件标识</label>
+                    <input id="lc-history-item" class="lc-input" type="text" name="item_key"
+                           data-lc-field="item_key" maxlength="64"
+                           t-att-value="lc_query.get('item_key') or ''"
+                           placeholder="lcsc:C123 / lab:42"/>
+                </div>
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-history-bag">袋 ID</label>
+                    <input id="lc-history-bag" class="lc-input" type="number" name="bag_id"
+                           data-lc-field="bag_id" min="1" step="1" inputmode="numeric"
+                           t-att-value="lc_query.get('bag_id') or ''"
+                           placeholder="可选"/>
+                </div>
+                <button class="lc-btn lc-btn-primary" type="submit"
+                        data-lc-action="history-search">查询</button>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="history-reset">重置</button>
+            </form>
+
+            <p class="lc-hint">
+                只读流水：每次入库 / 领用 / 归还的操作人、领用人、袋、数量与来源→目标库位。
+                不提供导出，也不提供修改或删除。
+            </p>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">作业流水</h2>
+                    <span class="lc-toolbar-note">按时间倒序</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-loading" data-lc-loading="history" hidden="hidden">加载中…</div>
+                    <p class="lc-empty" data-lc-empty="history" hidden="hidden">
+                        没有符合条件的作业流水。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="history">
+                            <thead>
+                                <tr>
+                                    <th scope="col">时间</th>
+                                    <th scope="col">类型</th>
+                                    <th scope="col">单号</th>
+                                    <th scope="col">袋码</th>
+                                    <th scope="col">器件</th>
+                                    <th scope="col">批次</th>
+                                    <th scope="col">数量</th>
+                                    <th scope="col">来源 → 目标</th>
+                                    <th scope="col">操作人</th>
+                                    <th scope="col">领用人</th>
+                                    <th scope="col">项目</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="history"></tbody>
+                        </table>
+                    </div>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="history-more" hidden="hidden">加载更多</button>
+                    </div>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+</odoo>

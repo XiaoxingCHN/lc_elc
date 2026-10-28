@@ -22,3 +22,6 @@ access_lab_label_wizard_operator,lab.label.wizard operator,model_lab_label_wizar
 access_lab_return_wizard_user,lab.return.wizard user,model_lab_return_wizard,group_lab_user,1,1,1,0
 access_lab_return_wizard_operator,lab.return.wizard operator,model_lab_return_wizard,group_lab_operator,1,1,1,0
 access_lab_request_log_manager,lab.request.log manager,model_lab_request_log,group_lab_manager,1,1,1,0
+access_lab_location_mapping_user,lab.location.mapping user read,model_lab_location_mapping,group_lab_user,1,0,0,0
+access_lab_location_mapping_operator,lab.location.mapping operator read,model_lab_location_mapping,group_lab_operator,1,0,0,0
+access_lab_location_mapping_manager,lab.location.mapping manager,model_lab_location_mapping,group_lab_manager,1,1,1,1

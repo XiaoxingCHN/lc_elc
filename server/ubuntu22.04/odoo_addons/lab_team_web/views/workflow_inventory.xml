@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================================================================
+         P3 · 库位 / 类别映射 / 管理 / 器件档案（inventory 子任务写域）
+         ==================================================================
+         模板 id 由 controllers/workflow_pages.py 按 page_id 选取，不可改名：
+           workflow_inventory_locations  /lab/locations          读=lab  写=manager
+           workflow_inventory_mappings   /lab/location-mappings  写=manager
+           workflow_inventory_settings   /lab/settings           写=manager
+           workflow_inventory_materials  /lab/materials          catalog 角色
+
+         约束（backend-contract §3.3 到 §3.5、frontend-contract §4/§5）：
+         * 写控件按服务端下发的 lc_workflow_permissions 决定是否渲染，
+           普通只读角色（lab_user）看不到任何写入口；
+         * 库存数量一律来自 stock.quant（locations?with_stats=1 的服务端投影），
+           本 domain 没有任何"手工改数量"的输入，也不提供删除库存/库位记录；
+         * 类别映射只影响"扫码上架"的库位推荐顺序，不自动入库（页面明确写出）；
+         * 成员角色只允许 lab_user / lab_operator / lab_manager 三个库存组，
+           不出现 base.group_system / 目录角色授权入口；
+         * 模板只画结构，不做业务查询；数据全部由同目录 pages/*.js 调 JSON-RPC 取；
+         * 无内联脚本 / onclick / style 里的 JS（CSP script-src 'self'）。
+         ================================================================== -->
+
+    <!-- ============================= 库位 ============================= -->
+    <template id="workflow_inventory_locations" name="P3 库位">
+        <t t-call="lab_team_web.workflow_page">
+
+            <!-- 未决提交（结果未知）恢复区：内容由 JS 按 LC.pendingAttempt 渲染 -->
+            <div class="lc-alert lc-alert-error" role="alert"
+                 data-lc-inv-locks="locations" hidden="hidden">
+                <p class="lc-inv-lock-head">
+                    存在「结果未知」的提交（未决）：本页不会自动重发，也不能改内容再提交。
+                </p>
+                <ul class="lc-inv-lock-list" data-lc-rows="locks"></ul>
+            </div>
+
+            <div class="lc-toolbar">
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-inv-loc-filter">筛选</label>
+                    <input class="lc-input" id="lc-inv-loc-filter" type="search"
+                           autocomplete="off" data-lc-inv-filter="locations"
+                           placeholder="按库码或路径筛选（本地过滤）"/>
+                </div>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="locations-reload">刷新</button>
+                <span class="lc-toolbar-spacer"></span>
+                <span class="lc-toolbar-note"
+                      t-if="lc_workflow_permissions['can_manage_locations']">
+                    可新建 / 改名 / 停用；数量以库存实时值为准
+                </span>
+                <span class="lc-toolbar-note"
+                      t-if="not lc_workflow_permissions['can_manage_locations']">
+                    只读视图：库位数量以库存实时值为准
+                </span>
+                <button class="lc-btn lc-btn-primary" type="button"
+                        t-if="lc_workflow_permissions['can_manage_locations']"
+                        data-lc-action="locations-toggle-create">新建库位</button>
+            </div>
+
+            <!-- 新建库位（仅 manager 渲染） -->
+            <section class="lc-panel" data-lc-inv-create-panel="locations" hidden="hidden"
+                     t-if="lc_workflow_permissions['can_manage_locations']">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">新建内部库位</h2>
+                    <span class="lc-badge">仅管理员</span>
+                </div>
+                <div class="lc-panel-body">
+                    <form class="lc-form-grid" data-lc-form="location-create"
+                          method="post" action="#">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-loc-name">库位名称</label>
+                            <input class="lc-input" id="lc-inv-loc-name" type="text"
+                                   name="name" data-lc-field="name" maxlength="64"
+                                   autocomplete="off" placeholder="例如 A-01" required="required"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-loc-parent">上级库位</label>
+                            <select class="lc-input" id="lc-inv-loc-parent"
+                                    name="parent_id" data-lc-field="parent_id">
+                                <option value="">（根级，无上级）</option>
+                            </select>
+                            <p class="lc-hint">上级只能是内部库位或视图库位；根级库位直接挂在仓库下。</p>
+                        </div>
+                        <div class="lc-field">
+                            <span class="lc-field-label">说明</span>
+                            <p class="lc-hint">
+                                新建的是 <span class="lc-mono">internal</span> 内部库位，库码由服务端自动生成；
+                                新建库位不会产生任何库存。
+                            </p>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit">创建库位</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="locations-cancel-create">取消</button>
+                        </div>
+                    </form>
+                    <p class="lc-hint">
+                        结果未知时请先用「刷新」核对列表，再决定是否重试；重试复用同一提交内容与同一请求键。
+                    </p>
+                </div>
+            </section>
+
+            <!-- 改名 / 停用（仅 manager 渲染） -->
+            <section class="lc-panel" data-lc-inv-edit-panel="locations" hidden="hidden"
+                     t-if="lc_workflow_permissions['can_manage_locations']">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">改名 / 停用</h2>
+                    <span class="lc-badge" data-lc-inv-edit-target="">未选择库位</span>
+                </div>
+                <div class="lc-panel-body">
+                    <form class="lc-form-grid" data-lc-form="location-edit"
+                          method="post" action="#">
+                        <input type="hidden" name="location_id" data-lc-field="location_id"/>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-edit-name">新名称</label>
+                            <input class="lc-input" id="lc-inv-edit-name" type="text"
+                                   name="name" data-lc-field="name" maxlength="64"
+                                   autocomplete="off" placeholder="1–64 个字符"/>
+                        </div>
+                        <div class="lc-field">
+                            <span class="lc-field-label">当前占用</span>
+                            <p class="lc-hint" data-lc-inv-edit-stats="">—</p>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit">保存改名</button>
+                            <button class="lc-btn lc-btn-danger" type="button"
+                                    data-lc-action="locations-deactivate">停用该库位</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="locations-close-edit">取消</button>
+                        </div>
+                    </form>
+                    <p class="lc-hint">
+                        停用前置条件：该库位及其子库位必须已经搬空（袋数 0、数量 0），
+                        否则服务端返回 <span class="lc-mono">PRECONDITION_FAILED</span> 并给出剩余数量。
+                        停用后该库位不再出现在列表里；本页不提供物理删除库位记录。
+                    </p>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">内部库位</h2>
+                    <span class="lc-badge" data-lc-count="locations">0</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-loading" data-lc-loading="locations" hidden="hidden">加载库位…</div>
+                    <p class="lc-empty" data-lc-empty="locations" hidden="hidden">
+                        当前公司还没有内部库位。管理员可以先「新建库位」，再到扫码上架里把袋放进该库位。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="locations">
+                            <thead>
+                                <tr>
+                                    <th>库码</th>
+                                    <th>路径</th>
+                                    <th class="lc-inv-num">袋数</th>
+                                    <th class="lc-inv-num">袋内数量</th>
+                                    <th class="lc-inv-num">在库数量</th>
+                                    <th t-if="lc_workflow_permissions['can_manage_locations']">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="locations"></tbody>
+                        </table>
+                    </div>
+                    <p class="lc-hint">
+                        袋数 / 袋内数量 / 在库数量都由服务端按 stock.quant 与实物袋实时统计（本库位口径，
+                        不含子库位）；本页不提供任何修改数量的入口。
+                    </p>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+    <!-- ========================== 类别映射 ========================== -->
+    <template id="workflow_inventory_mappings" name="P3 类别映射">
+        <t t-call="lab_team_web.workflow_page">
+
+            <!-- 未决提交（结果未知）恢复区：内容由 JS 按 LC.pendingAttempt 渲染 -->
+            <div class="lc-alert lc-alert-error" role="alert"
+                 data-lc-inv-locks="mappings" hidden="hidden">
+                <p class="lc-inv-lock-head">
+                    存在「结果未知」的提交（未决）：本页不会自动重发，也不能改内容再提交。
+                </p>
+                <ul class="lc-inv-lock-list" data-lc-rows="locks"></ul>
+            </div>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">这个页面做什么</h2>
+                    <span class="lc-badge" data-tone="warn">不写库存</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        类别 → 库位映射只用于「扫码上架」时的<strong>库位推荐排序</strong>：
+                        推荐顺序为 <span class="lc-mono">相同器件</span> →
+                        <span class="lc-mono">类别映射</span>（priority 小的先，含父分类）→
+                        <span class="lc-mono">同类器件</span>。
+                        推荐只是建议，<strong>不会自动入库、不会自动选中库位</strong>；
+                        真正写库存仍由操作员在入库页确认数量与库位。
+                    </p>
+                    <p class="lc-hint">
+                        映射是配置记录（可停用、可删除），不是库存流水；停用只影响之后的推荐。
+                    </p>
+                </div>
+            </section>
+
+            <div class="lc-toolbar">
+                <label class="lc-inline" for="lc-inv-map-inactive">
+                    <input id="lc-inv-map-inactive" type="checkbox"
+                           data-lc-field="include_inactive"/>
+                    显示已停用映射
+                </label>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="mappings-reload">刷新</button>
+                <span class="lc-toolbar-spacer"></span>
+                <span class="lc-toolbar-note">写操作需要「实验室库存 / 管理员」</span>
+            </div>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">新增或更新映射</h2>
+                    <span class="lc-badge">同一类别 + 库位 = 覆盖</span>
+                </div>
+                <div class="lc-panel-body">
+                    <form class="lc-form-grid" data-lc-form="mapping-set"
+                          method="post" action="#">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-map-category">
+                                元器件类别（产品分类 ID）
+                            </label>
+                            <input class="lc-input" id="lc-inv-map-category" type="number"
+                                   min="1" step="1" name="category_id"
+                                   data-lc-field="category_id" autocomplete="off"
+                                   placeholder="例如 12"/>
+                            <p class="lc-hint">
+                                可以从下面的「已有映射的类别」里点选，或手工填产品分类 ID
+                                （当前接口没有分类树读接口，本页不自造）。
+                            </p>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-map-location">推荐库位</label>
+                            <select class="lc-input" id="lc-inv-map-location"
+                                    name="location_id" data-lc-field="location_id">
+                                <option value="">（选择内部库位）</option>
+                            </select>
+                            <p class="lc-hint">只接受内部库位（internal），同公司。</p>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-map-priority">优先级</label>
+                            <input class="lc-input" id="lc-inv-map-priority" type="number"
+                                   min="0" max="1000" step="1" name="priority"
+                                   data-lc-field="priority" value="10" autocomplete="off"/>
+                            <p class="lc-hint">数字越小越先推荐；默认 10。</p>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-map-note">备注</label>
+                            <input class="lc-input" id="lc-inv-map-note" type="text"
+                                   name="note" data-lc-field="note" maxlength="200"
+                                   autocomplete="off" placeholder="可选，≤200 字符"/>
+                        </div>
+                        <div class="lc-field">
+                            <span class="lc-field-label">启用</span>
+                            <label class="lc-inline" for="lc-inv-map-active">
+                                <input id="lc-inv-map-active" type="checkbox" name="active"
+                                       data-lc-field="active" value="1" checked="checked"/>
+                                保存后参与推荐
+                            </label>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit">保存映射</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="mappings-clear-form">清空表单</button>
+                        </div>
+                    </form>
+                    <div class="lc-chips" data-lc-inv-category-picks="">
+                        <span class="lc-hint">已有映射的类别会出现在这里，点一下即可填回上面。</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">推荐关系预览</h2>
+                    <span class="lc-hint">按类别分组，priority 升序即推荐先后</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-empty" data-lc-empty="reco" hidden="hidden">
+                        还没有启用中的映射，入库页只会用「相同器件 / 同类器件」两种推荐原因。
+                    </p>
+                    <ul class="lc-inv-reco" data-lc-rows="reco"></ul>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">映射列表</h2>
+                    <span class="lc-badge" data-lc-count="mappings">0</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-loading" data-lc-loading="mappings" hidden="hidden">加载映射…</div>
+                    <p class="lc-empty" data-lc-empty="mappings" hidden="hidden">
+                        当前公司还没有类别映射。可以在上面新增一条，或继续使用入库页的默认推荐。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="mappings">
+                            <thead>
+                                <tr>
+                                    <th>类别</th>
+                                    <th>推荐库位</th>
+                                    <th>库码</th>
+                                    <th class="lc-inv-num">优先级</th>
+                                    <th>状态</th>
+                                    <th>备注</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="mappings"></tbody>
+                        </table>
+                    </div>
+                    <p class="lc-hint">
+                        停用是默认动作（保留配置以便解释历史）；「删除」只删除这条配置记录，
+                        不会动任何库存、袋或流水。
+                    </p>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+    <!-- ============================ 管理 ============================ -->
+    <template id="workflow_inventory_settings" name="P3 管理">
+        <t t-call="lab_team_web.workflow_page">
+
+            <!-- 未决提交（结果未知）恢复区：内容由 JS 按 LC.pendingAttempt 渲染 -->
+            <div class="lc-alert lc-alert-error" role="alert"
+                 data-lc-inv-locks="settings" hidden="hidden">
+                <p class="lc-inv-lock-head">
+                    存在「结果未知」的角色变更（未决）：本页不会自动重发。
+                    请先刷新成员列表确认角色现状，再决定「用原内容重试」或「已核对后解除」。
+                </p>
+                <ul class="lc-inv-lock-list" data-lc-rows="locks"></ul>
+            </div>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">成员库存角色</h2>
+                    <span class="lc-badge" data-tone="warn">只改库存三组</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        这里只维护 <span class="lc-mono">实验室库存 / 用户</span>、
+                        <span class="lc-mono">操作员</span>、
+                        <span class="lc-mono">管理员</span> 三个库存组。
+                        系统管理员组（<span class="lc-mono">base.group_system</span>）、
+                        ERP 管理员组与器件目录角色<strong>不在本页授权</strong>；
+                        账号的其他组保持不变。
+                    </p>
+                    <p class="lc-hint">
+                        保护规则由服务端强制：不能撤销最后一名库存管理员；不能先撤销
+                        「用户」而账号仍是「操作员 / 管理员」（隐含层级），要降级请从上往下逐级撤销。
+                    </p>
+                </div>
+            </section>
+
+            <div class="lc-toolbar">
+                <div class="lc-field">
+                    <label class="lc-field-label" for="lc-inv-mem-query">搜索成员</label>
+                    <input class="lc-input" id="lc-inv-mem-query" type="search"
+                           autocomplete="off" data-lc-field="query"
+                           placeholder="姓名或登录名"/>
+                </div>
+                <button class="lc-btn lc-btn-primary" type="button"
+                        data-lc-action="members-search">搜索</button>
+                <label class="lc-inline" for="lc-inv-mem-only-role">
+                    <input id="lc-inv-mem-only-role" type="checkbox"
+                           data-lc-field="only_with_role"/>
+                    只看有库存角色
+                </label>
+                <button class="lc-btn lc-btn-outline" type="button"
+                        data-lc-action="members-reload">刷新</button>
+                <span class="lc-toolbar-spacer"></span>
+                <span class="lc-toolbar-note">仅本公司有效内部账号</span>
+            </div>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">账号与角色</h2>
+                    <span class="lc-badge" data-lc-count="members">0</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-loading" data-lc-loading="members" hidden="hidden">加载成员…</div>
+                    <p class="lc-empty" data-lc-empty="members" hidden="hidden">
+                        没有匹配的账号。可以换关键词，或取消「只看有库存角色」。
+                    </p>
+                    <div class="lc-table-wrap">
+                        <table class="lc-table" data-lc-table="members">
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>登录名</th>
+                                    <th>用户</th>
+                                    <th>操作员</th>
+                                    <th>管理员</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody data-lc-rows="members"></tbody>
+                        </table>
+                    </div>
+                    <div class="lc-actions">
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="members-more" hidden="hidden">加载更多</button>
+                    </div>
+                    <p class="lc-hint">
+                        勾选/取消会立即提交到服务端；每次变更只动被勾选的那个库存组。
+                        提交结果未知时会显示「结果未知」并提供重试（同一请求键），不会自动重发。
+                    </p>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">不在本页的配置</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <ul class="lc-inv-plain">
+                        <li>项目参数（站点标题、根级别名开关、管理 Host）只在维护端配置，本页不提供修改接口。</li>
+                        <li>系统管理员、ERP 管理员的授权仍走原生后台，且不属于库存角色的范围。</li>
+                        <li>数据库、模块安装、密码复位不在本页；密码请走管理员复位或原生流程。</li>
+                        <li>每次库存角色变更由服务端记录操作人、目标账号、角色与开关值。</li>
+                    </ul>
+                </div>
+            </section>
+
+        </t>
+    </template>
+
+    <!-- ========================== 器件档案 ========================== -->
+    <template id="workflow_inventory_materials" name="P3 器件档案">
+        <t t-call="lab_team_web.workflow_page">
+
+            <div class="lc-toolbar">
+                <form class="lc-inline" data-lc-form="material-search"
+                      method="post" action="#">
+                    <div class="lc-field">
+                        <label class="lc-field-label" for="lc-inv-mat-query">检索器件</label>
+                        <input class="lc-input" id="lc-inv-mat-query" type="search"
+                               name="query" data-lc-field="query" autocomplete="off"
+                               placeholder="名称 / MPN / C 编号 / SN"/>
+                    </div>
+                    <button class="lc-btn lc-btn-primary" type="submit">搜索</button>
+                </form>
+                <span class="lc-toolbar-spacer"></span>
+                <span class="lc-toolbar-note">
+                    本地数量来自实验室库存；不显示供应商可售数量
+                </span>
+            </div>
+
+            <div class="lc-split">
+                <div class="lc-split-main">
+                    <section class="lc-panel">
+                        <div class="lc-panel-head">
+                            <h2 class="lc-section-title">检索结果</h2>
+                            <span class="lc-badge" data-lc-count="materials">0</span>
+                        </div>
+                        <div class="lc-panel-body">
+                            <div class="lc-loading" data-lc-loading="materials" hidden="hidden">
+                                检索器件…
+                            </div>
+                            <p class="lc-empty" data-lc-empty="materials" hidden="hidden">
+                                没有匹配的器件。换个关键词，或先在器件库里导入该立创编号。
+                            </p>
+                            <div class="lc-table-wrap">
+                                <table class="lc-table" data-lc-table="materials">
+                                    <thead>
+                                        <tr>
+                                            <th>名称</th>
+                                            <th>MPN</th>
+                                            <th>封装</th>
+                                            <th>立创编号</th>
+                                            <th>本地档案</th>
+                                            <th class="lc-inv-num">本地在库</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-lc-rows="materials"></tbody>
+                                </table>
+                            </div>
+                            <div class="lc-actions">
+                                <button class="lc-btn lc-btn-outline" type="button"
+                                        data-lc-action="materials-more" hidden="hidden">加载更多</button>
+                            </div>
+                            <p class="lc-hint">
+                                同一立创编号可以有多个本地档案（不同 SN）；存在多个时必须先选档案，
+                                不会默认取第一个。
+                            </p>
+                        </div>
+                    </section>
+                </div>
+
+                <aside class="lc-split-side">
+                    <section class="lc-panel">
+                        <div class="lc-panel-head">
+                            <h2 class="lc-section-title">详情 / 绑定 / 建档</h2>
+                            <span class="lc-badge" data-lc-inv-material-target="">未选择</span>
+                        </div>
+                        <div class="lc-panel-body">
+                            <p class="lc-empty" data-lc-empty="material-detail" hidden="hidden">
+                                从左侧选择一行查看详情，或直接绑定立创编号 / 建立本地档案。
+                            </p>
+                            <div class="lc-loading" data-lc-loading="material-detail" hidden="hidden">
+                                加载详情…
+                            </div>
+                            <dl class="lc-kv" data-lc-inv-material-facts="" hidden="hidden"></dl>
+
+                            <form class="lc-form-grid" data-lc-form="material-bind"
+                                  method="post" action="#">
+                                <div class="lc-field">
+                                    <label class="lc-field-label" for="lc-inv-mat-template">
+                                        本地档案（SN）
+                                    </label>
+                                    <select class="lc-input" id="lc-inv-mat-template"
+                                            name="product_template_id"
+                                            data-lc-field="product_template_id">
+                                        <option value="">（先在左侧选择一行器件）</option>
+                                    </select>
+                                    <p class="lc-hint">
+                                        同一立创编号有多个本地档案时必须选具体 SN，不会默认取第一个。
+                                    </p>
+                                </div>
+                                <div class="lc-field">
+                                    <label class="lc-field-label" for="lc-inv-mat-code">
+                                        绑定立创编号
+                                    </label>
+                                    <input class="lc-input" id="lc-inv-mat-code" type="text"
+                                           name="catalog_code" data-lc-field="catalog_code"
+                                           autocomplete="off" placeholder="例如 C12345"/>
+                                    <p class="lc-hint">
+                                        只给本地档案绑定或改绑一个立创编号；必须先在器件资料库里存在该编号。
+                                    </p>
+                                </div>
+                                <div class="lc-actions">
+                                    <button class="lc-btn lc-btn-primary" type="submit">保存绑定</button>
+                                    <button class="lc-btn lc-btn-outline" type="button"
+                                            data-lc-action="materials-create">按资料库建档</button>
+                                </div>
+                            </form>
+
+                            <div class="lc-inv-candidates" data-lc-inv-candidates="" hidden="hidden">
+                                <p class="lc-hint" data-lc-inv-candidates-note="">
+                                    同一立创编号下有多个本地档案，请选择要归属的 SN：
+                                </p>
+                                <ul class="lc-inv-candidate-list" data-lc-rows="candidates"></ul>
+                                <div class="lc-actions">
+                                    <button class="lc-btn lc-btn-primary" type="button"
+                                            data-lc-action="materials-create-selected">用选中档案建档</button>
+                                    <button class="lc-btn lc-btn-ghost" type="button"
+                                            data-lc-action="materials-clear-candidates">取消</button>
+                                </div>
+                            </div>
+
+                            <!-- 建档端点没有幂等键：结果未知的记录写进 sessionStorage，
+                                 刷新后仍锁定；只能"先核对、再显式解除"，不自动重发 -->
+                            <div class="lc-alert lc-alert-error" role="alert"
+                                 data-lc-inv-create-lock="" hidden="hidden">
+                                <p class="lc-inv-lock-head">
+                                    上一次建档结果未知（网络中断 / 超时 / 401 / 5xx）：
+                                    建档入口已锁定，本页不会自动重发请求。
+                                </p>
+                                <p class="lc-hint" data-lc-inv-create-lock-meta="">—</p>
+                                <p class="lc-hint">
+                                    验收口径：列表里<strong>看不到</strong>不等于<strong>没提交</strong>
+                                    （服务端没有幂等键，创建也可能已生效）。请按立创编号或统一料号 / SN
+                                    重新检索核对；同一浏览器另一个标签页不受此锁约束，若同时开过建档请一并核对。
+                                </p>
+                                <div class="lc-actions">
+                                    <button class="lc-btn lc-btn-outline" type="button"
+                                            data-lc-action="materials-verify">用现有查询核对</button>
+                                    <button class="lc-btn lc-btn-danger" type="button"
+                                            data-lc-action="materials-unlock-absent">
+                                        已核对：仍未建档，允许重新提交
+                                    </button>
+                                    <button class="lc-btn lc-btn-ghost" type="button"
+                                            data-lc-action="materials-unlock-present">
+                                        已核对：已经建档，使用现有档案
+                                    </button>
+                                </div>
+                            </div>
+
+                            <p class="lc-hint">
+                                建档只建立本地档案（不复制任何库存）；期初数量必须通过入库流程录入。
+                                绑定与建档接口都没有幂等键，结果未知时不会自动重试；请先核对再操作。
+                            </p>
+                        </div>
+                    </section>
+                </aside>
+            </div>
+
+        </t>
+    </template>
+
+</odoo>

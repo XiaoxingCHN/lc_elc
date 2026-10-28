@@ -515,6 +515,63 @@ def test_backup_stop_failure_before_dump():
           or not any((d / 'backups').iterdir()))
 
 
+def test_backup_refuses_empty_filestore_for_stored_attachments():
+    print('\n== T10b 库内附件存在但 filestore 为空 → 拒绝产出假备份 ==')
+    d = tmpdir()
+    addons = d / 'addons'; addons.mkdir()
+    (addons / 'lab_catalog').mkdir()
+    data = d / 'data'; data.mkdir()
+    conf = make_config(d / 'odoo.conf', str(addons), str(data))
+    ran = []
+
+    def psql_att(conf_, sql, params=None, dbname='postgres', check=True):
+        s = sql.strip()
+        if 'pg_database WHERE datname' in s:
+            return '1'
+        if 'pg_database_size' in s:
+            return '2048'
+        if 'count(DISTINCT store_fname)' in s:
+            return '7'
+        return ''
+
+    def run_stub(cmd, env=None, check=True):
+        ran.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, b'')
+
+    argv = ['odoo_backup.py', '--config', conf, '--db', 'dbatt', '--out-root',
+            str(d / 'backups'), '--addons-path', str(addons), '--unit', 'odoo.service',
+            '--no-service', '--label', 't']
+    old = sys.argv
+    sys.argv = argv
+    try:
+        with patched(backup_mod, run_psql=psql_att, run=run_stub):
+            exc, out = capture(backup_mod.main)
+    finally:
+        sys.argv = old
+    check('空 filestore + 有附件 → 直接失败', isinstance(exc, OpsError), repr(exc))
+    check('失败信息说明附件与 filestore',
+          exc is not None and ('附件' in str(exc) or 'filestore' in str(exc)), repr(exc))
+    check('失败前未调用 pg_dump',
+          not any('pg_dump' in ' '.join(map(str, c)) for c in ran), repr(ran[:2]))
+    check('未留下假备份目录', not (d / 'backups').exists()
+          or not any((d / 'backups').iterdir()))
+
+
+def test_filestore_candidates_cover_odoo_home():
+    print('\n== T10c filestore 候选覆盖 odoo 用户默认 data_dir ==')
+    conf = {'data_dir': '/var/lib/odoo'}
+    cands = [str(p) for p in conf_mod.filestore_candidates(conf, 'dbx')]
+    check('至少包含 data_dir 与 odoo 用户默认目录', len(cands) >= 2, repr(cands))
+    check('全部位于 filestore 下', all('/filestore/dbx' in c for c in cands), repr(cands))
+    check('包含 /var/lib/odoo 候选', any(c.startswith('/var/lib/odoo/filestore/') for c in cands),
+          repr(cands))
+    try:
+        conf_mod.filestore_candidates(conf, '../evil')
+        check('非法库名被拒绝', False)
+    except OpsError:
+        check('非法库名被拒绝', True)
+
+
 def test_backup_restart_failure_exit3():
     print('\n== T10 备份成功但重启失败 → 退出码 3（缺陷 9）==')
     d = tmpdir()
@@ -890,6 +947,8 @@ def main():
         test_restore_failure_must_not_start,
         test_restore_stop_failure_before_drop,
         test_backup_stop_failure_before_dump,
+        test_backup_refuses_empty_filestore_for_stored_attachments,
+        test_filestore_candidates_cover_odoo_home,
         test_backup_restart_failure_exit3,
         test_chown_checked,
         test_is_active_deactivating,

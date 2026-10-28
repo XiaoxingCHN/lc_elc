@@ -1,0 +1,188 @@
+/* ==========================================================================
+ * P3 · 领用 / 归还 / 作业流水（issue 子任务专属样式）
+ * --------------------------------------------------------------------------
+ * 只写本 domain 需要的样式，全部以 .lc-workflow 或 .lc-issue-* 类名开头；
+ * 不改 team.css，不加 !important，不用裸标签选择器（避免影响 Odoo 其它页面）。
+ * 令牌（--panel/--line/--lime/...）来自 team.css 的 :root，这里只消费。
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   工具条：扫码输入占满一行，按钮在窄屏自动换行（375px 不横向溢出）
+   -------------------------------------------------------------------------- */
+.lc-workflow .lc-issue-toolbar {
+  align-items: flex-end;
+}
+
+.lc-workflow .lc-issue-scan-field {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.lc-workflow .lc-issue-scan {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.lc-workflow .lc-issue-filter,
+.lc-workflow .lc-history-filter {
+  align-items: flex-end;
+}
+
+.lc-workflow .lc-issue-filter-q {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.lc-workflow .lc-history-filter .lc-field {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   扫码结果卡片
+   -------------------------------------------------------------------------- */
+.lc-workflow .lc-issue-results {
+  display: grid;
+  gap: 14px;
+}
+
+.lc-workflow .lc-issue-results-list {
+  display: grid;
+  gap: 12px;
+}
+
+.lc-workflow .lc-issue-result {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  min-width: 0;
+}
+
+.lc-workflow .lc-issue-result-title {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lc-workflow .lc-issue-bag-facts {
+  border-top: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   领用明细：数量输入框窄一点，避免把表格撑宽
+   -------------------------------------------------------------------------- */
+.lc-workflow .lc-issue-qty {
+  width: 100%;
+  min-width: 88px;
+  max-width: 132px;
+  font-family: var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   归还面板：两个指标块（可归还量 / 物理库存）并排，语义不同不能合并
+   -------------------------------------------------------------------------- */
+.lc-workflow .lc-issue-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+
+.lc-workflow .lc-issue-metric {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  min-width: 0;
+}
+
+.lc-workflow .lc-issue-metric[data-tone="ok"] {
+  border-left-color: var(--lime);
+  background: var(--lime-soft);
+}
+
+.lc-workflow .lc-issue-metric-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lc-workflow .lc-issue-metric-value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.lc-workflow .lc-issue-return-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   表格行内操作：按钮竖排会太挤，横排可换行
+   -------------------------------------------------------------------------- */
+.lc-workflow .lc-issue-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-workflow .lc-issue-row-actions .lc-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   未决锁（security S2-1）：锁定期间给表单一个"不可提交"的视觉信号
+   -------------------------------------------------------------------------- */
+.lc-workflow[data-lc-locked="1"] .lc-issue-form,
+.lc-workflow[data-lc-locked="1"] .lc-issue-return-form {
+  opacity: 0.6;
+}
+
+.lc-workflow .lc-hint[data-lc-pending-info]:not(:empty) {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: rgba(217, 180, 106, 0.1);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   窄屏：指标块单列、工具条字段占满
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .lc-workflow .lc-issue-scan-field,
+  .lc-workflow .lc-issue-filter-q,
+  .lc-workflow .lc-history-filter .lc-field {
+    flex: 1 1 100%;
+  }
+
+  .lc-workflow .lc-issue-qty {
+    max-width: none;
+  }
+
+  .lc-workflow .lc-issue-metric-value {
+    font-size: 20px;
+  }
+}

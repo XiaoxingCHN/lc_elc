@@ -432,6 +432,78 @@ class HostDecisionTest(unittest.TestCase):
                       '/lab/client/updates/manifest', '/web/login', '/team/lab', '/'):
             self.assertFalse(paths.is_root_alias_path(value), value)
 
+class WorkflowRootAliasTest(unittest.TestCase):
+    """P3 业务页面的根级别入口：root_aliases=0 时全部必须真实 404。
+
+    覆盖点（Lead 要求）：**每个新根页面**都在名单里；同时不能把其它控制器
+    已占用的路径（旧 /lab/scan、旧标签表单端点、/lab/api/**、更新清单）卷进来。
+    """
+
+    NEW_PAGES = (
+        '/scan',
+        '/account',
+        '/lab/receipts',
+        '/lab/bags',
+        '/lab/bags/12',
+        '/lab/labels',
+        '/lab/issues',
+        '/lab/issues/new',
+        '/lab/locations',
+        '/lab/location-mappings',
+        '/lab/history',
+        '/lab/materials',
+        '/lab/settings',
+    )
+
+    OTHER_CONTROLLER_PATHS = (
+        '/lab/scan',
+        '/lab/scan/resolve',
+        '/lab/scan/submit',
+        '/lab/labels/plan',
+        '/lab/labels/download',
+        '/lab/api/catalog/search',
+        '/lab/api/inventory/bags',
+        '/lab/api/inventory/bag',
+        '/lab/api/labels/plan',
+        '/lab/api/labels/preview',
+        '/lab/client/updates/manifest',
+        '/web/login',
+        '/odoo',
+        '/team/lab',
+        '/team/lab/receipts',
+        '',
+        '/',
+    )
+
+    def test_every_new_page_is_a_root_alias_path(self):
+        for value in self.NEW_PAGES:
+            with self.subTest(path=value):
+                self.assertTrue(paths.is_root_alias_path(value), value)
+
+    def test_other_controllers_are_never_matched(self):
+        for value in self.OTHER_CONTROLLER_PATHS:
+            with self.subTest(path=value):
+                self.assertFalse(paths.is_root_alias_path(value), value)
+
+    def test_new_pages_resolve_to_root_base(self):
+        for value in self.NEW_PAGES:
+            with self.subTest(path=value):
+                self.assertEqual(paths.resolve_base(value), '', value)
+
+    def test_new_pages_fall_back_to_team_base_when_aliases_disabled(self):
+        for value in self.NEW_PAGES:
+            with self.subTest(path=value):
+                self.assertEqual(
+                    paths.resolve_base(value, root_aliases_enabled=False),
+                    paths.CANONICAL_BASE, value)
+
+    def test_scan_and_account_are_declared_aliases(self):
+        # resolve_base 依赖 ROOT_ALIASES 前缀匹配；/lab 已覆盖 /lab/* 页面
+        for alias in ('/scan', '/account', '/lab', '/login', '/logout'):
+            with self.subTest(alias=alias):
+                self.assertIn(alias, paths.ROOT_ALIASES)
+
+
 class SafeDocUrlTest(unittest.TestCase):
     """资料链接白名单：只允许站内相对路径或 http(s)。"""
 

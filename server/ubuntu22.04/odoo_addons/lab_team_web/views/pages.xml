@@ -10,10 +10,25 @@
                 <meta name="robots" content="noindex, nofollow"/>
                 <title t-esc="(lc_page_title + ' · ' if lc_page_title else '') + lc_site_title"/>
                 <link rel="stylesheet" t-attf-href="/lab_team_web/static/src/css/team.css?v=#{lc_css_v}"/>
+                <!-- 业务页面专属样式：只有子任务文件存在（内容哈希 != '0'）时才输出，
+                     避免文件还没创建时浏览器 404；旧页面没有 lc_domain，不会命中。 -->
+                <t t-if="lc_domain and lc_domain_css_v and lc_domain_css_v != '0'">
+                    <link rel="stylesheet"
+                          t-attf-href="/lab_team_web/static/src/css/workflow_#{lc_domain}.css?v=#{lc_domain_css_v}"/>
+                </t>
+                <!-- 脚本顺序契约（全部 defer，按文档顺序执行）：core → team.js → 页面脚本。
+                     放在 <head> 而页面脚本在正文里，才能保证 window.LC 一定先就绪；
+                     只有外链脚本，没有内联脚本/事件属性（CSP script-src 'self'）。 -->
+                <script t-attf-src="/lab_team_web/static/src/js/workflow_core.js?v=#{lc_core_v}"
+                        defer="defer"></script>
+                <script t-attf-src="/lab_team_web/static/src/js/team.js?v=#{lc_js_v}"
+                        defer="defer"></script>
             </head>
             <body class="lc-body"
                   t-att-data-base="lc_base"
                   t-att-data-authenticated="'0' if lc_anonymous else '1'"
+                  t-att-data-active-page="lc_active_page or ''"
+                  t-att-data-workflow-config="lc_workflow_config_json"
                   data-api-search="/lab/api/catalog/search">
                 <a class="lc-skip" href="#lc-main">跳到主要内容</a>
 
@@ -26,11 +41,13 @@
                             </span>
                         </a>
                         <nav class="lc-nav" aria-label="主导航">
-                            <a class="lc-nav-link" t-att-href="lc_lab_url">仓库</a>
-                            <t t-if="lc_anonymous">
-                                <a class="lc-nav-link" t-att-href="lc_login_url">登录</a>
+                            <t t-foreach="lc_nav" t-as="nav">
+                                <a t-attf-class="lc-nav-link #{'is-active' if nav.get('active') else ''}"
+                                   t-att-href="nav.get('href')"
+                                   t-att-aria-current="'page' if nav.get('active') else None"
+                                   t-esc="nav.get('title')"/>
                             </t>
-                            <t t-else="">
+                            <t t-if="not lc_anonymous">
                                 <span class="lc-nav-user">
                                     <span class="lc-user-name" t-esc="lc_user_name"/>
                                     <form class="lc-logout-form" t-att-action="lc_logout_url" method="post">
@@ -50,8 +67,6 @@
                 <footer class="lc-footer">
                     <span t-esc="lc_site_title"/>
                 </footer>
-
-                <script t-attf-src="/lab_team_web/static/src/js/team.js?v=#{lc_js_v}" defer="defer"></script>
             </body>
         </html>
     </template>
@@ -62,7 +77,7 @@
             <section class="lc-hero">
                 <p class="lc-kicker">TEAM WAREHOUSE</p>
                 <h1 class="lc-title">热爱我的<span class="lc-accent">热爱</span></h1>
-                <p class="lc-lead">力创实验室仓库管理入口：查看器件资料、实验室库存与存放位置。</p>
+                <p class="lc-lead">力创实验室仓库管理入口：查看器件资料与实验室库存，完成扫码入库、领用与归还。</p>
                 <div class="lc-actions">
                     <t t-if="lc_anonymous">
                         <a class="lc-btn lc-btn-primary" t-att-href="lc_login_url">登录</a>
@@ -90,7 +105,7 @@
                 </div>
             </section>
 
-            <p class="lc-note">采购入库、领用归还、库位与操作记录暂未开放。</p>
+            <p class="lc-note">用实验室系统账号登录；日常库存作业全部在本站完成，管理员维护入口另行内网提供。</p>
         </t>
     </template>
 
@@ -132,7 +147,7 @@
                     <ul class="lc-side-list">
                         <li>使用实验室系统账号登录，本页不保存任何密码。</li>
                         <li>没有仓库权限的账号可以登录，但看不到器件资料。</li>
-                        <li>入库、领用与归还暂未开放。</li>
+                        <li>入库、领用、归还与标签按账号角色开放；无权限的入口不会显示。</li>
                     </ul>
                 </aside>
             </section>
@@ -397,7 +412,11 @@
     <template id="page_denied" name="LC Team Denied">
         <t t-call="lab_team_web.layout">
             <section class="lc-error-page">
-                <t t-if="lc_denied_code == 'FORBIDDEN'">
+                <t t-if="lc_denied_title">
+                    <h1 class="lc-title-sm" t-esc="lc_denied_title"/>
+                    <p class="lc-lead" t-esc="lc_denied_lead"/>
+                </t>
+                <t t-elif="lc_denied_code == 'FORBIDDEN'">
                     <h1 class="lc-title-sm">没有访问权限</h1>
                     <p class="lc-lead">当前账号没有实验室库存或器件库权限。请联系库存管理员分配角色后重试。</p>
                 </t>

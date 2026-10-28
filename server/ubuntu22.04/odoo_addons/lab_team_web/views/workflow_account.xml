@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================================================================
+         P3 · 我的账号（account 子任务写域）
+         (XML 注释内不得出现连续两个减号，本文件用等号做分隔线)
+         路由：/team/account、/account（任意已登录账号；匿名由外壳 303 到
+         /login?next=，页面级角色门槛为 need='user'，即登录即可）。
+         页面 id / domain：account。
+
+         模板 id（本子任务分配值）：workflow_account_account
+         控制器期望键（PAGE_SPECS['account']['template']）：
+             lab_team_web.workflow_account_page
+         两者不一致时页面会回退到"界面尚未接入"占位页，因此这里同时给出
+         这两个 id，**正文只有一份**（workflow_account_body），不存在第二份
+         实现、也没有任何"页面待实现"占位。外壳登记（__manifest__.py 的
+         data 列表）由 T0/Lead 处理，本子任务不改 manifest。
+
+         本页边界（按 frontend-contract.md §3/§4 与 backend-contract.md）：
+         * 只读：身份 / 权限 / 会话状态全部来自既有 /api/team/session
+           （页面 JS 只用 window.LC.session() / LC.refreshSession()）；
+         * 不新增密码修改接口、不新建第二套认证；密码变更走管理员复位或
+           Odoo 原生流程，页面只做说明；
+         * 退出复用外壳的原生 POST 表单 + CSRF 隐藏域（浏览器自己跟随 303），
+           不做 fetch 代提交；
+         * 不缓存凭据：不写 localStorage/sessionStorage，不显示 cookie/token；
+         * 无内联脚本、无 on* 事件属性（CSP script-src 'self'）；
+         * 数据属性只用契约 §4.5 列出的 data-lc-*；本页自有接线一律用
+           data-account-*，避免与公共 core 的约定冲突。
+         ================================================================== -->
+
+    <!-- 正文：身份 / 项目权限 / 会话与安全 / 入口 -->
+    <template id="workflow_account_body" name="P3 我的账号 · 正文">
+        <section class="lc-panel" aria-labelledby="lc-account-identity-title">
+            <div class="lc-panel-head">
+                <h2 class="lc-section-title" id="lc-account-identity-title">当前会话身份</h2>
+                <span class="lc-badge" data-account-badge="session" data-tone="warn">正在读取会话</span>
+            </div>
+            <div class="lc-panel-body">
+                <p class="lc-loading" data-lc-loading="1" hidden="hidden">正在读取会话信息…</p>
+                <dl class="lc-kv">
+                    <dt>姓名</dt>
+                    <dd data-account-field="name" t-esc="lc_user_name or '—'"/>
+                    <dt>登录名</dt>
+                    <dd class="lc-mono" data-account-field="login" t-esc="lc_user_login or '—'"/>
+                    <dt>用户编号</dt>
+                    <dd class="lc-mono" data-account-field="uid">—</dd>
+                    <dt>公司</dt>
+                    <dd data-account-field="company">—</dd>
+                    <dt>会话状态</dt>
+                    <dd data-account-field="session">已登录</dd>
+                </dl>
+                <p class="lc-hint">
+                    本页只展示当前会话的身份与权限。页面不显示、也不保存密码、cookie
+                    或任何令牌；身份信息来自既有会话接口，不新建账号体系。
+                </p>
+            </div>
+        </section>
+
+        <section class="lc-panel" aria-labelledby="lc-account-perms-title">
+            <div class="lc-panel-head">
+                <h2 class="lc-section-title" id="lc-account-perms-title">项目权限</h2>
+                <span class="lc-hint">未获取 = 该入口不会出现在导航里</span>
+            </div>
+            <div class="lc-panel-body">
+                <ul class="lc-account-perms" aria-label="当前账号的项目权限">
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">器件资料</span>
+                        <span class="lc-badge" data-account-perm="can_catalog" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">查看器件档案、实验室库存与存放位置（仓库检索）</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">实验室库存（只读）</span>
+                        <span class="lc-badge" data-account-perm="can_lab" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">查看库位与库码、实物袋、领用记录与作业流水</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">采购入库</span>
+                        <span class="lc-badge" data-account-perm="can_receipt" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">建待入库袋、打印追溯标签、扫码确认实物入库</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">领用</span>
+                        <span class="lc-badge" data-account-perm="can_issue" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">扫码按袋领用；领用人必须是系统账号</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">归还</span>
+                        <span class="lc-badge" data-account-perm="can_return" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">归还本人的领用记录，必须关联原领用行</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">标签打印</span>
+                        <span class="lc-badge" data-account-perm="can_manage_labels" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">按毫米尺寸排版并下载标签 PDF（每袋一个追溯二维码）</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">代他人领料</span>
+                        <span class="lc-badge" data-account-perm="can_issue_for_others" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">为其他账号领用；服务端按库存组另行校验</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">库位管理</span>
+                        <span class="lc-badge" data-account-perm="can_manage_locations" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">新建、改名、停用库位（停用前必须先搬空库存）</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">类别映射</span>
+                        <span class="lc-badge" data-account-perm="can_manage_mappings" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">维护类别到库位的推荐顺序，只影响推荐，不自动入库</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">成员角色</span>
+                        <span class="lc-badge" data-account-perm="can_manage_members" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">调整成员的库存组角色（只碰库存组，不碰系统管理员组）</span>
+                    </li>
+                    <li class="lc-account-perm">
+                        <span class="lc-account-perm-name">库存管理员</span>
+                        <span class="lc-badge" data-account-perm="is_manager" data-tone="warn">未获取</span>
+                        <span class="lc-account-perm-desc">上述管理项的判定依据（实验室库存 / 管理员组）</span>
+                    </li>
+                </ul>
+                <p class="lc-hint">
+                    角色由库存管理员在「管理」页分配。页面只按权限位隐藏入口，每个接口仍由
+                    服务端独立校验；隐藏入口不等于授予或回收权限。
+                </p>
+            </div>
+        </section>
+
+        <section class="lc-panel" aria-labelledby="lc-account-safety-title">
+            <div class="lc-panel-head">
+                <h2 class="lc-section-title" id="lc-account-safety-title">会话与安全</h2>
+            </div>
+            <div class="lc-panel-body">
+                <ul class="lc-account-list">
+                    <li>会话由 Odoo 会话 cookie 维持，退出后立即失效；本页不读取、不显示 cookie 或令牌。</li>
+                    <li>本页没有任何写操作，也不会把身份信息写入浏览器存储。</li>
+                    <li>密码变更本版本不提供入口：请由管理员复位，或走 Odoo 原生流程；不新建第二套认证。</li>
+                    <li>会话过期时接口返回 UNAUTHORIZED，状态区会给出「重新登录」入口。</li>
+                </ul>
+            </div>
+        </section>
+
+        <div class="lc-account-actions">
+            <a class="lc-btn lc-btn-primary" data-account-entry="lab"
+               t-att-href="lc_entry_urls['lab']">返回仓库</a>
+            <t t-if="lc_workflow_permissions.get('can_lab')">
+                <a class="lc-btn lc-btn-outline" data-account-entry="issues"
+                   t-att-href="lc_entry_urls['issues']">我的领用</a>
+            </t>
+            <button class="lc-btn lc-btn-ghost" type="button"
+                    data-lc-action="refresh-session">重新读取会话</button>
+            <form class="lc-account-logout" data-account-logout="1"
+                  t-att-action="lc_logout_url" method="post">
+                <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                <button class="lc-btn lc-btn-danger" type="submit">安全退出</button>
+            </form>
+        </div>
+    </template>
+
+    <!-- 正式页面：模板 id 按本子任务分配值（workflow_account_account） -->
+    <template id="workflow_account_account" name="P3 我的账号">
+        <t t-call="lab_team_web.workflow_page">
+            <t t-call="lab_team_web.workflow_account_body"/>
+        </t>
+    </template>
+
+    <!-- 别名：控制器 PAGE_SPECS['account']['template'] 用的是这个 id。
+         只有一行转交，正文仍只有 workflow_account_body 一份。 -->
+    <template id="workflow_account_page" name="P3 我的账号（控制器模板键）">
+        <t t-call="lab_team_web.workflow_account_account"/>
+    </template>
+
+</odoo>

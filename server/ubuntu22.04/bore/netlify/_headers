@@ -1,0 +1,6 @@
+/*
+  Cache-Control: private, no-store, max-age=0
+  Netlify-CDN-Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'

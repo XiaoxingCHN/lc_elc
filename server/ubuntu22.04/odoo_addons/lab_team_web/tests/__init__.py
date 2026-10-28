@@ -13,6 +13,10 @@
 import importlib.util
 
 from . import test_paths  # noqa: F401
+# 入口/退出接线契约（纯文本断言，无需 Odoo 运行时；Odoo 的 loader 也只认已导入模块）
+from . import test_entry_contract  # noqa: F401
+from . import test_p3_web_contract  # noqa: F401
 
 if importlib.util.find_spec('odoo') is not None:  # pragma: no cover - 取决于运行环境
     from . import test_team_web_http  # noqa: F401
+    from . import test_p3_workflows_http  # noqa: F401
