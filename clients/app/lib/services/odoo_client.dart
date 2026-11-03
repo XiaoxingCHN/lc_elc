@@ -52,6 +52,16 @@ class OdooClient implements AuthGateway {
   late final Dio _dio;
   late final CookieJar _cookieJar;
   int? _uid;
+  final _updateEvents = StreamController<void>.broadcast();
+  Stream<void> get updateConnectionEvents => _updateEvents.stream;
+  int _activeRpc = 0;
+  bool get hasActiveRequests => _activeRpc > 0;
+  bool _clientInstallPending = false;
+  bool beginClientInstall() {
+    if (hasActiveRequests || _clientInstallPending) return false;
+    _clientInstallPending = true; return true;
+  }
+  void endClientInstall() { _clientInstallPending = false; }
 
   /// Request counter for the JSON-RPC `id` field (diagnostics only).
   int _requestSeq = 0;
@@ -122,6 +132,60 @@ class OdooClient implements AuthGateway {
 
     // Odoo-specific error translation / logging.
     _dio.interceptors.add(OdooInterceptor());
+    // Track before translators: an earlier handler.reject can short-circuit
+    // following error interceptors and otherwise leave the install gate busy.
+    _dio.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (_clientInstallPending) {
+          handler.reject(DioException(requestOptions: options, error: '安装更新期间暂停服务器操作'));
+          return;
+        }
+        _activeRpc++; handler.next(options);
+      },
+      onResponse: (response, handler) {
+        if (_activeRpc > 0) _activeRpc--;
+        _updateEvents.add(null);
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        if (_activeRpc > 0) _activeRpc--;
+        if (error.requestOptions.path.contains('/lab/client/updates/assets/') &&
+            [401, 302, 303].contains(error.response?.statusCode)) {
+          _notifySessionInvalid();
+        }
+        handler.next(error);
+      },
+    ));
+  }
+
+  Future<void> downloadClientUpdate({required String server, required String path,
+      required File target, required int expectedBytes, required CancelToken token,
+      required void Function(int) onProgress}) async {
+    final base = Uri.parse(baseUrl);
+    final uri = Uri.parse(server).resolve(path);
+    if (server != baseUrl || !_isSameOrigin(uri, base) ||
+        !path.startsWith('/lab/client/updates/assets/') || !isAuthenticated) {
+      throw StateError('请连接当前服务器并登录后下载');
+    }
+    final response = await _dio.get<ResponseBody>(uri.toString(), cancelToken: token,
+        options: Options(responseType: ResponseType.stream, followRedirects: false,
+            validateStatus: (code) => code == 200));
+    final declared = int.tryParse(response.headers.value('content-length') ?? '');
+    if (declared != null && declared != expectedBytes) throw const FormatException('安装包大小不符');
+    final output = target.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response.data!.stream) {
+        if (token.isCancelled) throw token.cancelError!;
+        if (baseUrl != server || !isAuthenticated) throw StateError('登录或服务器已切换');
+        received += chunk.length;
+        if (received > expectedBytes) throw const FormatException('安装包超过声明大小');
+        output.add(chunk);
+        onProgress(received);
+      }
+      await output.flush();
+      if (received != expectedBytes) throw const FormatException('安装包下载不完整');
+    } finally { await output.close(); }
   }
 
   void _ensureConfigured() {

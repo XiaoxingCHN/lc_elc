@@ -1,0 +1,138 @@
+{
+  "file": "local/build/web-ui-20261102/candidates/server-web-ui-20261102-r2-source.zip",
+  "bytes": 13251445,
+  "sha256": "cb868d7645b48836666810c84d2571a2e353f69bf5269e028f1f84a147f9de62",
+  "version": "lab_team_web19.0.1.2.0+server-ops2026.11.02.1",
+  "source_manifest": "maintenance/registry/source-server-web-ui-20261102-r2.json",
+  "source_tree_sha256": "aad3eacd53b112943d2204b6cb9ba7e1f4feb1cee445dea3608b2a0fe254f765",
+  "validation": "r2 re-freeze after the one-rule CSS fix that un-clips the combobox dropdown (body.lc-body .lc-panel:has(.lc-combobox-pop:not([hidden])) { overflow: visible } in lab_team_web/static/src/css/team.css). Local verification on the isolated WSL Odoo 19 instance (db p3_ui_20261102): -u lab_team_web with /lab_team_web tests on the r2 source gave ODOO_EXIT=0 and 52 tests / 0 failed / 0 error(s) (odoo.tests.result also recorded 0 failed/0 error of 42 at-install tests); node combobox 20/20, workflow core 19/19, bore legacy-action gateway contract 19 OK (7 env-dependent skips); repo_check PASS 52 checks / 0 errors / 1 known warning; git diff --check clean. Real-browser evidence re-run after the CSS fix: dropdown capture 48/48 pass / 0 fail (5 cases: keyword 1440, keyword 375, multi 1440, multi 375, bare-code 1440), and the full real UI suite 54 items = 51 pass / 0 fail / 3 blocked (the 3 blocked need WEBUI_BAG_ID / WEBUI_LEGACY_ARCHIVE_ID env inputs and are either covered elsewhere or deliberately not guessed). Not deployed to production; host 192.168.31.105 is currently unreachable so no SSH/production action was taken; deploy bundle built locally only.",
+  "source_manifest_sha256": "9b29e0d2f4441ed61c2de4c0df48584dc8a56379737da9666b6004593592fd4d",
+  "source_commit": "b3bcbf244e44939c6d481e3f97f11579cdf9ee99",
+  "source_worktree": "uncommitted candidate worktree (no commit/push in this round); the frozen r2 source manifest is authoritative",
+  "kind": "source-only-local-candidate",
+  "production_deployed": false,
+  "build_environment": {
+    "os": "Windows 11",
+    "python": "3.15.0",
+    "packaging": "stdlib zipfile; sorted entries (MANIFEST.json first), fixed 1980-01-01 metadata, mode 0644, deflate 9; per-file raw and LF-normalized SHA256 verified, archive re-read after write",
+    "source_files": 258,
+    "archive_entries": 259
+  },
+  "signing": {
+    "status": "not_applicable",
+    "reason": "Source-only ZIP, not an executable application or a signed production release"
+  },
+  "build_report": "local/build/web-ui-20261102/candidates/build-summary-20261102-r2.json",
+  "supersedes": "maintenance/registry/artifact-server-web-ui-20261102.json (r1: frozen before the CSS clip fix; its manifest and both packages are kept unmodified as history and must not be deployed)",
+  "deploy_bundle": {
+    "file": "local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102-r2.tar.gz",
+    "bytes": 91273,
+    "sha256": "848082612140a6aa8710c4dc9505690fc6aaa9ca78e7fd80c6139ef138811f34",
+    "entries": 27,
+    "params": "local/build/web-ui-20261102/candidates/params.env",
+    "params_contains_secrets": false,
+    "freeze_file": "FROZEN-20261102.sha256",
+    "freeze_entries": 19,
+    "bundle_meta_shipped_scripts": 15,
+    "bundle_meta_freeze_sha256": "93b07b020fb76d0ce48075495737a1e08b34df081370ab966eddacfb40b416b8",
+    "pack_command": "python local/web-ui-implementation/scripts/pack-bundle.py --out local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102-r2.tar.gz --params local/build/web-ui-20261102/candidates/params.env",
+    "pack_rc": 0,
+    "contents": "lc_root.py + remote/ (14 scripts, params.env, params.env.example) + tools/ (5 scripts) + gateway_source/ (4 files) + FROZEN-20261102.sha256 + bundle-meta.json",
+    "integrity_note": "re-read with python tarfile: 27 files, archive sha256 matches, every shipped script in FROZEN-20261102.sha256 verifies; the only FROZEN entries absent from the archive are the 3 local-only helpers (check-scripts.py, pack-bundle.py, askpass.cmd) plus a blank line, by design"
+  },
+  "validation_results": {
+    "module_suite_on_upgrade": {
+      "command": "bash local/web-ui-implementation/browser/upgrade-only-test.sh (-u lab_team_web --test-enable --test-tags=/lab_team_web --stop-after-init --http-port=18071)",
+      "run": "upgrade-keepdb-20261102T125331Z",
+      "odoo_exit": 0,
+      "tests": 52,
+      "failed": 0,
+      "errors": 0,
+      "log": "local/web-ui-implementation/evidence/upgrade-keepdb-20261102T125331Z.log",
+      "at_install_note": "odoo.tests.result recorded 0 failed, 0 error(s) of 42 tests during the at_install phase; post-install module stats recorded 52 tests on the r2 source"
+    },
+    "db_version_after_upgrade": {
+      "db": "p3_ui_20261102 (isolated WSL instance)",
+      "lab_team_web": "19.0.1.2.0 installed",
+      "lab_workflow": "19.0.2.0.0 installed",
+      "lab_catalog": "19.0.2.0.5 installed",
+      "note": "version queried after the r1 -u run; the r2 change is a single CSS rule and the module version was not bumped again, so the r2 -u run above started from this state"
+    },
+    "combobox": {
+      "total": 20,
+      "pass": 20,
+      "fail": 0,
+      "exit": 0,
+      "command": "node server/ubuntu22.04/odoo_addons/lab_team_web/tests/test_combobox.mjs"
+    },
+    "workflow_core": {
+      "total": 19,
+      "pass": 19,
+      "fail": 0,
+      "exit": 0,
+      "command": "node server/ubuntu22.04/odoo_addons/lab_team_web/tests/test_workflow_core.mjs"
+    },
+    "legacy_action_gateway_contract": {
+      "ran": 19,
+      "skipped": 7,
+      "failed": 0,
+      "exit": 0,
+      "note": "unittest reported 'OK (skipped=7)'; skips are environment-dependent (no live gateway/nginx on this host)",
+      "command": "python server/ubuntu22.04/bore/tests/test_legacy_action_gateway_contract.py"
+    },
+    "dropdown_capture": {
+      "total": 48,
+      "pass": 48,
+      "fail": 0,
+      "exit": 0,
+      "cases": [
+        "keyword-open/select 1440",
+        "keyword-open/select 375",
+        "multi 1440",
+        "multi 375",
+        "bare-code 1440"
+      ],
+      "evidence": "local/web-ui-implementation/out/receipt-dropdown-20261102/evidence.json",
+      "command": "node local/web-ui-implementation/browser/capture-receipt-dropdown.mjs",
+      "note": "assertions verify real POST /lab/api/catalog/search traffic, candidates showing code/name/model/package without internal prefixes, popup fully inside the viewport and every visible option hit-testable, committed-key input after pick, explicit choice for duplicate local archives, dark-theme tokens and the lime hover accent"
+    },
+    "full_real_ui_suite": {
+      "total": 54,
+      "pass": 51,
+      "fail": 0,
+      "blocked": 3,
+      "exit_code": 3,
+      "report": "local/web-ui-implementation/out/run-real-2026-11-02T12-50-26-676Z/report.json",
+      "log": "local/web-ui-implementation/out/run-real-after-css-fix.log",
+      "command": "node local/web-ui-implementation/run-real-ui.mjs",
+      "blocked_ids": [
+        "real-page-bag-detail-deferred (no WEBUI_BAG_ID; covered by the dynamic bag case)",
+        "real-receipt-multi-create-lock (no WEBUI_LEGACY_ARCHIVE_ID)",
+        "real-receipt-legacy-precondition (no WEBUI_LEGACY_ARCHIVE_ID)"
+      ]
+    },
+    "repo_check": {
+      "result": "PASS",
+      "passed_checks": 52,
+      "errors": 0,
+      "warnings": 1,
+      "warning_ids": [
+        "production-py312-rebuild"
+      ],
+      "exit": 0
+    },
+    "git_diff_check": {
+      "exit": 0,
+      "note": "only a CRLF-normalization notice on stderr (core.autocrlf=true, same as the 10-28 manifest)"
+    }
+  },
+  "limitations": [
+    "Source-only candidate plus a local deploy bundle: nothing was deployed, no production host was contacted, no SSH or credentials were used in this round",
+    "Production host 192.168.31.105 is unreachable (ping 100% loss, TCP 22/8069 refused, no ARP entry), so the deployment gate is blocked on host availability, not on the package",
+    "The deploy bundle's params.env takes production paths/topology from the reviewed scripts/remote/params.env.example; they must be re-verified on the target before a real run",
+    "Isolated WSL Odoo 19/Python 3.10.12 instance is not production Python 3.12.15 equivalence; production-py312-rebuild payload remains open (repo_check warning)",
+    "Fixing a pre-existing registry drift (components.json vs on-disk lab_workflow version) was out of scope; both are 19.0.2.0.0 today",
+    "Candidate identity was frozen before the docs/CHANGELOG/CURRENT_STATE updates; those files live outside server/ubuntu22.04 and are not part of the source manifest",
+    "Known cosmetic gap deliberately NOT fixed in r2 (recorded, not blocking): lab_team_web dark theme has no color-scheme: dark declaration, so native scrollbars / the native archive <select> popup / autofill chrome can render light on Windows; fixing it would require another freeze and was deferred. Also deferred: narrowing the :has() overflow-visible rule to a dedicated class, and letting the 1440 dropdown match the 770px input width instead of max 540px"
+  ]
+}

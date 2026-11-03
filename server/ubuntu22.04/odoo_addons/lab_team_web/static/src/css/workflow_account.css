@@ -1,0 +1,157 @@
+/* ==========================================================================
+   lab_team_web · 我的账号（domain: account）
+   --------------------------------------------------------------------------
+   只写本页专属类，不改 team.css：
+     .lc-account-perms / .lc-account-perm / .lc-account-perm-name
+     .lc-account-perm-desc / .lc-account-list / .lc-account-actions
+     .lc-account-logout
+   规则一律以 body.lc-body 开头（与 team.css 同一套令牌与作用域），不裸写标签名，
+   不用 !important 覆盖别人的规则。权限清单用"名称 + 徽章 + 说明"的网格而不是表格，
+   375px 下不会产生横向滚动；交互按钮沿用公共 .lc-btn。
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   权限清单
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-account-perms {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+body.lc-body .lc-account-perm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 12px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+body.lc-body .lc-account-perm:last-child {
+  border-bottom: 0;
+}
+
+body.lc-body .lc-account-perm-name {
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-account-perm .lc-badge {
+  justify-self: end;
+}
+
+body.lc-body .lc-account-perm-desc {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   会话与安全说明列表
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-account-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.lc-body .lc-account-list > li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-account-list > li::before {
+  content: "";
+  position: absolute;
+  top: 0.68em;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   底部入口：返回仓库 / 我的领用 / 重新读取会话 / 安全退出
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-account-logout {
+  display: inline-flex;
+  margin: 0;
+  margin-left: auto;
+}
+
+body.lc-body .lc-account-logout .lc-btn {
+  width: 100%;
+}
+
+/* 提交中的原生表单：只降透明度，不禁用按钮（否则浏览器无法继续提交） */
+body.lc-body .lc-account-logout[aria-busy="true"] {
+  opacity: 0.72;
+}
+
+/* --------------------------------------------------------------------------
+   窄屏（375px 可用）：按钮整行、退出不贴右、徽章不挤压名称
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  body.lc-body .lc-account-actions .lc-btn,
+  body.lc-body .lc-account-actions .lc-account-logout {
+    flex: 1 1 100%;
+  }
+
+  body.lc-body .lc-account-logout {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  body.lc-body .lc-account-perm {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  body.lc-body .lc-account-perm .lc-badge {
+    justify-self: start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   打印：入口区（含退出按钮）不进入纸面
+   -------------------------------------------------------------------------- */
+@media print {
+  body.lc-body .lc-account-actions {
+    display: none !important;
+  }
+
+  body.lc-body .lc-account-perm,
+  body.lc-body .lc-account-list > li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -1,5 +1,6 @@
 import 'package:lab_inventory_client/widgets/lab_ui.dart';
 import 'dart:async';
+import '../../../updates/update_ui.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -152,6 +153,7 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
           appBar: LabAppBar(
             title: const Text('仓库'),
             actions: <Widget>[
+              const ClientUpdateButton(),
               IconButton(
                 tooltip: _grid ? '切换为列表' : '切换为网格',
                 onPressed: () => setState(() => _grid = !_grid),

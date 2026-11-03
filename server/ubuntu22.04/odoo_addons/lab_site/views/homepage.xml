@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 用 l-creation.club 静态站内容替换 Odoo 网站首页 -->
+    <template id="homepage_lc" inherit_id="website.homepage" name="LC Team Homepage">
+        <xpath expr="//t[@t-call='website.layout']/div[@id='wrap']" position="replace">
+            <div id="wrap" class="oe_structure lc-site">
+
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <div class="scroll-progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+  <header class="site-header" id="top">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="力创RM战队首页">
+        <img src="/lab_site/static/src/img/team-logo.png" alt="力创RM战队队徽" width="44" height="44"/>
+        <span class="brand-text">
+          <strong>力创RM战队</strong>
+          <span>L-CREATION ROBOTICS</span>
+        </span>
+      </a>
+
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="#about">战队档案</a>
+        <a href="#robots">机器人系统</a>
+        <a href="#honors">赛事荣誉</a>
+        <a href="#engineering">研发流程</a>
+        <a href="#join">加入我们</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="btn btn-ghost header-cta" href="https://bbs.robomaster.com/reg/team-space?teamId=73" target="_blank" rel="noopener">
+          战队空间
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12L12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开菜单">
+          <span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-grid" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <div class="hero-layout">
+          <div class="hero-copy">
+            <p class="hero-kicker"><span class="status-dot" aria-hidden="true"></span>ROBOMASTER 2026 <span class="kicker-divider">/</span> RMUL 安徽站八强</p>
+            <h1 id="hero-title">热爱我的<span class="accent">热爱</span><span class="dot">.</span></h1>
+            <p class="hero-sub">湖北工业大学 · 力创RM战队。把图纸、代码与无数个深夜，做成能在赛场上战斗的机器。</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#about">
+                认识力创
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </a>
+              <a class="btn btn-outline" href="https://bbs.robomaster.com/reg/team-space?teamId=73" target="_blank" rel="noopener">查看战队空间</a>
+            </div>
+          </div>
+
+          <figure class="hero-figure">
+            <div class="hero-photo">
+              <img src="/lab_site/static/src/img/hero-team.jpg" alt="力创RM战队两名队员在赛场边联调机器人" width="1600" height="1067" fetchpriority="high"/>
+              <span class="hero-photo-tag">TEAM LOG <b>001</b></span>
+            </div>
+            <figcaption>
+              <span>赛前调试 · 队员与机器人</span>
+              <span>HUBEI / CHINA</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <dl class="hero-stats">
+          <div><dt>2016—2026</dt><dd>十一年战队历程</dd></div>
+          <div><dt>60</dt><dd>项赛事荣誉</dd></div>
+          <div><dt>06</dt><dd>类机器人系统</dd></div>
+          <div><dt>05</dt><dd>个技术方向</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span class="ticker-group">
+          <span>2026 RMUL 安徽站 · 3V3 八强</span><span class="sep">///</span>
+          <span>2026 英雄机器人组 · 一等奖</span><span class="sep">///</span>
+          <span>2023 RMUC 全国赛 · 二等奖</span><span class="sep">///</span>
+          <span>2023 RMUC 区域赛 · 一等奖</span><span class="sep">///</span>
+          <span>热爱我的热爱</span><span class="sep">///</span>
+        </span>
+        <span class="ticker-group">
+          <span>2026 RMUL 安徽站 · 3V3 八强</span><span class="sep">///</span>
+          <span>2026 英雄机器人组 · 一等奖</span><span class="sep">///</span>
+          <span>2023 RMUC 全国赛 · 二等奖</span><span class="sep">///</span>
+          <span>2023 RMUC 区域赛 · 一等奖</span><span class="sep">///</span>
+          <span>热爱我的热爱</span><span class="sep">///</span>
+        </span>
+      </div>
+    </div>
+
+    <section class="section about" id="about">
+      <div class="container">
+        <div class="section-head">
+          <p class="section-index">01 / TEAM PROFILE</p>
+          <h2>把热爱，做成<br/><span class="accent-text">能上场的东西。</span></h2>
+        </div>
+
+        <div class="about-grid">
+          <div class="about-copy reveal">
+            <p class="lead">力创RM战队来自湖北工业大学，是一支征战 RoboMaster 机甲大师高校系列赛的本科生战队。自 2016 年建队以来，我们持续出现在区域赛、全国赛与高校联盟赛的赛场上。</p>
+            <p>从机械结构、嵌入式电控，到视觉感知、运动决策与战队运营，机器人从图纸到上场，由队员自己完成。队训只有一句——<strong>热爱我的热爱</strong>。</p>
+
+            <ul class="about-list">
+              <li>
+                <span class="about-num">01</span>
+                <div><strong>自主设计</strong><p>结构、电路、视觉与决策，由战队独立完成。</p></div>
+              </li>
+              <li>
+                <span class="about-num">02</span>
+                <div><strong>持续参赛</strong><p>2016—2026，十一年持续站上赛场。</p></div>
+              </li>
+              <li>
+                <span class="about-num">03</span>
+                <div><strong>协同作战</strong><p>机械、电控、视觉、算法与运营共同推进。</p></div>
+              </li>
+            </ul>
+          </div>
+
+          <figure class="about-figure reveal">
+            <div class="figure-frame">
+              <img src="/lab_site/static/src/img/team-about.jpg" alt="力创RM战队队员在赛场围栏边联调机器人" width="1600" height="1067" loading="lazy"/>
+            </div>
+            <figcaption><span>赛场边 · 队员联调</span><span>TEAM LOG / 002</span></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-band" aria-label="战队数据">
+      <div class="container stats-grid">
+        <div class="stat reveal"><span class="stat-num">11</span><span class="stat-label">年战队历程</span></div>
+        <div class="stat reveal"><span class="stat-num">60</span><span class="stat-label">项赛事荣誉</span></div>
+        <div class="stat reveal"><span class="stat-num">06</span><span class="stat-label">类机器人系统</span></div>
+        <div class="stat reveal"><span class="stat-num">05</span><span class="stat-label">个技术方向</span></div>
+      </div>
+    </section>
+
+    <section class="section robots" id="robots">
+      <div class="container">
+        <div class="section-head split">
+          <div>
+            <p class="section-index">02 / ROBOT SYSTEMS</p>
+            <h2>六种单位，<br/>一套战术。</h2>
+          </div>
+          <p class="section-desc">围绕 RoboMaster 2026 赛季兵种体系，我们把每个机器人当作一套完整的工程系统来打磨：能上场，也能被复盘。</p>
+        </div>
+
+        <div class="robot-grid">
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-heavy.png" alt="RoboMaster 重装机器人官方示意" width="581" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">01 / HEAVY</span><span class="robot-role">前排 · 输出</span></div>
+              <h3>重装机器人</h3>
+              <p>柔性执行机构，负责前排突破、救援与高额输出。</p>
+              <ul class="tags"><li>高自由度</li><li>大弹丸</li></ul>
+            </div>
+          </article>
+
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-infantry.png" alt="RoboMaster 步兵机器人官方示意" width="595" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">02 / INFANTRY</span><span class="robot-role">机动 · 占点</span></div>
+              <h3>步兵机器人</h3>
+              <p>高通过性底盘，适应复杂地形，承担持续火力与占点任务。</p>
+              <ul class="tags"><li>42 mm</li><li>高机动</li></ul>
+            </div>
+          </article>
+
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-sentry.png" alt="RoboMaster 哨兵机器人官方示意" width="595" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">03 / SENTRY</span><span class="robot-role">自动 · 防御</span></div>
+              <h3>哨兵机器人</h3>
+              <p>全自动防御单位，根据战局自主选择进攻或防守。</p>
+              <ul class="tags"><li>自动瞄准</li><li>自主决策</li></ul>
+            </div>
+          </article>
+
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-dart.png" alt="RoboMaster 飞镖系统官方示意" width="581" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">04 / DART</span><span class="robot-role">远程 · 压制</span></div>
+              <h3>飞镖系统</h3>
+              <p>超远程精准打击，压制对方前哨与基地。</p>
+              <ul class="tags"><li>远程</li><li>精准</li></ul>
+            </div>
+          </article>
+
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-radar.png" alt="RoboMaster 雷达系统官方示意" width="595" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">05 / RADAR</span><span class="robot-role">感知 · 决策</span></div>
+              <h3>雷达系统</h3>
+              <p>战场信息中枢，为全队提供态势感知与决策依据。</p>
+              <ul class="tags"><li>感知</li><li>决策</li></ul>
+            </div>
+          </article>
+
+          <article class="robot-card reveal">
+            <div class="robot-media"><img src="/lab_site/static/src/img/robot-aerial.png" alt="RoboMaster 空中系统官方示意" width="595" height="325" loading="lazy" decoding="async"/></div>
+            <div class="robot-body">
+              <div class="robot-top"><span class="robot-code">06 / AERIAL</span><span class="robot-role">空中 · 侦察</span></div>
+              <h3>空中系统</h3>
+              <p>从机库起飞，执行侦察、干扰与多样化空中任务。</p>
+              <ul class="tags"><li>空中</li><li>侦察</li></ul>
+            </div>
+          </article>
+        </div>
+
+        <p class="asset-note">机器人形象来自 RoboMaster 官方兵种示意；实际参赛机器人由战队自主设计、加工与调试。</p>
+      </div>
+    </section>
+
+    <section class="honors" id="honors">
+      <div class="honors-bg" aria-hidden="true">
+        <img src="/lab_site/static/src/img/arena-honors.jpg" alt="" width="1920" height="1080" loading="lazy"/>
+      </div>
+      <div class="container">
+        <div class="section-head light">
+          <p class="section-index">03 / TRACK RECORD</p>
+          <h2>赛场，是唯一的标准。</h2>
+          <p class="section-desc">从 2016 到 2026，十一年，我们持续把机器人送上赛场，也把每一次结果带回来复盘。以下为 2021 赛季以来的赛事记录。</p>
+        </div>
+
+        <div class="honor-highlights">
+          <article class="honor-card reveal">
+            <span class="honor-year">2026</span>
+            <h3>RMUL 安徽站</h3>
+            <p>3V3 对抗赛 · 八强</p>
+          </article>
+          <article class="honor-card reveal">
+            <span class="honor-year">2026</span>
+            <h3>英雄机器人组</h3>
+            <p>机器人竞技奖 · 一等奖</p>
+          </article>
+          <article class="honor-card reveal">
+            <span class="honor-year">2023</span>
+            <h3>RMUC 全国赛</h3>
+            <p>超级对抗赛 · 二等奖</p>
+          </article>
+          <article class="honor-card reveal">
+            <span class="honor-year">2023</span>
+            <h3>RMUC 区域赛</h3>
+            <p>一等奖 · 冉冉新星奖</p>
+          </article>
+        </div>
+
+        <div class="honor-timeline">
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2026</span>
+            <ul class="honor-items">
+              <li><strong>RMUL 3V3 对抗赛（非甲级组）</strong><span>二等奖</span></li>
+              <li><strong>RMUL 步兵对抗赛</strong><span>二等奖</span></li>
+              <li><strong>RMUL 工程挑战赛</strong><span>三等奖</span></li>
+              <li><strong>机器人竞技奖 · 英雄机器人组</strong><span>一等奖</span></li>
+              <li><strong>机器人竞技奖 · 步兵 / 哨兵组</strong><span>三等奖</span></li>
+            </ul>
+          </div>
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2025</span>
+            <ul class="honor-items">
+              <li><strong>RMUL 3V3 对抗赛</strong><span>二等奖</span></li>
+              <li><strong>机器人竞技奖 · 步兵组</strong><span>一等奖</span></li>
+              <li><strong>机器人竞技奖 · 英雄组</strong><span>二等奖</span></li>
+              <li><strong>机器人竞技奖 · 哨兵组</strong><span>三等奖</span></li>
+            </ul>
+          </div>
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2024</span>
+            <ul class="honor-items">
+              <li><strong>RMUC 区域赛</strong><span>三等奖</span></li>
+              <li><strong>RMUL 3V3 对抗赛（甲级组）</strong><span>三等奖</span></li>
+              <li><strong>RMUL 步兵对抗赛</strong><span>二等奖</span></li>
+              <li><strong>机器人竞技奖 · 步兵 / 英雄 / 哨兵组</strong><span>三等奖</span></li>
+            </ul>
+          </div>
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2023</span>
+            <ul class="honor-items">
+              <li><strong>RMUC 全国赛</strong><span>二等奖</span></li>
+              <li><strong>RMUC 区域赛</strong><span>一等奖</span></li>
+              <li><strong>冉冉新星奖</strong><span>—</span></li>
+              <li><strong>RMUL 3V3 对抗赛（甲级组）</strong><span>二等奖</span></li>
+            </ul>
+          </div>
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2022</span>
+            <ul class="honor-items">
+              <li><strong>RMUC 全国赛</strong><span>三等奖</span></li>
+              <li><strong>RMUC 区域赛</strong><span>二等奖</span></li>
+              <li><strong>技术组别奖 · 嵌入式</strong><span>一等奖</span></li>
+              <li><strong>技术组别奖 · 机械 / 算法</strong><span>二等奖</span></li>
+            </ul>
+          </div>
+          <div class="honor-row reveal">
+            <span class="honor-row-year">2021</span>
+            <ul class="honor-items">
+              <li><strong>RMUC 全国赛</strong><span>三等奖</span></li>
+              <li><strong>RMUC 区域赛</strong><span>二等奖</span></li>
+              <li><strong>RMUL 3V3 / 步兵对抗赛</strong><span>二等奖</span></li>
+              <li><strong>机器人外观设计奖 · 哨兵</strong><span>—</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <a class="link-arrow" href="https://bbs.robomaster.com/reg/team-space?teamId=73" target="_blank" rel="noopener">
+          查看完整赛事与获奖记录
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <section class="section engineering" id="engineering">
+      <div class="container">
+        <div class="section-head split">
+          <div>
+            <p class="section-index">04 / ENGINEERING</p>
+            <h2>一台机器人上场前，<br/>要经过五道关。</h2>
+          </div>
+          <p class="section-desc">比赛只有几分钟，功夫在赛场之外。方案、设计、装配、调试、复盘，每一步都决定机器人能不能按预期战斗。</p>
+        </div>
+
+        <ol class="process">
+          <li class="reveal"><span class="process-num">01</span><h3>方案与仿真</h3><p>拆解规则，定义指标，完成结构方案与风险清单。</p></li>
+          <li class="reveal"><span class="process-num">02</span><h3>设计与加工</h3><p>三维建模、出图，完成结构件加工与装配验证。</p></li>
+          <li class="reveal"><span class="process-num">03</span><h3>装配与布线</h3><p>机械装配、线束规划、电源与气路管理。</p></li>
+          <li class="reveal"><span class="process-num">04</span><h3>电控与算法</h3><p>嵌入式控制、视觉识别、导航与决策联调。</p></li>
+          <li class="reveal"><span class="process-num">05</span><h3>赛场与复盘</h3><p>对抗测试、战术演练，用赛后数据修正下一版。</p></li>
+        </ol>
+
+        <div class="disciplines">
+          <span class="disciplines-label">DISCIPLINES</span>
+          <ul>
+            <li>机械结构</li>
+            <li>嵌入式电控</li>
+            <li>视觉感知</li>
+            <li>运动与决策</li>
+            <li>战队运营</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="join" id="join">
+      <div class="container join-grid">
+        <div class="join-copy">
+          <p class="section-index">05 / JOIN US</p>
+          <h2>下一台机器人，<br/>等你一起造。</h2>
+          <p>我们面向湖北工业大学在校生招募。无论你来自机械、电子、计算机、自动化还是其他专业，只要你愿意把想法做成能上场的东西，这里都有你的位置。</p>
+          <ul class="role-list">
+            <li>机械</li><li>电控</li><li>视觉</li><li>算法</li><li>运营</li>
+          </ul>
+          <p class="join-note">招新安排以校内社团公告为准。</p>
+        </div>
+
+        <div class="join-card">
+          <span class="join-card-label">TEAM SPACE</span>
+          <h3>在 RoboMaster 战队空间<br/>查看我们的完整档案</h3>
+          <p>参赛记录、获奖记录与队伍信息，均由官方赛事系统维护。</p>
+          <div class="join-actions">
+            <a class="btn btn-primary" href="https://bbs.robomaster.com/reg/team-space?teamId=73" target="_blank" rel="noopener">
+              前往战队空间
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12L12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            </a>
+            <a class="btn btn-outline" href="https://www.robomaster.com/zh-CN" target="_blank" rel="noopener">了解 RoboMaster</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <img src="/lab_site/static/src/img/team-logo.png" alt="力创RM战队队徽" width="40" height="40" loading="lazy"/>
+        <div>
+          <strong>湖北工业大学 · 力创RM战队</strong>
+          <span>热爱我的热爱</span>
+        </div>
+      </div>
+
+      <nav class="footer-nav" aria-label="页脚导航">
+        <a href="#about">战队档案</a>
+        <a href="#robots">机器人系统</a>
+        <a href="#honors">赛事荣誉</a>
+        <a href="#join">加入我们</a>
+      </nav>
+
+      <div class="footer-meta">
+        <p>本站为力创RM战队展示站点，非 RoboMaster 官方网站。机器人形象与部分赛场图片来自 RoboMaster 官方公开素材，战队照片由队员提供。</p>
+        <p><a href="https://www.robomaster.com/zh-CN" target="_blank" rel="noopener">RoboMaster 官网</a><span aria-hidden="true"> · </span><a href="https://bbs.robomaster.com/reg/team-space?teamId=73" target="_blank" rel="noopener">战队空间</a></p>
+        <p class="footer-copy">© 2026 湖北工业大学 力创RM战队</p>
+      </div>
+    </div>
+  </footer>
+
+  
+
+            </div>
+            <link rel="stylesheet" href="/lab_site/static/src/css/site.css"/>
+            <script src="/lab_site/static/src/js/site.js"></script>
+        </xpath>
+    </template>
+</odoo>

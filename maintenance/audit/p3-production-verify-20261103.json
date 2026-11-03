@@ -1,0 +1,877 @@
+{
+ "status": "PASS",
+ "checked_at": "2026-11-03T00:35:28.437358+00:00",
+ "checks_total": 129,
+ "checks_failed": 0,
+ "failures": [],
+ "checks": [
+  {
+   "check": "db.lab_team_web.version",
+   "expect": "19.0.1.2.0",
+   "actual": "19.0.1.2.0",
+   "ok": true
+  },
+  {
+   "check": "db.lab_workflow.version",
+   "expect": "19.0.2.0.0",
+   "actual": "19.0.2.0.0",
+   "ok": true
+  },
+  {
+   "check": "db.lab_location_mapping",
+   "expect": "t",
+   "actual": "t",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.rows",
+   "expect": "2",
+   "actual": "2",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.products",
+   "expect": "1",
+   "actual": "1",
+   "ok": true
+  },
+  {
+   "check": "db.stock_location.rows",
+   "expect": "16",
+   "actual": "16",
+   "ok": true
+  },
+  {
+   "check": "db.res_users.active",
+   "expect": "3",
+   "actual": "3",
+   "ok": true
+  },
+  {
+   "check": "db.store_fname.distinct",
+   "expect": "139",
+   "actual": "139",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.qty_total",
+   "expect": "0.00",
+   "actual": "0.00",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.reserved_total",
+   "expect": "0.00",
+   "actual": "0.00",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.fp_qty",
+   "expect": "c3a3a002318aad1424a4d8f754988ce8da88aa2afa05c9409c3282d0fdf7d57a",
+   "actual": "c3a3a002318aad1424a4d8f754988ce8da88aa2afa05c9409c3282d0fdf7d57a",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.fp_reserved",
+   "expect": "099b82bb85a78473e6317a7d84fc8090353cac79e71a71fb642f257f5f5621f2",
+   "actual": "099b82bb85a78473e6317a7d84fc8090353cac79e71a71fb642f257f5f5621f2",
+   "ok": true
+  },
+  {
+   "check": "db.stock_quant.fp_rows",
+   "expect": "2",
+   "actual": "2",
+   "ok": true
+  },
+  {
+   "check": "db.attachment.business_rows",
+   "expect": "177",
+   "actual": "177",
+   "ok": true
+  },
+  {
+   "check": "db.attachment.business_fp",
+   "expect": "e30d3b00c4ca4d7ba079b5af619ae9fd79b1d0554c420b7eab0e1ffc50b47f4f",
+   "actual": "e30d3b00c4ca4d7ba079b5af619ae9fd79b1d0554c420b7eab0e1ffc50b47f4f",
+   "ok": true
+  },
+  {
+   "check": "db.attachment.all_rows_informational",
+   "expect": "recorded only - assets may change",
+   "actual": "423",
+   "ok": true
+  },
+  {
+   "check": "origin/login",
+   "expect": "200",
+   "actual": "200",
+   "ok": true
+  },
+  {
+   "check": "origin/web/login",
+   "expect": "200",
+   "actual": "200",
+   "ok": true
+  },
+  {
+   "check": "origin/team/login",
+   "expect": "200",
+   "actual": "200",
+   "ok": true
+  },
+  {
+   "check": "origin/lab",
+   "expect": "303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "origin/team/scan",
+   "expect": "303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "origin/team/lab/receipts",
+   "expect": "303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "origin/lab/api/inventory/bags",
+   "expect": "405",
+   "actual": "405",
+   "ok": true
+  },
+  {
+   "check": "origin/nonexistent-xyz",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "gateway./__lc_origin_probe",
+   "expect": "200",
+   "actual": "200",
+   "ok": true
+  },
+  {
+   "check": "gateway/team/scan",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway/team/lab/receipts",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway/lab/bags",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway/lab/receipts",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_scan_console",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_bag",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_issue_line",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_return_wizard",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_label_open",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_location",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_workflow.action_lab_operation",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_catalog.action_lab_unified_catalog_client",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_catalog.view_lab_catalog_item_action",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_catalog.view_lab_catalog_binding_action",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_inventory.action_lab_product",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_inventory.action_lab_location",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway./odoo/action-lab_inventory.action_lab_mapping",
+   "expect": [
+    "301",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.page_post_denied",
+   "expect": [
+    "403",
+    "404",
+    "405"
+   ],
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_scan_console",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_bag",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_issue_line",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_return_wizard",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_label_open",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_location",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_workflow.action_lab_operation",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_catalog.action_lab_unified_catalog_client",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_catalog.view_lab_catalog_item_action",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_catalog.view_lab_catalog_binding_action",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_inventory.action_lab_product",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_inventory.action_lab_location",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.lab_inventory.action_lab_mapping",
+   "expect": "one of 403/404/405",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_post_denied.count",
+   "expect": "13",
+   "actual": "13",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_scan_console",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_bag",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_issue_line",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_return_wizard",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_label_open",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_location",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_workflow.action_lab_operation",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_catalog.action_lab_unified_catalog_client",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_catalog.view_lab_catalog_item_action",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_catalog.view_lab_catalog_binding_action",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_inventory.action_lab_product",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_inventory.action_lab_location",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.lab_inventory.action_lab_mapping",
+   "expect": "one of 301/302/303",
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "gateway.legacy_action_head_allowed.count",
+   "expect": "13",
+   "actual": "13",
+   "ok": true
+  },
+  {
+   "check": "gateway.api_get_denied",
+   "expect": [
+    "403",
+    "404",
+    "405"
+   ],
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "gateway.blocked/web/login",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "gateway.blocked/web/database/manager",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "gateway.blocked/jsonrpc",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "gateway.blocked/web/dataset/call_kw",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "gateway.cross_origin_denied",
+   "expect": "403",
+   "actual": "403",
+   "ok": true
+  },
+  {
+   "check": "public/team/scan",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "public/team/lab/receipts",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "public/lab/bags",
+   "expect": [
+    "200",
+    "302",
+    "303"
+   ],
+   "actual": "303",
+   "ok": true
+  },
+  {
+   "check": "public.blocked/web/login",
+   "expect": "404",
+   "actual": "404",
+   "ok": true
+  },
+  {
+   "check": "public.api_reachable",
+   "expect": [
+    "200",
+    "400",
+    "403",
+    "415"
+   ],
+   "actual": "415",
+   "ok": true
+  },
+  {
+   "check": "origin.static.workflow_core.sha256",
+   "expect": "6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936",
+   "actual": "6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_site.file_count",
+   "expect": "19",
+   "actual": "19",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_site.content",
+   "expect": "identical to frozen manifest",
+   "actual": "missing=0 extra=0 changed=0",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_team_web.file_count",
+   "expect": "58",
+   "actual": "58",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_team_web.content",
+   "expect": "identical to frozen manifest",
+   "actual": "missing=0 extra=0 changed=0",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_theme.file_count",
+   "expect": "6",
+   "actual": "6",
+   "ok": true
+  },
+  {
+   "check": "installed.lab_theme.content",
+   "expect": "identical to frozen manifest",
+   "actual": "missing=0 extra=0 changed=0",
+   "ok": true
+  },
+  {
+   "check": "db.menu_actions.present",
+   "expect": "13",
+   "actual": "13",
+   "ok": true
+  },
+  {
+   "check": "menu.removed",
+   "expect": "0",
+   "actual": "0",
+   "ok": true
+  },
+  {
+   "check": "menu.added",
+   "expect": "1",
+   "actual": "1",
+   "ok": true
+  },
+  {
+   "check": "menu.changed",
+   "expect": "12",
+   "actual": "12",
+   "ok": true
+  },
+  {
+   "check": "menu.match",
+   "expect": "1",
+   "actual": "1",
+   "ok": true
+  },
+  {
+   "check": "menu.added.xmlids",
+   "expect": "lab_team_web.menu_legacy_label_wizard",
+   "actual": "lab_team_web.menu_legacy_label_wizard",
+   "ok": true
+  },
+  {
+   "check": "menu.snapshot.before_sha256",
+   "expect": "3eb392d032ae1c0ed7a78456cd837c89aa1dc9f7ffc3f167c2e211b24a5e7c2a",
+   "actual": "3eb392d032ae1c0ed7a78456cd837c89aa1dc9f7ffc3f167c2e211b24a5e7c2a",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_root.id",
+   "expect": "non-zero",
+   "actual": "329",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_root.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_scan.id",
+   "expect": "non-zero",
+   "actual": "342",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_scan.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_issue_line.id",
+   "expect": "non-zero",
+   "actual": "343",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_issue_line.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_bag.id",
+   "expect": "non-zero",
+   "actual": "344",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_bag.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_operation_list.id",
+   "expect": "non-zero",
+   "actual": "345",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_operation_list.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_location.id",
+   "expect": "non-zero",
+   "actual": "347",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_location.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_labels.id",
+   "expect": "non-zero",
+   "actual": "348",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_workflow.menu_lab_labels.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_product.id",
+   "expect": "non-zero",
+   "actual": "330",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_product.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_location.id",
+   "expect": "non-zero",
+   "actual": "331",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_location.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_mapping.id",
+   "expect": "non-zero",
+   "actual": "332",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_inventory.menu_lab_mapping.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_catalog.menu_lab_unified_catalog.id",
+   "expect": "non-zero",
+   "actual": "335",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_catalog.menu_lab_unified_catalog.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_catalog.menu_lab_catalog_binding.id",
+   "expect": "non-zero",
+   "actual": "338",
+   "ok": true
+  },
+  {
+   "check": "menu.changed.lab_catalog.menu_lab_catalog_binding.fields",
+   "expect": "subset of action",
+   "actual": "action",
+   "ok": true
+  },
+  {
+   "check": "menu.snapshot.after_sha256",
+   "expect": "recorded - differs by design when menus are added",
+   "actual": "43a0323e775145a837dc2f949e7ae539cc439e1803a24a3cf82e90ac4860da12",
+   "ok": true
+  },
+  {
+   "check": "menu.tree.stable_outside_declared",
+   "expect": "bafa905fc5f5fdb65fe3ea72af42647e78300b685d5323b9764db26e9ec64b8c",
+   "actual": "bafa905fc5f5fdb65fe3ea72af42647e78300b685d5323b9764db26e9ec64b8c",
+   "ok": true
+  },
+  {
+   "check": "menu.added.lab_team_web.menu_legacy_label_wizard.id",
+   "expect": "non-zero",
+   "actual": "382",
+   "ok": true
+  },
+  {
+   "check": "menu.added.lab_team_web.menu_legacy_label_wizard.in_delta",
+   "expect": "true",
+   "actual": "true",
+   "ok": true
+  },
+  {
+   "check": "menu.added.lab_team_web.menu_legacy_label_wizard.parent",
+   "expect": "lab_workflow.menu_lab_config",
+   "actual": "lab_workflow.menu_lab_config",
+   "ok": true
+  },
+  {
+   "check": "menu.added.lab_team_web.menu_legacy_label_wizard.action",
+   "expect": "lab_workflow.action_lab_label_open",
+   "actual": "lab_workflow.action_lab_label_open",
+   "ok": true
+  },
+  {
+   "check": "menu.added.lab_team_web.menu_legacy_label_wizard.active",
+   "expect": "true",
+   "actual": "true",
+   "ok": true
+  },
+  {
+   "check": "runtime.odoo_service_active",
+   "expect": "active",
+   "actual": "active",
+   "ok": true
+  },
+  {
+   "check": "runtime.odoo_nrestarts",
+   "expect": "informational",
+   "actual": "0",
+   "ok": true
+  }
+ ],
+ "_note": "生产 50-verify 原始输出（root 侧生成于 /var/tmp/lc-deploy/verify-20261103T003528Z.json），2026-11-03 从部署证据归档取出；不含口令/cookie/token/odoo.conf 内容或数据库行数据。归档 sha256 见 maintenance/audit/p3-production-deploy-20261103.md。"
+}

@@ -1,0 +1,129 @@
+{
+  "date": "2026-10-24",
+  "status": "installed; HTTP functional checks passed; browser visual acceptance blocked",
+  "authorization": "User requested deploying the supplied lab_portal update",
+  "module": "lab_portal",
+  "version": "19.0.1.0.0",
+  "source_manifest": "maintenance/registry/source-server-portal-final-20261024.json",
+  "source_tree_sha256": "3e097d12bfee93577b3d8a7ba954f2260a2fbd91844f60b89d3eb340978820bd",
+  "source_files": 154,
+  "production_module_files_match": 130,
+  "existing_module_files_unchanged": 108,
+  "package": {
+    "file": "server/releases/2026-10-24-portal/server-portal-19.0.1.0.0.tar.gz",
+    "bytes": 12611497,
+    "sha256": "8e54e2e1e51c63ca792ab8888010f958ba4feaa0baea0b09f48228b1af2c77e7"
+  },
+  "repairs": [
+    "Converted invalid HTML/XML and nonexistent web.login XPath inheritance to standalone QWeb homepage",
+    "Implemented website homepage controller; native login left intact",
+    "Fixed static asset paths directly",
+    "Removed login-hiding CSS and global asset injection",
+    "Replaced unsafe deployment script with preflight-only helper"
+  ],
+  "environment": "Existing Ubuntu22.04 Odoo19 Python3.12 production; website dependency already installed; no packages installed",
+  "isolated_validation": {
+    "disposable_database": "lc_portal_verify_20261024",
+    "install_exit_code": 0,
+    "install_errors": 0,
+    "homepage_status": 200,
+    "content_sections": 5,
+    "assets_verified": 13,
+    "native_login_form_and_csrf": true,
+    "invalid_login_retains_form_and_error": true,
+    "database_removed_after_test": true,
+    "initial_attempt": "Logfile could not be created in root-owned stage; precreated owned logfile and reran successfully; initial attempt not counted as passed"
+  },
+  "production_install": {
+    "selected_modules": [
+      "lab_portal"
+    ],
+    "flag": "-i",
+    "exit_code": 0,
+    "errors": 0,
+    "critical": 0,
+    "tracebacks": 0,
+    "service": "active"
+  },
+  "backup": {
+    "path": "/var/backups/lc-elc/20261024T124820Z-before-portal",
+    "db_dump": {
+      "bytes": 110513551,
+      "sha256": "7b855ade5e1bf904a9b237041eee51f68e12221420b149d9189678754d69ae81"
+    },
+    "filestore": {
+      "bytes": 12497262,
+      "sha256": "361ee7f386faa95eaebe421c3d4811ba434d35a117c9431e74df247a66f75065",
+      "files_verified": 141
+    },
+    "pg_restore_list_exit_code": 0,
+    "old_source": {
+      "file": "/opt/odoo/deployments/portal-20261024-a1/old-source.tar.gz",
+      "bytes": 11711196,
+      "sha256": "9995e8dd11fae431a8e221acaa8670fc03979244c6d10237af129a6538270fe6"
+    },
+    "portal_previously_absent": true
+  },
+  "verification": {
+    "anonymous_homepage": 200,
+    "native_login_form_and_csrf": true,
+    "served_assets_with_exact_source_hash": 13,
+    "authenticated_root_redirect": {
+      "status": 303,
+      "target": "/odoo"
+    },
+    "authenticated_backend": 200,
+    "temporary_auth_sessions_removed": 1,
+    "inventory_before_after": {
+      "bag": 1,
+      "quant": 2,
+      "move": 1,
+      "operation": 1,
+      "catalog": 695217,
+      "location": 16,
+      "pending": 1,
+      "trace": 2
+    },
+    "quantity_and_reserved": [
+      0,
+      0
+    ],
+    "android_update": 200,
+    "windows_update": 204,
+    "linux_update": 204,
+    "stable_manifest_hash_unchanged": true,
+    "runtime_log_lines": 122,
+    "runtime_errors": 0,
+    "maintenance_tests": {
+      "passed": 11,
+      "exit_code": 0
+    },
+    "lan_http": {
+      "homepage": 200,
+      "native_login": 200,
+      "android_manifest": 200
+    },
+    "repo_check": {
+      "full_exit_code": 1,
+      "full_passed": 49,
+      "full_error_count": 30,
+      "cause": "Unrelated untracked Python3.15 stdlib parsed by Python3.12; all errors under Python/",
+      "scoped_exit_code": 0,
+      "scoped_passed": 49,
+      "scope": "Only /Python/ excluded temporarily for this process; repository ignore unchanged",
+      "known_warning": "production-py312-rebuild",
+      "payload_verification": false
+    },
+    "git_diff_check_exit_code": 0
+  },
+  "resolved_incident": "The disposable test database temporarily caused public requests to enter Odoo database selection. Removed only this task's disposable database; repeated public homepage/login and authenticated routing checks all passed without changing production config.",
+  "not_verified": [
+    "Visual/mobile acceptance: IAB and Edge attachment timed out; native Computer Use stopped because current URL could not be determined confidently",
+    "Real password login not tested; native form/CSRF and temporary authenticated session tested",
+    "Previous dark backend white-table/pale-text and purple-menu issue remains unresolved",
+    "Off-machine backup and full restore drill",
+    "Full offline payload hash validation"
+  ],
+  "source_control": "Working tree not committed; no GitHub push",
+  "remote_stage": "/opt/odoo/deployments/portal-20261024-a1"
+}

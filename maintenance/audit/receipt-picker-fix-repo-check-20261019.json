@@ -1,0 +1,170 @@
+{
+  "result": "PASS",
+  "passed_checks": 49,
+  "git_candidate_files": 508,
+  "errors": [],
+  "warnings": [
+    {
+      "check": "known-payload-not-built",
+      "id": "production-py312-rebuild",
+      "recovery": "See registered preparation commands; this is not a complete offline closure."
+    }
+  ],
+  "checks": [
+    {
+      "check": "component-source:client"
+    },
+    {
+      "check": "component-tracked:client"
+    },
+    {
+      "check": "component-source:odoo"
+    },
+    {
+      "check": "component-tracked:odoo"
+    },
+    {
+      "check": "component-source:server-ops"
+    },
+    {
+      "check": "component-tracked:server-ops"
+    },
+    {
+      "check": "component-source:eda"
+    },
+    {
+      "check": "component-tracked:eda"
+    },
+    {
+      "check": "component-source:crawler"
+    },
+    {
+      "check": "component-tracked:crawler"
+    },
+    {
+      "check": "component-source:catalog-import"
+    },
+    {
+      "check": "component-tracked:catalog-import"
+    },
+    {
+      "check": "component-source:maintenance"
+    },
+    {
+      "check": "component-tracked:maintenance"
+    },
+    {
+      "check": "odoo-manifest:lab_inventory",
+      "details": "19.0.1.0.0"
+    },
+    {
+      "check": "odoo-manifest:lab_catalog",
+      "details": "19.0.2.0.3"
+    },
+    {
+      "check": "odoo-manifest:lab_workflow",
+      "details": "19.0.1.2.0"
+    },
+    {
+      "check": "frozen-source:client",
+      "details": 163
+    },
+    {
+      "check": "frozen-source:server",
+      "details": 130
+    },
+    {
+      "check": "frozen-source:eda",
+      "details": 63
+    },
+    {
+      "check": "payload-method:flutter-windows"
+    },
+    {
+      "check": "payload-method:flutter-linux"
+    },
+    {
+      "check": "payload-method:android-cmdline-tools"
+    },
+    {
+      "check": "payload-method:android-jdk17"
+    },
+    {
+      "check": "payload-method:android-platform36"
+    },
+    {
+      "check": "payload-method:android-buildtools36"
+    },
+    {
+      "check": "payload-method:android-ndk28"
+    },
+    {
+      "check": "payload-method:windows-vc-runtime"
+    },
+    {
+      "check": "payload-method:odoo-source"
+    },
+    {
+      "check": "payload-method:ubuntu-server-debs"
+    },
+    {
+      "check": "payload-method:odoo-py310-wheels"
+    },
+    {
+      "check": "payload-method:crawler-wheels"
+    },
+    {
+      "check": "payload-method:barcode-py312"
+    },
+    {
+      "check": "payload-method:flutter-expanded-toolchains"
+    },
+    {
+      "check": "payload-method:pub-caches"
+    },
+    {
+      "check": "payload-method:gradle-cache"
+    },
+    {
+      "check": "payload-method:linux-runtime-debs"
+    },
+    {
+      "check": "payload-method:eda-node-windows"
+    },
+    {
+      "check": "payload-method:eda-npm-cache"
+    },
+    {
+      "check": "payload-method:current-client-releases"
+    },
+    {
+      "check": "payload-method:current-eda-release"
+    },
+    {
+      "check": "payload-method:current-server-release"
+    },
+    {
+      "check": "payload-method:catalog-checkpoint"
+    },
+    {
+      "check": "payload-method:production-backup"
+    },
+    {
+      "check": "payload-method:windows-msvc"
+    },
+    {
+      "check": "payload-method:android-signing-key"
+    },
+    {
+      "check": "payload-method:wsl-build-tools"
+    },
+    {
+      "check": "payload-method:production-py312-rebuild"
+    },
+    {
+      "check": "payload-method:catalog-sqlite-file"
+    }
+  ],
+  "production_access": false,
+  "payload_verification": false
+}

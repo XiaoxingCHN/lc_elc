@@ -12,3 +12,5 @@ python tools/generate_routes.py --check
 变更API时同时检查server方法的真实输入、返回JSON信封、权限和幂等语义，更新客户端lab_api_client.dart与EDA调用方。路由表不是完整业务schema，不会自动证明权限或库存事务正确。
 
 旧business_api_contract.json/catalog_api_contract.json原稿保存在local/archive/docs-original，可能早于最近修复，不能用它们覆盖当前实现。确认其内容后才可作为新的契约基线。
+
+客户端更新器新增两个普通GET接口，独立于上述库存JSON-RPC：`/lab/client/updates/manifest`为匿名最小签名清单，`/lab/client/updates/assets/{release_id}/{filename}`要求合法登录及lab角色。状态码、签名载荷、平台匹配及发布布局见[实现契约](CLIENT_UPDATE_IMPLEMENTATION.md)。路由登记现为32项；新接口仅开发/隔离验证，尚未上线。

@@ -31,10 +31,12 @@ class _AuthRouterRefresh extends ChangeNotifier {
   }
 }
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRouterRefresh(ref);
 
   final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     // Startup lands on the loading screen, never straight on the login form:
     // the remembered account / automatic login must be resolved first.
     initialLocation: '/splash',

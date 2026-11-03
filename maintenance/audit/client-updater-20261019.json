@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-19",
+  "status": "implemented candidate; not deployed or published",
+  "client_version": "1.1.1+4",
+  "server_candidate_version": "19.0.1.2.0",
+  "production_version_unchanged": "19.0.1.1.0",
+  "client_source_manifest": "maintenance/registry/source-client-updater-releasecheck-20261019.json",
+  "client_source_tree_sha256": "18bd51c6ca222d3e2151e09f00f0b56b895638cb3749de67f182ac7a8b35803a",
+  "server_source_manifest": "maintenance/registry/source-server-updater-20261019.json",
+  "server_source_tree_sha256": "446e7ada847f86c15572f808c3175723e6e533dea845a0c0fd9e63f6b3ec841e",
+  "defaults": {
+    "server": "http://127.0.0.1:18069",
+    "database": "lc_candidate_test"
+  },
+  "environment": {
+    "windows": "Flutter3.47.7, MSVC14.44.35207, CMake4.1.1, Ninja",
+    "android": "WSL Ubuntu22.04, Flutter3.47.7, JDK17, SDK36, registered existing debug signing identity",
+    "linux": "WSL Ubuntu22.04, Flutter3.47.7, clang14/CMake3.22.1; private libsecret dev sysroot; existing PDFium5200"
+  },
+  "validation": {
+    "flutter_all": {
+      "passed": 264,
+      "skipped": 5,
+      "exit_code": 0,
+      "command": "flutter test"
+    },
+    "updater_subset_included_in_all": {
+      "passed": 22,
+      "exit_code": 0
+    },
+    "maintenance": {
+      "passed": 10,
+      "skipped": 1,
+      "exit_code": 0,
+      "skipped_reason": "Windows symlink privilege unavailable",
+      "command": "python -m unittest discover -s maintenance/checks -v"
+    },
+    "odoo_isolation": {
+      "collected": 55,
+      "passed": 54,
+      "skipped": 1,
+      "exit_code": 0,
+      "command": "bash server/ubuntu22.04/odoo_addons/lab_workflow/tools/run_isolation_tests.sh --keep --with-http --skip-process-concurrency --real-catalog <current-addons>",
+      "skipped_reason": "In-process concurrency skipped; separate real HTTP concurrency passed."
+    },
+    "http_concurrency": {
+      "passed": 6,
+      "exit_code": 0
+    },
+    "dart_analyze": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 105,
+      "exit_code": 0,
+      "command": "flutter analyze --no-fatal-infos"
+    },
+    "ui_actual_flutter_render": {
+      "passed": 1,
+      "exit_code": 0,
+      "path": "local/build/updater-20261019/update-panel.png"
+    },
+    "native_helper_invalid_signature": {
+      "windows": {
+        "expected_exit_code": 1,
+        "actual_exit_code": 1,
+        "result": {
+          "status": "failed",
+          "old_version_retained": true
+        }
+      },
+      "linux": {
+        "expected_exit_code": 1,
+        "actual_exit_code": 1,
+        "result": {
+          "status": "failed",
+          "old_version_retained": true
+        }
+      }
+    },
+    "android_apksigner": {
+      "exit_code": 0,
+      "certificate_matches_existing": true
+    },
+    "repository": {
+      "command": "python tools/repo_check.py --output maintenance/audit/client-updater-repo-check-20261019.json",
+      "passed_checks": 49,
+      "exit_code": 0,
+      "verify_payloads": "not run",
+      "known_warning": "production-py312-rebuild"
+    },
+    "git_diff_check": {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  },
+  "artifacts": [
+    {
+      "platform": "windows",
+      "path": "local/build/updater-20261019/LC_ELC-Windows-1.1.1+4-validated-candidate.zip",
+      "bytes": 19181771,
+      "sha256": "88dea57f1246c05aa17e8635c7b74c56c2fcfe4a245eb0fcc7d8a37c10be1ebb",
+      "build_exit_code": 0,
+      "source_check": {
+        "files": 162,
+        "mismatches": []
+      },
+      "installation_marker": {
+        "app_id": "com.example.lab_inventory_client",
+        "layout": 1,
+        "version": "1.1.1",
+        "build": 4,
+        "platform": "windows"
+      },
+      "helper_sha256": "cb07c7f64d1d34cce8ce5c6f4deb6a0cff380312741de94abc66480a870ef312"
+    },
+    {
+      "platform": "android",
+      "path": "local/build/updater-20261019/LC_ELC-Android-1.1.1+4-validated-candidate.apk",
+      "bytes": 74777509,
+      "sha256": "45dca7848bee1ff992ce9e73789bda3e7f2682aabd36aacfcaae3aba97cd4b92",
+      "build_exit_code": 0,
+      "source_check": {
+        "files": 162,
+        "mismatches": []
+      },
+      "certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43"
+    },
+    {
+      "platform": "linux",
+      "path": "local/build/updater-20261019/LC_ELC-Linux-1.1.1+4-validated-candidate.tar.gz",
+      "bytes": 16471442,
+      "sha256": "38eec49f0c2c885d92188ff1f90803d140cf56cb4d2af29d5dd63bce7be36259",
+      "build_exit_code": 0,
+      "helper_mode": "0o755",
+      "source_check": {
+        "files": 162,
+        "mismatches": []
+      },
+      "linked_libraries": [
+        {
+          "file": "lab_inventory_client",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "client_update_helper",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libapp.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libflutter_linux_gtk.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libflutter_secure_storage_linux_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libpdfium.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/libprinting_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        },
+        {
+          "file": "lib/liburl_launcher_linux_plugin.so",
+          "exit_code": 0,
+          "missing": []
+        }
+      ],
+      "installation_marker": {
+        "app_id": "com.example.lab_inventory_client",
+        "layout": 1,
+        "version": "1.1.1",
+        "build": 4,
+        "platform": "linux"
+      }
+    }
+  ],
+  "log_sha256": {
+    "local/build/updater-flutter-releasecheck.log": "a16186a8afece9cb4a8c1137229c76e04bff7fafba490cac222141c8483e45d0",
+    "local/build/updater-protocol-verified.log": "6ba5cdd3892beaa5bfad29dfd7e8a53a415458a691632cc13bea5e5f1040c0dc",
+    "local/build/updater-maintenance-tests-final.log": "3e7a6a4c904772efd0447cc60f402740c19d24ad10030f91610b45733a687d84",
+    "local/build/updater-analyze-releasecheck.log": "aef899ae582bc110504d80110d16a81db1f5d1cc0cbbcf71412d0a03e8a0e533",
+    "local/build/updater-odoo-isolation-final.log": "5c7169ca778e34fe4daedb1effb6ad910dd56b877694db90b3fd704de531d5ae",
+    "local/build/updater-ui-evidence.log": "6acdcb3ff714d745549cd3ea3938d91ba0293adb617f0db5d9bc91ae065da113",
+    "local/build/updater-20261019/android-releasecheck.log": "c899e12aad059eccc0485ad30fded95933c7057e34a346411e89f42bc08dbbbe",
+    "local/build/updater-20261019/android-signature.log": "074fc3c6d9c6107f19cb8b4ed97bb5cccd4308a85e24a711fd86eb76f574d489",
+    "local/build/updater-20261019/linux-releasecheck.log": "6d55996ead4cee4eb739e1880a3dcca29f0f903c04f6d342ff8adf2c03060d74",
+    "local/build/client-windows-20261019T174544742/native-releasecheck.log": "df44fd313a3c3bd237c8eb3a541589a532f0967bfdf3c15934e549e2096d6c52",
+    "local/build/client-windows-20261019T174544742/helper-releasecheck.log": "04172d13132b326757476639c74896c6b0263f204e82794997b672e8c56ad27a",
+    "local/build/updater-20261019/native-negative-windows.json.result": "8630c319c43057bd16c97b7124e1b2a68fa3e81267a05c6174429add017c9daf",
+    "local/build/updater-20261019/native-negative-linux.json.result": "8630c319c43057bd16c97b7124e1b2a68fa3e81267a05c6174429add017c9daf"
+  },
+  "not_verified": [
+    "Real Android system install/permission confirmation on a physical device",
+    "Full Windows/Linux upgrade and rollback with two actual native app versions",
+    "Metered network detection on real devices",
+    "Power-loss interruption recovery",
+    "Physical scanner/printer",
+    "Publishing stable manifest or deployment of new server endpoint"
+  ],
+  "notes": [
+    "Initial login widget fixtures left automatic-check timers; tests now explicitly isolate update networking and UpdateHost pauses retries on disposal.",
+    "First HTTP isolation run aborted because masked /dev had no random devices; preserving standard device binds fixed it. Initial failed logs retained separately.",
+    "Initial Windows helper preparation hit system text encoding; explicit UTF8 fixed it.",
+    "No source push, production changes, or installation of these candidates occurred in this task.",
+    "Real transport tests exposed interceptor ordering; request tracking now precedes error translators. Windows directory rename retries handle transient locks.",
+    "Repository CI dependency setup updated locally; GitHub Actions not run."
+  ],
+  "source_base_commit": "8df35b502f89c6f61dfdfddbece3f22c5a7f559e",
+  "working_tree_dirty_at_build": true
+}

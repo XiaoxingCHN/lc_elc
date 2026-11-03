@@ -1,4 +1,3 @@
-import 'package:lab_inventory_client/widgets/lab_ui.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,21 +18,41 @@ import 'status_views.dart';
 /// never disturbs the main library list, and it keeps the same rule as the main
 /// list: search and paging happen on the server.
 class ItemPickerDialog extends ConsumerStatefulWidget {
-  const ItemPickerDialog({super.key, this.title = '选择器件', this.initialQuery = ''});
+  const ItemPickerDialog({
+    super.key,
+    this.title = '选择器件',
+    this.initialQuery = '',
+    this.onCreate,
+  });
 
   final String title;
   final String initialQuery;
+  final VoidCallback? onCreate;
 
   /// Opens the picker and returns the chosen row, or `null`.
   static Future<UnifiedItem?> show(
     BuildContext context, {
     String title = '选择器件',
     String initialQuery = '',
-  }) {
-    return showDialog<UnifiedItem>(
+    Future<void> Function()? onCreate,
+  }) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    var createRequested = false;
+    final item = await showDialog<UnifiedItem>(
       context: context,
-      builder: (context) => ItemPickerDialog(title: title, initialQuery: initialQuery),
+      builder: (context) => ItemPickerDialog(
+        title: title,
+        initialQuery: initialQuery,
+        onCreate: onCreate == null
+            ? null
+            : () {
+                createRequested = true;
+                Navigator.of(context).pop();
+              },
+      ),
     );
+    if (createRequested && context.mounted) await onCreate!();
+    return item;
   }
 
   @override
@@ -41,8 +60,9 @@ class ItemPickerDialog extends ConsumerStatefulWidget {
 }
 
 class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
-  late final TextEditingController _search =
-      TextEditingController(text: widget.initialQuery);
+  late final TextEditingController _search = TextEditingController(
+    text: widget.initialQuery,
+  );
   Timer? _debounce;
 
   CatalogQuery _query = const CatalogQuery();
@@ -80,6 +100,7 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
   }
 
   Future<void> _loadFirstPage() async {
+    if (!mounted) return;
     final token = ++_token;
     setState(() {
       _loading = true;
@@ -144,21 +165,32 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
         child: Column(
           children: <Widget>[
-            LabAppBar(
-              automaticallyImplyLeading: false,
-              title: Text(widget.title),
-              actions: <Widget>[
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
+            // AppBar's preferred height is only applied by Scaffold. In a
+            // Column its flexibleSpace receives unbounded height and breaks
+            // layout. A content-sized header also survives large system text.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: TextField(
                 controller: _search,
-                autofocus: true,
+                autofocus: false,
                 textInputAction: TextInputAction.search,
                 onChanged: _onSearchChanged,
                 onSubmitted: (value) {
@@ -174,34 +206,49 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
                 ),
               ),
             ),
+            if (widget.onCreate != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: widget.onCreate,
+                    icon: const Icon(Icons.add),
+                    label: const Text('自定义 / 新建器件'),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: <Widget>[
-                  Text(
-                    _loading ? '检索中…' : '匹配 $_total 条，已显示 ${_items.length} 条',
-                    style: Theme.of(context).textTheme.labelSmall,
+                  Expanded(
+                    child: Text(
+                      _loading
+                          ? '正在读取立创资料与自定义器件…'
+                          : '匹配 $_total 条，已显示 ${_items.length} 条',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
                   ),
-                  const Spacer(),
                   if (_error != null)
                     Text(
                       '加载失败',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: Theme.of(context).colorScheme.error),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                 ],
               ),
             ),
             const Divider(height: 8),
-            Expanded(
-              child: _buildList(),
-            ),
+            Expanded(child: _buildList()),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+                child: Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
           ],
         ),
@@ -212,7 +259,13 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
   Widget _buildList() {
     if (_loading && _items.isEmpty) return const LoadingView();
     if (_error != null && _items.isEmpty) {
-      return ErrorView(message: _error!, onRetry: _loadFirstPage, compact: true);
+      return SingleChildScrollView(
+        child: ErrorView(
+          message: _error!,
+          onRetry: _loadFirstPage,
+          compact: true,
+        ),
+      );
     }
     if (_items.isEmpty) {
       return const EmptyView(title: '没有匹配的器件', subtitle: '换个关键词或 C 编号再试');
@@ -232,8 +285,14 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
               child: Center(
                 child: _loadingMore
                     ? const SizedBox(
-                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : TextButton(onPressed: _loadMore, child: const Text('加载更多')),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : TextButton(
+                        onPressed: _loadMore,
+                        child: const Text('加载更多'),
+                      ),
               ),
             );
           }
@@ -245,10 +304,15 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
               height: 44,
               compactPlaceholder: true,
             ),
-            title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+            title: Text(
+              item.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             subtitle: Text(
               <String>[
-                if (item.catalogCode.isNotEmpty) displayCatalogCode(item.catalogCode),
+                if (item.catalogCode.isNotEmpty)
+                  displayCatalogCode(item.catalogCode),
                 if (item.subtitle.isNotEmpty) item.subtitle,
                 item.hasStock ? '内部库存 ${item.labQuantityLabel}' : '内部无库存',
               ].join(' · '),

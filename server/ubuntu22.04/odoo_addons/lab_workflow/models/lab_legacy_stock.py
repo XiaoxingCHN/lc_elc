@@ -60,9 +60,19 @@ class LabWorkflowLegacyStock(models.AbstractModel):
     def lab_adopt_untracked_stock(self, item_key, bags, note=''):
         """把现有无批次库存按袋适配为真实批次库存。
 
+        **整单原子**：security-review S3 指出本方法原先没有 SAVEPOINT，
+        业务失败（例如两袋用了同一个 trace_code）时前几袋的 stock.move
+        会随请求 commit 留下残留，而文案却写"已回滚"。
+        现在整段包 SAVEPOINT：任何 LabApiError 都回滚到进入前，零残留。
+
         :param bags: [{'location_id': 1, 'quantity': 10, 'trace_code': None, 'note': ''}]
         :returns: {'bags': [...], 'total_quantity': ..., 'item_key': ...}
         """
+        with self.lab_savepoint():
+            return self._lab_adopt_untracked_stock_once(item_key, bags, note=note)
+
+    @api.model
+    def _lab_adopt_untracked_stock_once(self, item_key, bags, note=''):
         if not self.lab_can_issue_for_others():
             raise LabApiError.forbidden(
                 '历史库存分袋适配会改变整批物料的追溯结构，只有库存管理员可以执行')

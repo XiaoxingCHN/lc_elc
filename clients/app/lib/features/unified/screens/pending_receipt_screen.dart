@@ -14,6 +14,7 @@ import '../models/unified_item.dart';
 import '../providers/inventory_providers.dart';
 import '../providers/unified_providers.dart';
 import '../unified_routes.dart';
+import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
 
@@ -108,6 +109,14 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   Map<String, dynamic>? _createAttempt;
   Map<String, dynamic>? _confirmAttempt;
 
+  /// The card committed by the LAST inline suggestion pick, so a subsequent
+  /// keystroke can drop that selection instead of keeping it armed.
+  String? _suggestPicked;
+
+  /// Bumped on every keystroke / clear so an in-flight archive lookup cannot
+  /// resurrect a selection the operator already replaced.
+  int _selectionSeq = 0;
+
   LabApiClient get _api => ref.read(labApiProvider);
 
   @override
@@ -188,7 +197,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   }
 
   Future<void> _pickItem() async {
-    final item = await ItemPickerDialog.show(context);
+    final item = await ItemPickerDialog.show(context, onCreate: _newItem);
     if (item == null || !mounted) return;
     await _run(() async {
       final detail = await _api.detail(item.itemKey);
@@ -201,6 +210,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
             ? _materials.single.templateId
             : null;
         _createAttempt = null;
+        _error = null;
       });
     });
   }
@@ -219,8 +229,77 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
       _materials = [];
       _templateId = null;
       _createAttempt = null;
+      _error = null;
     });
   }
+
+  /// Commits an inline suggestion: loads its real archives and makes the
+  /// operator pick one when the C code maps to several.
+  ///
+  /// The archives are always re-read from the service; a suggestion never
+  /// carries an archive list that could be stale.
+  Future<void> _selectSuggestion(UnifiedItem item) async {
+    final token = ++_selectionSeq;
+    _suggestPicked = item.itemKey;
+    await _run(() async {
+      final CatalogDetail detail;
+      try {
+        detail = await _api.detail(item.itemKey);
+      } catch (_) {
+        if (!mounted || token != _selectionSeq) return;
+        rethrow;
+      }
+      if (!mounted || token != _selectionSeq) return;
+      setState(() {
+        _item = item;
+        _newMaterial = null;
+        _materials = detail.materials;
+        _templateId =
+            _materials.length == 1 ? _materials.single.templateId : null;
+        _createAttempt = null;
+        _error = null;
+      });
+    });
+  }
+
+  /// Drops the selection while the operator edits the query again.
+  ///
+  /// A card left selected under a changed query is a stale commit: it could
+  /// create bags for a component the field no longer names. Picks that were
+  /// replaced by the picker / scan / reset are left alone.
+  void _releaseSuggestion(String _) {
+    final picked = _suggestPicked;
+    if (picked == null) {
+      _selectionSeq++;
+      return;
+    }
+    _selectionSeq++;
+    _suggestPicked = null;
+    if (_item?.itemKey != picked) return;
+    setState(() {
+      _item = null;
+      _materials = [];
+      _templateId = null;
+      _createAttempt = null;
+      _error = null;
+    });
+  }
+
+  void _clearItem() {
+    if (_busy) return;
+    _selectionSeq++;
+    setState(() {
+      _item = null;
+      _newMaterial = null;
+      _materials = [];
+      _templateId = null;
+      _suggestPicked = null;
+      _createAttempt = null;
+      _error = null;
+    });
+  }
+
+  bool get _ambiguousArchive => _materials.length > 1 && _templateId == null;
 
   Future<void> _create() => _run(() async {
     if (_createAttempt == null) {
@@ -233,10 +312,12 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
           count == null ||
           count < 1 ||
           count > 100) {
-        throw StateError('请选择器件，填写每袋数量和袋数（1～100）。');
+        setState(() => _error = '请选择器件，填写每袋数量和袋数（1～100）。');
+        return;
       }
       if (_materials.length > 1 && _templateId == null) {
-        throw StateError('请选择本次制袋对应的内部档案。');
+        setState(() => _error = '请选择本次制袋对应的内部档案。');
+        return;
       }
       _createAttempt = {
         'request_key': newRequestKey(),
@@ -378,7 +459,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
 
   void _print() {
     final ids = _records
-        .where((r) => r.selected && !r.isCancelled && (_showProcessed || r.isPending))
+        .where(
+          (r) =>
+              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
+        )
         .map((r) => r.id)
         .join(',');
     context.push(
@@ -408,7 +492,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     final theme = Theme.of(context);
     final locations = ref.watch(inventoryLocationsProvider);
     final selectedCount = _records
-        .where((r) => r.selected && !r.isCancelled && (_showProcessed || r.isPending))
+        .where(
+          (r) =>
+              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
+        )
         .length;
     final attempt = _tab == 0 ? _createAttempt : _confirmAttempt;
     return Scaffold(
@@ -515,24 +602,52 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                   ),
                 if (_tab == 0) ...[
                   _section([
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        _item?.title ??
-                            _newMaterial?['name']?.toString() ??
-                            '选择元器件',
-                      ),
-                      subtitle: Text(
-                        _item == null ? '搜索型号、参数或立创编号' : '核对型号和规格后制袋',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _busy || attempt != null ? null : _pickItem,
+                    CatalogSuggestField(
+                      enabled: !_busy && attempt == null,
+                      label: '搜索并选择元器件',
+                      helperText: _item != null
+                          ? '已选：${_item!.title}'
+                          : '支持 C 编号（可带 lcsc:）、型号、名称或参数；也可用扫码或器件库选择。',
+                      onSelected: _selectSuggestion,
+                      onQueryChanged: _releaseSuggestion,
                     ),
+                    if (_item != null || _newMaterial != null)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          _item != null ? Icons.memory : Icons.fiber_new,
+                        ),
+                        title: Text(
+                          _item?.title ??
+                              _newMaterial?['name']?.toString() ??
+                              '已选元器件',
+                        ),
+                        subtitle: Text(
+                          _item != null ? '核对型号和规格后制袋' : '新建器件资料（随袋码一起创建）',
+                        ),
+                        trailing: IconButton(
+                          tooltip: '清除选择',
+                          onPressed:
+                              _busy || attempt != null ? null : _clearItem,
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: _busy || attempt != null ? null : _newItem,
-                        child: const Text('资料库没有？新建器件'),
+                      child: Wrap(
+                        spacing: 8,
+                        children: <Widget>[
+                          TextButton(
+                            onPressed:
+                                _busy || attempt != null ? null : _pickItem,
+                            child: const Text('从器件库选择'),
+                          ),
+                          TextButton(
+                            onPressed:
+                                _busy || attempt != null ? null : _newItem,
+                            child: const Text('资料库没有？新建器件'),
+                          ),
+                        ],
                       ),
                     ),
                     if (_materials.length > 1)
@@ -553,6 +668,14 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                         onChanged: _busy || attempt != null
                             ? null
                             : (v) => setState(() => _templateId = v),
+                      ),
+                    if (_ambiguousArchive)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '此编号对应多个本地档案，请先选择本次制袋的档案。',
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ),
                     const SizedBox(height: 16),
                     TextField(
@@ -585,7 +708,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: _busy ? null : _create,
+                      onPressed: _busy || _ambiguousArchive ? null : _create,
                       icon: const Icon(Icons.add),
                       label: Text(attempt == null ? '生成袋码并加入待打印' : '重试生成袋码'),
                     ),

@@ -12,7 +12,18 @@ echo "  uid=$(id -u) gid=$(id -g)"
 
 mount --make-rprivate / 2>/dev/null || true
 mount -t tmpfs -o mode=1777,size=4G tmpfs /tmp || { echo "tmpfs /tmp 失败"; exit 3; }
+# Preserve only standard devices before masking /dev. Native CSS/crypto libraries
+# open /dev/urandom; an empty /dev aborts HTTP tests even when getrandom works.
+mkdir -p /tmp/labwf-devices
+for device in null zero random urandom; do
+  touch "/tmp/labwf-devices/$device"
+  mount --bind "/dev/$device" "/tmp/labwf-devices/$device" || exit 3
+done
 mount -t tmpfs -o mode=755,size=32M tmpfs /dev 2>/dev/null || true
+for device in null zero random urandom; do
+  touch "/dev/$device"
+  mount --bind "/tmp/labwf-devices/$device" "/dev/$device" || exit 3
+done
 mkdir -p /dev/pts /dev/shm
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 mount -t tmpfs tmpfs /dev/shm 2>/dev/null || true
@@ -175,7 +186,7 @@ if [[ "$FAIL" -eq 0 ]]; then
   echo "== 2) 业务测试（真实 stock.move/quant/lot、幂等、权限、标签、多档案绑定）=="
   # 只跑 at_install 的两个 TransactionCase 类；并发 suite 是 post_install，单独在第 3 步跑
   odoo_run tests_business --test-enable -u lab_workflow \
-    --test-tags /lab_workflow:LabWorkflowTransactionTest,/lab_workflow:LabWorkflowHttpTest \
+    --test-tags /lab_workflow:LabWorkflowTransactionTest,/lab_workflow:LabWorkflowHttpTest,/lab_workflow:TestClientUpdateHttp \
     --stop-after-init --no-http
   rc=$?
   if [[ $rc -ne 0 ]]; then

@@ -1,0 +1,2642 @@
+/* ==========================================================================
+   lab_team_web · 战队仓库前端样式（自包含）
+   --------------------------------------------------------------------------
+   设计约定：
+   * 深色 + 荧光绿。令牌取值与 lab_theme 一致，但本文件不依赖其它模块的
+     CSS / 字体 / 图片 / CDN，单独 <link> 即可成形。
+   * 所有选择器都以 body.lc-body 开头，避免污染 Odoo 其它页面。
+   * 只使用系统字体栈与纯 CSS 图形；无网络字体、无图片资源。
+   * 键盘：全局 :focus-visible 荧光绿描边；触控目标不小于 40px。
+   * 375px 宽度可用：导航可横向滚动、卡片单列、参数/表格自动换行。
+   * 打印：@media print 退回白底黑字，隐藏导航与交互控件。
+   ========================================================================== */
+
+body.lc-body {
+  /* 核心令牌（与 lab_theme 对齐） */
+  --bg: #070809;
+  --bg-soft: #0b0d10;
+  --panel: #111418;
+  --panel-2: #161a20;
+  --line: rgba(242, 244, 238, 0.12);
+  --line-strong: rgba(242, 244, 238, 0.26);
+  --text: #f2f4ee;
+  --text-soft: rgba(242, 244, 238, 0.82);
+  --muted: #9aa199;
+  --lime: #c9ff3f;
+  --lime-soft: rgba(201, 255, 63, 0.14);
+  --red: #ff4b3e;
+  --gold: #d9b46a;
+
+  /* 字体与节奏 */
+  --font-body: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+  --lc-wrap: 1180px;
+  --lc-radius: 10px;
+  --lc-radius-lg: 14px;
+  --lc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 原生控件跟随深色：滚动条、select、input 的 UA 默认渲染不再按浅色走 */
+  color-scheme: dark;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body.lc-body *,
+body.lc-body *::before,
+body.lc-body *::after {
+  box-sizing: border-box;
+}
+
+body.lc-body h1,
+body.lc-body h2,
+body.lc-body h3,
+body.lc-body h4,
+body.lc-body p,
+body.lc-body figure {
+  margin: 0;
+}
+
+body.lc-body ul,
+body.lc-body ol,
+body.lc-body dl,
+body.lc-body dd {
+  margin: 0;
+  padding: 0;
+}
+
+body.lc-body li {
+  list-style: none;
+}
+
+body.lc-body img {
+  display: block;
+  max-width: 100%;
+}
+
+body.lc-body a {
+  color: inherit;
+  text-decoration: none;
+}
+
+body.lc-body button,
+body.lc-body input,
+body.lc-body select,
+body.lc-body textarea {
+  font: inherit;
+  color: inherit;
+}
+
+body.lc-body table {
+  border-collapse: collapse;
+}
+
+body.lc-body code,
+body.lc-body .lc-mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* 统一禁用原生外观里过强的默认样式，同时保留可访问性 */
+body.lc-body button {
+  cursor: pointer;
+}
+
+body.lc-body [hidden] {
+  display: none !important;
+}
+
+body.lc-body ::selection {
+  background: var(--lime);
+  color: #070809;
+}
+
+/* 键盘焦点：任何可交互元素都有荧光绿描边 */
+body.lc-body :focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   跳转链接（仅键盘聚焦时出现）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-skip {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--lime);
+  color: #070809;
+  font-size: 14px;
+  font-weight: 700;
+  transform: translateY(-220%);
+  transition: transform 0.2s var(--lc-ease);
+}
+
+body.lc-body .lc-skip:focus,
+body.lc-body .lc-skip:focus-visible {
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   顶部导航
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 8, 9, 0.94);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+body.lc-body .lc-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  width: min(var(--lc-wrap), calc(100% - 48px));
+  margin-inline: auto;
+  padding: 10px 0;
+  min-height: 72px;
+}
+
+body.lc-body .lc-brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding-right: 6px;
+}
+
+body.lc-body .lc-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+body.lc-body .lc-brand-text strong {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+body.lc-body .lc-brand-sub {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body.lc-body .lc-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 实际模板把 .lc-nav-user 放在 nav 内部；让 nav 占满剩余宽度，
+   用户信息才能被 margin-left:auto 推到最右侧。 */
+body.lc-body .lc-nav:has(.lc-nav-user) {
+  flex: 1 1 auto;
+}
+
+body.lc-body .lc-nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+body.lc-body .lc-nav-link:hover {
+  color: var(--lime);
+  background: var(--lime-soft);
+}
+
+body.lc-body .lc-nav-link.is-active {
+  color: var(--lime);
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+}
+
+body.lc-body .lc-nav-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+body.lc-body .lc-user-name {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.lc-body .lc-logout-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   按钮
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+    transform 0.2s var(--lc-ease);
+}
+
+body.lc-body .lc-btn:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+body.lc-body .lc-btn:active {
+  transform: translateY(1px);
+}
+
+body.lc-body .lc-btn:disabled,
+body.lc-body .lc-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+body.lc-body .lc-btn-primary {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: #070809;
+}
+
+body.lc-body .lc-btn-primary:hover {
+  border-color: #ddff7d;
+  background: #ddff7d;
+  color: #070809;
+}
+
+body.lc-body .lc-btn-outline {
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--text);
+}
+
+body.lc-body .lc-btn-outline:hover {
+  border-color: var(--lime);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+body.lc-body .lc-btn-ghost {
+  min-height: 44px;
+  padding: 0 14px;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+body.lc-body .lc-btn-ghost:hover {
+  border-color: var(--lime);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   主内容容器
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-main {
+  flex: 1 0 auto;
+  width: min(var(--lc-wrap), calc(100% - 48px));
+  margin-inline: auto;
+  padding: 36px 0 72px;
+  scroll-margin-top: 96px;
+}
+
+body.lc-body .lc-main:focus {
+  outline: none;
+}
+
+body.lc-body .lc-main:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 8px;
+}
+
+/* 说明性文字 */
+body.lc-body .lc-note {
+  margin-top: 24px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--lime);
+  border-radius: 0 8px 8px 0;
+  background: var(--lime-soft);
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+body.lc-body .lc-note strong {
+  color: var(--text);
+}
+
+/* 欢迎页标题里的强调词 */
+body.lc-body .lc-accent {
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   欢迎页
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-hero {
+  max-width: 920px;
+  padding: clamp(20px, 5vw, 64px) 0 28px;
+}
+
+body.lc-body .lc-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+body.lc-body .lc-kicker::before {
+  content: "";
+  width: 28px;
+  height: 2px;
+  background: var(--lime);
+}
+
+body.lc-body .lc-title {
+  margin-top: 16px;
+  color: var(--text);
+  font-size: clamp(34px, 6vw, 68px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+body.lc-body .lc-lead {
+  max-width: 62ch;
+  margin-top: 20px;
+  color: var(--text-soft);
+  font-size: clamp(15px, 1.8vw, 18px);
+}
+
+body.lc-body .lc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+body.lc-body .lc-entries {
+  margin-top: clamp(36px, 6vw, 72px);
+}
+
+body.lc-body .lc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+body.lc-body .lc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--panel);
+  transition: border-color 0.2s ease, background 0.2s ease,
+    transform 0.2s var(--lc-ease);
+}
+
+body.lc-body .lc-card:hover {
+  border-color: rgba(201, 255, 63, 0.45);
+  background: var(--panel-2);
+  transform: translateY(-2px);
+}
+
+/* 欢迎页里尚未开放/无权限的入口：保留卡片但明确弱化，不伪装成可点击。 */
+body.lc-body .lc-card-planned,
+body.lc-body .lc-card-denied {
+  border-style: dashed;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-card-planned .lc-card-title,
+body.lc-body .lc-card-denied .lc-card-title {
+  color: var(--text-soft);
+}
+
+body.lc-body .lc-card-link.is-disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+body.lc-body .lc-card-link.is-disabled::after {
+  content: "—";
+}
+
+body.lc-body .lc-card-title {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.lc-body .lc-card-desc {
+  flex: 1;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+body.lc-body .lc-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--lime);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.lc-body .lc-card-link::after {
+  content: "→";
+  transition: transform 0.2s var(--lc-ease);
+}
+
+body.lc-body .lc-card:hover .lc-card-link::after {
+  transform: translateX(4px);
+}
+
+/* --------------------------------------------------------------------------
+   登录页
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.66fr);
+  gap: 24px;
+  align-items: start;
+  max-width: 1000px;
+  margin-inline: auto;
+  padding-top: 8px;
+}
+
+body.lc-body .lc-auth-card {
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--panel);
+}
+
+body.lc-body .lc-auth-card h1 {
+  color: var(--text);
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.2;
+}
+
+body.lc-body .lc-auth-card > p,
+body.lc-body .lc-auth-card .lc-note {
+  margin-top: 12px;
+}
+
+body.lc-body #lc-login-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+body.lc-body .lc-field {
+  display: grid;
+  gap: 8px;
+}
+
+body.lc-body .lc-field-label {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body.lc-body .lc-input,
+body.lc-body #lc-q {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+body.lc-body .lc-input::placeholder,
+body.lc-body #lc-q::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+body.lc-body .lc-input:hover,
+body.lc-body #lc-q:hover {
+  border-color: rgba(242, 244, 238, 0.4);
+}
+
+body.lc-body .lc-input:focus,
+body.lc-body #lc-q:focus {
+  border-color: var(--lime);
+  outline: 2px solid var(--lime);
+  outline-offset: 1px;
+}
+
+body.lc-body .lc-form-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 75, 62, 0.5);
+  border-radius: 8px;
+  background: rgba(255, 75, 62, 0.1);
+  color: #ffd0cb;
+  font-size: 13px;
+}
+
+body.lc-body #lc-login-form .lc-btn {
+  width: 100%;
+}
+
+body.lc-body .lc-auth-side {
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--bg-soft);
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+body.lc-body .lc-auth-side h2 {
+  color: var(--text);
+  font-size: 16px;
+}
+
+body.lc-body .lc-auth-side p {
+  margin-top: 10px;
+}
+
+body.lc-body .lc-auth-side ul {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+body.lc-body .lc-auth-side li {
+  position: relative;
+  padding-left: 16px;
+}
+
+body.lc-body .lc-auth-side li::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   仓库页：检索栏 + 侧栏 + 结果
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-searchbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body.lc-body .lc-searchbar #lc-q {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+body.lc-body .lc-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.lc-body .lc-check input[type="checkbox"] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--lime);
+}
+
+body.lc-body .lc-searchbar > .lc-btn {
+  flex: 0 0 auto;
+}
+
+/* 桌面端两栏：优先支持直接子元素，也兼容模板把检索区包进一层容器。
+   不支持 :has() 的旧浏览器会自然退化为上下堆叠，功能不受影响。 */
+@media (min-width: 900px) {
+  body.lc-body main.lc-main:has(> .lc-sidebar),
+  body.lc-body main.lc-main > *:has(> .lc-sidebar) {
+    display: grid;
+    grid-template-columns: 264px minmax(0, 1fr);
+    gap: 18px 24px;
+    align-items: start;
+    /* 关键：main 在 flex 布局里会被拉高，grid 默认 align-content:stretch
+       会把多出的高度均摊到 auto 行，产生一大段空白。这里让行从顶部紧凑排列。 */
+    align-content: start;
+  }
+
+  body.lc-body main.lc-main:has(> .lc-sidebar) > .lc-searchbar,
+  body.lc-body main.lc-main > *:has(> .lc-sidebar) > .lc-searchbar {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  body.lc-body main.lc-main:has(> .lc-sidebar) > .lc-sidebar,
+  body.lc-body main.lc-main > *:has(> .lc-sidebar) > .lc-sidebar {
+    position: sticky;
+    top: 92px;
+    grid-column: 1;
+    max-height: calc(100vh - 116px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  body.lc-body main.lc-main:has(> .lc-sidebar) > .lc-results,
+  body.lc-body main.lc-main > *:has(> .lc-sidebar) > .lc-results {
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+body.lc-body .lc-sidebar {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+body.lc-body .lc-sidebar-title {
+  padding: 4px 8px 10px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body.lc-body .lc-cats {
+  display: grid;
+  gap: 2px;
+}
+
+body.lc-body .lc-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 13.5px;
+  line-height: 1.35;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+body.lc-body .lc-cat:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+body.lc-body .lc-cat.is-active {
+  border-color: rgba(201, 255, 63, 0.35);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+body.lc-body .lc-cat-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-cat-count {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+body.lc-body .lc-cat.is-active .lc-cat-count {
+  color: var(--lime);
+}
+
+body.lc-body .lc-results {
+  min-width: 0;
+}
+
+body.lc-body .lc-results-meta {
+  min-height: 32px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+body.lc-body .lc-results-meta b {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+body.lc-body .lc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+  transition: opacity 0.15s ease;
+}
+
+body.lc-body #lc-results.is-loading .lc-grid {
+  opacity: 0.5;
+}
+
+body.lc-body .lc-item {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition: border-color 0.2s ease, background 0.2s ease,
+    transform 0.2s var(--lc-ease);
+}
+
+body.lc-body .lc-item:hover {
+  border-color: rgba(201, 255, 63, 0.45);
+  background: var(--panel-2);
+}
+
+body.lc-body .lc-item-link {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
+}
+
+body.lc-body .lc-item-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: #0a0c0e;
+}
+
+body.lc-body .lc-item-img {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  object-fit: contain;
+}
+
+body.lc-body .lc-item-noimg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  gap: 8px;
+  padding: 12px;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(242, 244, 238, 0.05) 0 1px,
+    transparent 1px 10px
+  );
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+body.lc-body .lc-item-noimg::before {
+  content: "◇";
+  color: var(--muted);
+  font-size: 16px;
+}
+
+body.lc-body .lc-item-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+}
+
+body.lc-body .lc-item-code {
+  color: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+body.lc-body .lc-item-name {
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 2.8em;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.lc-body .lc-item-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* 服务端模板把型号/品牌/封装渲染成相邻的 span，这里补分隔符，
+   与 JS 追加卡片时的纯文本格式保持一致。 */
+body.lc-body .lc-item-meta > span + span::before {
+  content: " · ";
+  color: var(--muted);
+}
+
+body.lc-body .lc-item-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+body.lc-body .lc-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+body.lc-body .lc-stock::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+body.lc-body .lc-in-stock {
+  color: var(--lime);
+}
+
+body.lc-body .lc-no-stock {
+  color: var(--muted);
+}
+
+body.lc-body .lc-no-stock::before {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+body.lc-body .lc-item-price {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 状态：加载 / 错误 / 空 */
+body.lc-body .lc-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+body.lc-body .lc-loading::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(201, 255, 63, 0.25);
+  border-top-color: var(--lime);
+  border-radius: 50%;
+  animation: lc-spin 0.8s linear infinite;
+}
+
+@keyframes lc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body.lc-body .lc-alert {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-alert-error {
+  border-color: rgba(255, 75, 62, 0.5);
+  background: rgba(255, 75, 62, 0.1);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-empty {
+  margin-top: 16px;
+  padding: 48px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+body.lc-body #lc-more {
+  margin-top: 20px;
+}
+
+/* --------------------------------------------------------------------------
+   器件详情
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+body.lc-body .lc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+body.lc-body .lc-back:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+body.lc-body .lc-detail-code {
+  color: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-detail-main {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 44px);
+  align-items: start;
+}
+
+body.lc-body .lc-detail-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--panel);
+}
+
+body.lc-body .lc-detail-media img {
+  width: 100%;
+  height: 100%;
+  padding: 18px;
+  object-fit: contain;
+}
+
+body.lc-body .lc-detail-media .lc-item-noimg {
+  min-height: 100%;
+}
+
+body.lc-body .lc-detail-info {
+  min-width: 0;
+}
+
+body.lc-body .lc-detail-title {
+  color: var(--text);
+  font-size: clamp(24px, 3.4vw, 40px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-detail-sub {
+  margin-top: 10px;
+  color: var(--text-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-stock-badge {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 16px;
+  padding: 7px 14px;
+  border: 1px solid rgba(201, 255, 63, 0.45);
+  border-radius: 999px;
+  background: var(--lime-soft);
+  color: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-stock-badge::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+body.lc-body .lc-stock-badge.lc-no-stock,
+body.lc-body .lc-stock-badge.is-empty {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+body.lc-body .lc-section {
+  margin-top: clamp(30px, 4vw, 48px);
+  min-width: 0;
+}
+
+body.lc-body .lc-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+body.lc-body .lc-section-title::before {
+  content: "";
+  flex: none;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--lime);
+}
+
+body.lc-body .lc-kv {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+
+body.lc-body .lc-kv dt,
+body.lc-body .lc-kv dd {
+  min-width: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-kv dt {
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+body.lc-body .lc-kv dd {
+  color: var(--text);
+  font-size: 14px;
+}
+
+body.lc-body .lc-table {
+  width: 100%;
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+
+body.lc-body .lc-table th,
+body.lc-body .lc-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+body.lc-body .lc-table th {
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.lc-body .lc-table tbody tr:nth-child(even) {
+  background: rgba(242, 244, 238, 0.02);
+}
+
+body.lc-body .lc-table tbody tr:hover {
+  background: var(--lime-soft);
+}
+
+body.lc-body .lc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 资料文件列表（模板中的 .lc-files，未在初始契约里单列） */
+body.lc-body .lc-files {
+  display: grid;
+  gap: 8px;
+}
+
+body.lc-body .lc-files li {
+  position: relative;
+  padding-left: 16px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-files li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--lime);
+}
+
+body.lc-body .lc-files a {
+  color: var(--lime);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.lc-body .lc-files a:hover {
+  color: #ddff7d;
+}
+
+body.lc-body .lc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body.lc-body .lc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+body.lc-body .lc-chip:hover {
+  border-color: var(--lime);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+/* 详情加载失败 / 无权限页（模板中的 .lc-error-page，未在初始契约里单列） */
+body.lc-body .lc-error-page {
+  max-width: 760px;
+  padding: clamp(16px, 4vw, 48px) 0;
+}
+
+body.lc-body .lc-title-sm {
+  margin-bottom: 16px;
+  color: var(--text);
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+body.lc-body .lc-error-page .lc-lead {
+  margin-top: 12px;
+}
+
+body.lc-body .lc-error-page .lc-actions {
+  margin-top: 24px;
+}
+
+/* --------------------------------------------------------------------------
+   页脚
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-footer {
+  margin-top: auto;
+  padding: 26px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+body.lc-body .lc-footer a {
+  color: var(--text-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.lc-body .lc-footer a:hover {
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   响应式
+   -------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  body.lc-body .lc-detail-main {
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 899px) {
+  body.lc-body .lc-main {
+    padding: 24px 0 56px;
+  }
+
+  /* 实际模板的检索表单在 .lc-results 内；JS 增强时会把它提升到
+     .lc-lab 首位。未启用 JS 时保持模板顺序，因此这里只处理间距。 */
+  body.lc-body .lc-sidebar {
+    margin-top: 0;
+    padding: 10px;
+  }
+
+  body.lc-body .lc-results {
+    margin-top: 16px;
+  }
+
+  /* 移动端把分类做成可横向滚动的胶囊，避免长列表把结果推得很远 */
+  body.lc-body .lc-cats {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.lc-body .lc-cats > li {
+    flex: 0 0 auto;
+  }
+
+  body.lc-body .lc-cat {
+    min-height: 44px;
+    padding: 0 14px;
+    border-color: var(--line);
+    border-radius: 999px;
+  }
+
+  body.lc-body .lc-cat-name {
+    white-space: nowrap;
+  }
+
+  body.lc-body .lc-auth,
+  body.lc-body .lc-detail-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.lc-body .lc-detail-media {
+    max-width: 420px;
+  }
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-header-inner {
+    gap: 6px 12px;
+    padding: 8px 0;
+  }
+
+  body.lc-body .lc-brand {
+    flex: 1 1 auto;
+  }
+
+  /* 导航单独占一行并可横向滚动，375px 不撑破页面 */
+  body.lc-body .lc-nav {
+    order: 3;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.lc-body .lc-nav-link {
+    flex: 0 0 auto;
+  }
+
+  body.lc-body .lc-nav-user {
+    gap: 8px;
+  }
+
+  body.lc-body .lc-user-name {
+    max-width: 110px;
+  }
+
+  body.lc-body .lc-hero {
+    padding-top: 16px;
+  }
+
+  body.lc-body .lc-actions .lc-btn {
+    flex: 1 1 auto;
+  }
+
+  body.lc-body .lc-searchbar {
+    padding: 10px;
+  }
+
+  body.lc-body .lc-searchbar #lc-q {
+    flex: 1 1 100%;
+  }
+
+  body.lc-body .lc-searchbar > .lc-btn {
+    flex: 1 1 100%;
+  }
+
+  body.lc-body .lc-searchbar .lc-check {
+    flex: 1 1 auto;
+  }
+
+  body.lc-body .lc-card {
+    padding: 20px;
+  }
+
+  body.lc-body .lc-detail-head {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  body.lc-body .lc-header-inner,
+  body.lc-body .lc-main {
+    width: calc(100% - 32px);
+  }
+
+  body.lc-body .lc-brand-sub {
+    display: none;
+  }
+
+  body.lc-body .lc-user-name {
+    max-width: 84px;
+  }
+
+  body.lc-body .lc-card-grid,
+  body.lc-body .lc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 手机端（含 375px）：列表卡片改为紧凑信息行。
+     缘由：4:3 空图占位在窄屏约 257px 高，首屏看不到一条完整结果。
+     这里改成 88px 缩略图/占位 + 右侧可换行信息；桌面网格与详情主图不受影响。 */
+  body.lc-body .lc-grid {
+    gap: 10px;
+  }
+
+  body.lc-body .lc-item-link {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    height: auto;
+    min-height: 0;
+    padding: 10px;
+  }
+
+  body.lc-body .lc-item-media {
+    flex: 0 0 88px;
+    width: 88px;
+    height: 88px;
+    aspect-ratio: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #0a0c0e;
+  }
+
+  body.lc-body .lc-item-img {
+    padding: 4px;
+  }
+
+  /* 无图时只占 88px，不再撑出大面积斜纹占位 */
+  body.lc-body .lc-item-noimg {
+    height: 100%;
+    min-height: 0;
+    padding: 4px;
+    font-size: 11px;
+    line-height: 1.2;
+    background-image: none;
+  }
+
+  body.lc-body .lc-item-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    gap: 4px;
+  }
+
+  body.lc-body .lc-item-name {
+    min-height: 0;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  body.lc-body .lc-item-meta {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  body.lc-body .lc-item-foot {
+    margin-top: 2px;
+    padding-top: 6px;
+    gap: 4px 10px;
+    font-size: 12px;
+  }
+
+  body.lc-body .lc-item-price {
+    font-size: 12px;
+  }
+
+  body.lc-body .lc-title {
+    font-size: clamp(30px, 9vw, 40px);
+  }
+
+  body.lc-body .lc-empty {
+    padding: 36px 16px;
+  }
+
+  body.lc-body .lc-table th,
+  body.lc-body .lc-table td {
+    padding: 8px 8px;
+    font-size: 12px;
+  }
+
+  /* 参数表改为上下两行，长值不撑破屏幕 */
+  body.lc-body .lc-kv {
+    display: block;
+    border-top: 1px solid var(--line);
+  }
+
+  body.lc-body .lc-kv dt {
+    padding: 10px 0 2px;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  body.lc-body .lc-kv dd {
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  body.lc-body .lc-auth-card {
+    padding: 22px 18px;
+  }
+
+  body.lc-body .lc-detail-title {
+    font-size: clamp(22px, 7vw, 30px);
+  }
+
+  body.lc-body #lc-more {
+    width: 100%;
+  }
+}
+
+@media (max-width: 375px) {
+  body.lc-body .lc-header-inner,
+  body.lc-body .lc-main {
+    width: calc(100% - 24px);
+  }
+
+  body.lc-body .lc-user-name {
+    display: none;
+  }
+
+  body.lc-body .lc-btn {
+    padding-inline: 14px;
+  }
+}
+
+/* 尊重系统的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  body.lc-body *,
+  body.lc-body *::before,
+  body.lc-body *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   打印：白底黑字，隐藏导航 / 检索 / 交互按钮
+   -------------------------------------------------------------------------- */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body.lc-body {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.lc-body * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body.lc-body .lc-skip,
+  body.lc-body .lc-header,
+  body.lc-body .lc-footer,
+  body.lc-body .lc-actions,
+  body.lc-body .lc-searchbar,
+  body.lc-body .lc-sidebar,
+  body.lc-body .lc-loading,
+  body.lc-body #lc-more {
+    display: none !important;
+  }
+
+  body.lc-body .lc-main {
+    width: 100%;
+    padding: 0;
+  }
+
+  /* 打印时取消两栏网格，避免隐藏侧栏后仍保留 264px 空列。
+     桌面网格规则的选择器权重更高，这里必须用 !important 覆盖。 */
+  body.lc-body .lc-lab {
+    display: block !important;
+  }
+
+  body.lc-body .lc-results {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  body.lc-body .lc-card,
+  body.lc-body .lc-item,
+  body.lc-body .lc-auth-card,
+  body.lc-body .lc-auth-side,
+  body.lc-body .lc-detail-media,
+  body.lc-body .lc-empty,
+  body.lc-body .lc-alert,
+  body.lc-body .lc-table,
+  body.lc-body .lc-kv,
+  body.lc-body .lc-kv dt,
+  body.lc-body .lc-kv dd {
+    border-color: #999 !important;
+  }
+
+  body.lc-body .lc-card-grid,
+  body.lc-body .lc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6mm !important;
+  }
+
+  body.lc-body .lc-item,
+  body.lc-body .lc-card,
+  body.lc-body .lc-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.lc-body a {
+    color: #000 !important;
+    text-decoration: underline;
+  }
+
+  body.lc-body img {
+    max-width: 100% !important;
+    filter: none !important;
+  }
+
+  body.lc-body .lc-table {
+    font-size: 10pt;
+  }
+
+  body.lc-body .lc-detail-main {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   P3 业务页面外壳（T0）
+   --------------------------------------------------------------------------
+   这一段的类由 views/team_templates.xml + workflow_core.js 使用，也是三路
+   UI 子任务可以直接复用的公共组件：
+     .lc-workflow / .lc-page-head / .lc-status / .lc-toolbar / .lc-panel /
+     .lc-tabs / .lc-table-wrap / .lc-badge / .lc-field-error / .lc-form-grid
+   子任务只在自己的 static/src/css/workflow_<domain>.css 里加页面专属样式，
+   不要改本文件。所有规则仍以 body.lc-body 开头，避免影响 Odoo 其它页面。
+   ========================================================================== */
+
+body.lc-body .lc-workflow {
+  display: block;
+}
+
+body.lc-body .lc-workflow-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --------------------------------------------------------------------------
+   页面头
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-page-head {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+body.lc-body .lc-page-title {
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+body.lc-body .lc-page-desc {
+  max-width: 78ch;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   状态区（六态：loading / empty / denied / error / unknown / success）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-status-region:empty {
+  display: none;
+}
+
+body.lc-body .lc-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-status-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.lc-body .lc-status-text {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-status-detail {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-status-action {
+  flex: 0 0 auto;
+}
+
+body.lc-body .lc-status[data-kind="loading"] {
+  border-left-color: var(--muted);
+}
+
+body.lc-body .lc-status[data-kind="empty"] {
+  border-left-color: var(--line-strong);
+  color: var(--muted);
+}
+
+body.lc-body .lc-status[data-kind="denied"] {
+  border-left-color: var(--gold);
+  background: rgba(217, 180, 106, 0.1);
+  color: #f0dfb8;
+}
+
+body.lc-body .lc-status[data-kind="denied"] .lc-status-mark {
+  color: var(--gold);
+}
+
+body.lc-body .lc-status[data-kind="error"] {
+  border-left-color: var(--red);
+  background: rgba(255, 75, 62, 0.1);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-status[data-kind="error"] .lc-status-mark {
+  color: var(--red);
+}
+
+body.lc-body .lc-status[data-kind="unknown"] {
+  border-left-color: var(--gold);
+  background: rgba(217, 180, 106, 0.08);
+  color: #f0dfb8;
+}
+
+body.lc-body .lc-status[data-kind="success"] {
+  border-left-color: var(--lime);
+  background: var(--lime-soft);
+  color: var(--text);
+}
+
+body.lc-body .lc-status[data-kind="success"] .lc-status-mark {
+  background: var(--lime);
+  color: #070809;
+}
+
+/* 页面级提交中：只降透明与禁用指针，不隐藏内容（用户要能看到自己在等什么） */
+body.lc-body .lc-workflow.is-busy .lc-workflow-body {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   工具条 / 两栏 / 面板
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+body.lc-body .lc-toolbar-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+body.lc-body .lc-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+body.lc-body .lc-split-main,
+body.lc-body .lc-split-side {
+  min-width: 0;
+}
+
+body.lc-body .lc-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+body.lc-body .lc-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+body.lc-body .lc-panel-head .lc-section-title {
+  margin: 0;
+  padding-left: 12px;
+  font-size: 15px;
+}
+
+body.lc-body .lc-panel-body {
+  padding: 18px;
+}
+
+body.lc-body .lc-panel-body > * + * {
+  margin-top: 14px;
+}
+
+body.lc-body .lc-panel .lc-empty {
+  margin-top: 0;
+  padding: 28px 16px;
+}
+
+/* --------------------------------------------------------------------------
+   页签
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.lc-body .lc-tab:hover {
+  color: var(--lime);
+  background: var(--lime-soft);
+}
+
+body.lc-body .lc-tab.is-active,
+body.lc-body .lc-tab[aria-selected="true"] {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   表格包装（窄屏横向滚动，不撑破页面）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.lc-body .lc-table-wrap .lc-table {
+  min-width: 560px;
+}
+
+/* --------------------------------------------------------------------------
+   徽章 / 提示 / 表单网格 / 字段错误
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+body.lc-body .lc-badge[data-tone="ok"] {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+body.lc-body .lc-badge[data-tone="warn"] {
+  border-color: rgba(217, 180, 106, 0.5);
+  background: rgba(217, 180, 106, 0.12);
+  color: var(--gold);
+}
+
+body.lc-body .lc-badge[data-tone="bad"] {
+  border-color: rgba(255, 75, 62, 0.5);
+  background: rgba(255, 75, 62, 0.12);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-hint {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+}
+
+body.lc-body .lc-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+body.lc-body .lc-field.is-invalid .lc-field-label {
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-input[data-lc-invalid="true"],
+body.lc-body select[data-lc-invalid="true"],
+body.lc-body textarea[data-lc-invalid="true"] {
+  border-color: rgba(255, 75, 62, 0.7);
+  background: rgba(255, 75, 62, 0.06);
+}
+
+body.lc-body .lc-field-error {
+  margin-top: 6px;
+  color: #ffd0cb;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-btn-danger {
+  border-color: rgba(255, 75, 62, 0.6);
+  background: rgba(255, 75, 62, 0.12);
+  color: #ffd0cb;
+}
+
+body.lc-body .lc-btn-danger:hover {
+  border-color: var(--red);
+  color: #ffd0cb;
+  background: rgba(255, 75, 62, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   窄屏：两栏改单列、工具条换行（375px 不横向溢出）
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  body.lc-body .lc-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-page-head {
+    margin-bottom: 16px;
+  }
+
+  body.lc-body .lc-toolbar {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-toolbar .lc-btn {
+    flex: 1 1 auto;
+  }
+
+  body.lc-body .lc-panel-body {
+    padding: 14px;
+  }
+
+  body.lc-body .lc-status {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-tabs {
+    border-radius: 14px;
+  }
+
+  body.lc-body .lc-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* 打印：状态区与工具条不进入纸面 */
+@media print {
+  body.lc-body .lc-status-region,
+  body.lc-body .lc-toolbar,
+  body.lc-body .lc-page-actions {
+    display: none !important;
+  }
+}
+/* ==========================================================================
+   共用搜索下拉（输入即候选）
+   --------------------------------------------------------------------------
+   由 workflow_core.js 的 LC.combobox 生成，页面只提供 input + .lc-combobox 容器：
+     .lc-combobox > input            输入框（role=combobox）
+     .lc-combobox-pop > ul[role=listbox] > li.lc-combobox-option
+     .lc-combobox-note[data-kind]    加载 / 无结果 / 失败 提示（role=status）
+   弹层绝对定位在输入框下方，不出视口；375px 时整宽显示，不横向溢出。
+   宽度跟输入框对齐，桌面不再被 540px 上限卡窄；窄屏仍受视口宽度约束。
+   ========================================================================== */
+
+body.lc-body .lc-combobox {
+  position: relative;
+  min-width: 0;
+}
+
+body.lc-body .lc-combobox-pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 240px;
+  max-width: min(780px, calc(100vw - 28px));
+  max-height: min(52vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--lc-radius);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.58);
+}
+
+/* 下方空间不足时由 LC.combobox 标 data-placement="up"，翻到输入框上方展开，
+   仍受 max-height 限制；窄屏/软键盘场景不再把候选裁到视口外。 */
+body.lc-body .lc-combobox-pop[data-placement="up"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.58);
+}
+
+/* 弹层要越过 .lc-panel 的圆角裁切：面板在下拉展开期间临时放开 overflow，
+   否则窄屏向上展开（data-placement="up"）时候选会被面板上沿裁掉，
+   elementFromPoint 会命中面板外的背景、点击落不到选项上（375px 实测）。 */
+body.lc-body .lc-panel:has(.lc-combobox-pop:not([hidden])) {
+  overflow: visible;
+}
+
+body.lc-body .lc-combobox-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+body.lc-body .lc-combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+body.lc-body .lc-combobox-option + .lc-combobox-option {
+  border-top: 1px solid var(--line);
+}
+
+body.lc-body .lc-combobox-option:hover,
+body.lc-body .lc-combobox-option.is-active {
+  background: var(--lime-soft);
+  box-shadow: inset 2px 0 0 var(--lime);
+}
+
+body.lc-body .lc-combobox-primary {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-badge {
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-note {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-combobox-note[data-kind="error"] {
+  color: var(--red);
+}
+
+body.lc-body .lc-combobox-note[data-kind="loading"] {
+  color: var(--lime);
+}
+
+/* 失败态里的"重试检索"：真按钮，键盘可达，不掉出暗色主题 */
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:hover,
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:focus-visible {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+/* 权限不足等常驻提示：不依赖候选面板是否打开 */
+body.lc-body .lc-hint-warn {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--red);
+  background: rgba(255, 75, 62, 0.08);
+  color: var(--red);
+  border-radius: 0 8px 8px 0;
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-combobox-pop {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* ==========================================================================
+   整站骨架：桌面固定业务侧栏 + 顶部账号区（断点 1024px）
+   --------------------------------------------------------------------------
+   方案 §一：桌面不是"一行横向链接"，而是左侧固定业务侧栏 + 顶部账号区；
+   ≤1023px 侧栏收成抽屉（按钮在顶部条、品牌左侧），内容区单列。
+   侧栏用 .lc-rail 命名——.lc-sidebar 在本文件里已表示"目录筛选侧栏"，不复用。
+   ========================================================================== */
+
+body.lc-body .lc-rail {
+  min-width: 0;
+}
+
+body.lc-body .lc-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  body.lc-body .lc-header-inner {
+    flex-wrap: nowrap;
+    min-height: 68px;
+    padding: 10px 0;
+  }
+
+  body.lc-body .lc-shell {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    align-items: start;
+    gap: 32px;
+    width: min(var(--lc-wrap), calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  /* 无导航（匿名登录/欢迎页）时不保留那条 236px 空列 */
+  body.lc-body .lc-shell-plain {
+    display: block;
+  }
+
+  body.lc-body .lc-rail {
+    position: sticky;
+    top: 84px;
+    align-self: start;
+    max-height: calc(100vh - 108px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 0 28px;
+    border-right: 1px solid var(--line);
+    scrollbar-width: thin;
+  }
+
+  body.lc-body .lc-rail .lc-nav {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 2px;
+    padding-right: 18px;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link {
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 44px;
+    border-radius: 10px;
+  }
+
+  /* 当前页：左侧 2px 荧光条，与候选弹层的选中语言一致 */
+  body.lc-body .lc-rail .lc-nav-link.is-active {
+    box-shadow: inset 2px 0 0 var(--lime);
+  }
+
+  body.lc-body .lc-content {
+    min-width: 0;
+  }
+
+  /* 内容宽度交给 .lc-shell，避免 main 自己再居中造成双重留白 */
+  body.lc-body .lc-content .lc-main {
+    width: 100%;
+    margin: 0;
+    padding: 28px 0 64px;
+    scroll-margin-top: 84px;
+  }
+
+  body.lc-body .lc-content .lc-footer {
+    width: 100%;
+    margin: 0;
+    padding-bottom: 28px;
+  }
+}
+
+/* 桌面（≥1024px）隐藏抽屉按钮：固定侧栏已把导航摊开，这个按钮既不该可见也不该可点。
+   窄屏样式见下面 @media (max-width: 1023px)。 */
+body.lc-body .lc-nav-toggle {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  body.lc-body .lc-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    margin-left: 0;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  body.lc-body .lc-nav-toggle:hover {
+    border-color: var(--lime);
+    color: var(--lime);
+  }
+
+  body.lc-body .lc-nav-toggle-bars {
+    width: 14px;
+    height: 2px;
+    background: currentColor;
+    box-shadow: 0 -5px 0 currentColor, 0 5px 0 currentColor;
+  }
+
+  /* 覆盖 ≤760px 那版"横向滚动导航"：整个侧栏变抽屉 */
+  body.lc-body .lc-rail {
+    position: fixed;
+    z-index: 60;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(84vw, 320px);
+    max-width: 320px;
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--line-strong);
+    box-shadow: 0 0 42px rgba(0, 0, 0, 0.6);
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition: transform 0.22s var(--lc-ease), visibility 0.22s linear;
+  }
+
+  body.lc-body.lc-nav-open .lc-rail {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  body.lc-body .lc-rail .lc-nav {
+    order: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 2px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link {
+    flex: 0 0 auto;
+    padding: 12px 10px;
+    border-radius: var(--lc-radius);
+  }
+
+  body.lc-body .lc-shell {
+    width: min(var(--lc-wrap), calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  body.lc-body .lc-content .lc-main {
+    padding: 24px 0 56px;
+  }
+
+  body.lc-body.lc-nav-open .lc-nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(3, 4, 6, 0.62);
+  }
+
+  body.lc-body.lc-nav-open {
+    overflow: hidden;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link:focus-visible,
+  body.lc-body .lc-nav-toggle:focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 560px) {
+  body.lc-body .lc-account .lc-user-name {
+    max-width: 84px;
+  }
+}
+
+/* ==========================================================================
+   折叠帮助（.lc-help）
+   --------------------------------------------------------------------------
+   入库台首屏要留给"输入料号"：编号规则、台账来源这类技术细节收进 details，
+   默认只占一行 12px 的"＋ 编号规则与示例"，展开后才显示正文。
+   ========================================================================== */
+
+body.lc-body .lc-help {
+  margin: 0 0 12px;
+}
+
+body.lc-body .lc-help > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+body.lc-body .lc-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.lc-body .lc-help > summary::before {
+  content: "＋";
+  color: var(--lime);
+  font-size: 11px;
+}
+
+body.lc-body .lc-help[open] > summary::before {
+  content: "－";
+}
+
+body.lc-body .lc-help > summary:hover {
+  color: var(--text);
+}
+
+body.lc-body .lc-help > summary:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+body.lc-body .lc-help > p {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius);
+}
+
+body.lc-body .lc-hint-tight {
+  margin: 0 0 8px;
+}
+
+/* 窄屏首屏：标题与说明收紧，让"输入料号"尽早就位 */
+@media (max-width: 560px) {
+  body.lc-body .lc-receipt-intro {
+    margin: 0 0 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  body.lc-body .lc-tabs {
+    margin-bottom: 12px;
+  }
+
+  body.lc-body .lc-main > h1,
+  body.lc-body .lc-page-title {
+    margin: 0 0 8px;
+  }
+
+  /* 375 首屏优先给搜索：入库面板的标题/说明已经由输入框 label 和 placeholder 承担，
+     小屏上只保留一行「不增库存」提示，其余纵向留白收紧。 */
+  body.lc-body .lc-panel[data-lc-panel="prepare"] .lc-panel-head {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-panel[data-lc-panel="prepare"] .lc-panel-body {
+    padding: 12px;
+  }
+
+  body.lc-body .lc-receipt-write > .lc-section-title {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+
+  body.lc-body .lc-receipt-write > .lc-hint-tight {
+    display: none;
+  }
+
+  body.lc-body .lc-receipt-intro {
+    margin: 0 0 8px;
+    font-size: 11.5px;
+  }
+}
+
+/* ==========================================================================
+   表格内勾选（待入库袋"打印"、标签"选择"这类行内勾选）
+   --------------------------------------------------------------------------
+   表格里的裸 checkbox 只有 13px，与 44px 触控目标差三倍：命中区放到外层 label，
+   图形仍按 .lc-check 的 20px，input 上的 data-lc-action / checked / disabled 一律不动。
+   ========================================================================== */
+
+body.lc-body .lc-check.lc-check-cell {
+  min-width: 44px;
+  min-height: 44px;
+  gap: 0;
+  padding: 0;
+  justify-content: flex-start;
+}
+
+body.lc-body .lc-table td.lc-cell-check {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+
+body.lc-body .lc-table td.lc-cell-check .lc-check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+body.lc-body .lc-table td.lc-cell-check .lc-check input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

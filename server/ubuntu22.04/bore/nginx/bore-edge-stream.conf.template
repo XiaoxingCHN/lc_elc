@@ -1,0 +1,15 @@
+# 受控公开边缘（模板）：对外只做普通 TCP，不接受客户端 PROXY；
+# 由本层「主动生成」PROXY 交给隧道，供入口 Nginx 取真实访客地址。
+# 占位符由部署脚本替换：公开监听地址、bore 隧道公网端口。
+events { worker_connections 256; }
+
+stream {
+    server {
+        # 关键：公开 listen 不得带 proxy_protocol（否则等于信任客户端自带前缀）
+        listen @EDGE_LISTEN@;
+        proxy_pass @TUNNEL_ADDR@;
+        proxy_protocol on;             # 主动生成 PROXY v1 给 bore 隧道
+        proxy_connect_timeout 5s;
+        proxy_timeout 60s;
+    }
+}

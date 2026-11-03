@@ -1,0 +1,319 @@
+/* ==========================================================================
+   lab_team_web · P3 入库 / 扫码 / 袋追溯 / 标签 页面样式（domain = receipt）
+   --------------------------------------------------------------------------
+   * 只写本 domain 的页面类，全部以 body.lc-body 开头；不改 team.css；
+   * 选择器不裸写标签名（除了作用域内的后代元素），不需要 !important；
+   * 375px 无横向溢出：扫描行、工具条、两栏都在窄屏下改为单列；
+   * 不引入网络字体/图片，颜色全部复用 team.css 的 CSS 变量。
+   ========================================================================== */
+
+body.lc-body .lc-receipt-intro {
+  margin-top: 0;
+}
+
+/* ---------------------------------------------------------------- 扫描行 */
+body.lc-body .lc-scanrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+body.lc-body .lc-scanrow-field {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+body.lc-body .lc-scanrow .lc-field {
+  min-width: 0;
+}
+
+body.lc-body .lc-scanrow .lc-btn {
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------- 料号选择 */
+body.lc-body .lc-material-picked {
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--lime);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+body.lc-body .lc-material-picked > * + * {
+  margin-top: 8px;
+}
+
+body.lc-body .lc-material-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------- 写区容器 */
+body.lc-body .lc-receipt-write > * + * {
+  margin-top: 16px;
+}
+
+body.lc-body .lc-receipt-new {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-receipt-new > summary {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body.lc-body .lc-receipt-new > summary:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+body.lc-body .lc-receipt-new .lc-form {
+  margin-top: 12px;
+}
+
+body.lc-body .lc-receipt-rewrite {
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+body.lc-body .lc-receipt-rewrite .lc-form {
+  margin-top: 12px;
+}
+
+/* 改数量说明里的有序步骤（team.css 全局 li 去掉了列表符号，这里只在本块恢复） */
+body.lc-body .lc-receipt-steps {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+body.lc-body .lc-receipt-steps > li {
+  padding-left: 4px;
+  list-style: decimal;
+}
+
+/* ---------------------------------------------------------------- 未决提交横幅
+   core v1.2 的未决锁：结果未知时该 (scope, endpoint) 未决，页面只能重试原内容
+   或核对后显式解除。用暖色（gold）与"错误"区分：这不是失败，是"状态待确认"。 */
+body.lc-body .lc-lock {
+  padding: 14px 16px;
+  border: 1px solid rgba(217, 180, 106, 0.55);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: rgba(217, 180, 106, 0.1);
+}
+
+body.lc-body .lc-lock > * + * {
+  margin-top: 10px;
+}
+
+body.lc-body .lc-lock .lc-alert {
+  margin-bottom: 0;
+}
+
+body.lc-body .lc-lock .lc-actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-lock .lc-btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- 扫码上架 */
+body.lc-body .lc-receipt-shelve,
+body.lc-body .lc-receipt-done {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-receipt-shelve > * + *,
+body.lc-body .lc-receipt-done > * + * {
+  margin-top: 14px;
+}
+
+body.lc-body .lc-receipt-shelve .lc-kv,
+body.lc-body .lc-receipt-done .lc-kv {
+  border-top: 1px solid var(--line);
+}
+
+body.lc-body .lc-receipt-done {
+  border-left: 3px solid var(--lime);
+}
+
+body.lc-body .lc-receipt-unknown {
+  padding: 12px 14px;
+  border: 1px dashed rgba(217, 180, 106, 0.6);
+  border-radius: 10px;
+  background: rgba(217, 180, 106, 0.08);
+}
+
+body.lc-body .lc-receipt-unknown > * + * {
+  margin-top: 10px;
+}
+
+/* 库位推荐：只是顺序参考，样式上弱化，不暗示"已选中" */
+body.lc-body .lc-recommend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body.lc-body .lc-recommend-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- 扫码页 */
+body.lc-body .lc-camera {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-camera-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #000;
+  object-fit: cover;
+}
+
+body.lc-body .lc-scan-result {
+  display: grid;
+  gap: 20px;
+}
+
+body.lc-body .lc-scan-result .lc-actions {
+  margin-top: 14px;
+}
+
+/* ---------------------------------------------------------------- 标签工作台 */
+body.lc-body .lc-label-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (min-width: 1000px) {
+  body.lc-body .lc-label-workbench {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    align-items: start;
+  }
+
+  /* 排版结果面板跨两列，避免和参数面板挤在一起 */
+  body.lc-body .lc-label-workbench > .lc-panel:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+
+body.lc-body .lc-label-fields {
+  gap: 10px;
+}
+
+body.lc-body .lc-label-fields .lc-inline {
+  gap: 6px 10px;
+}
+
+body.lc-body .lc-label-plan {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lime);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+body.lc-body .lc-label-plan > * + * {
+  margin-top: 8px;
+}
+
+body.lc-body .lc-label-plan .lc-alert {
+  margin-bottom: 0;
+}
+
+/* PDF 表单只是提交载体，永远不显示 */
+body.lc-body .lc-label-pdf {
+  display: none;
+}
+
+/* 打印份数输入框在小屏别撑破工具栏 */
+body.lc-body .lc-meter {
+  flex: 0 1 140px;
+  min-width: 110px;
+}
+
+/* ---------------------------------------------------------------- 袋追溯 */
+body.lc-body .lc-bag {
+  display: block;
+}
+
+body.lc-body .lc-bag .lc-kv {
+  border-top: 1px solid var(--line);
+}
+
+/* ---------------------------------------------------------------- 窄屏 */
+@media (max-width: 760px) {
+  body.lc-body .lc-scanrow {
+    align-items: stretch;
+  }
+
+  body.lc-body .lc-scanrow .lc-btn {
+    flex: 1 1 100%;
+  }
+
+  body.lc-body .lc-receipt-shelve,
+  body.lc-body .lc-receipt-done,
+  body.lc-body .lc-receipt-rewrite {
+    padding: 12px;
+  }
+
+  body.lc-body .lc-camera {
+    max-width: 100%;
+  }
+
+  body.lc-body .lc-recommend-item {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  body.lc-body .lc-material-line {
+    font-size: 13px;
+  }
+
+  body.lc-body .lc-camera-video {
+    aspect-ratio: 3 / 4;
+  }
+}

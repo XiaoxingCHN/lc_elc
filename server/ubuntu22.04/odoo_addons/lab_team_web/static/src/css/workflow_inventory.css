@@ -1,0 +1,455 @@
+/* ==========================================================================
+ * lab_team_web · P3 inventory 页面样式（库位 / 类别映射 / 管理 / 器件档案）
+ * --------------------------------------------------------------------------
+ * 约定（frontend-contract §2.2 / §9-11）：
+ *   * 只写本文件，不改 team.css；选择器一律以 body.lc-body .lc-workflow 开头；
+ *   * 新类名统一 lc-inv- 前缀，避免与 receipt / issue 两路作者的类冲突；
+ *   * 不用 !important、不裸写标签选择器、不引外部字体或图片（CSP 只允许 'self'）；
+ *   * 375px 无横向溢出：表格一律在 .lc-table-wrap 里横向滚动。
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   表格单元 / 行内操作
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow .lc-inv-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+body.lc-body .lc-workflow .lc-inv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+body.lc-body .lc-workflow .lc-inv-btn-sm {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* 触控设备（触屏 / 二合一）：行内小按钮抬到 44px 触控下限（方案 §三 组件清单） */
+@media (any-pointer: coarse) {
+  body.lc-body .lc-workflow .lc-inv-btn-sm {
+    min-height: 44px;
+    padding: 0 14px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+body.lc-body .lc-workflow .lc-inv-self {
+  margin-left: 8px;
+  border-color: rgba(201, 255, 63, 0.35);
+  background: rgba(201, 255, 63, 0.12);
+  color: var(--lime);
+}
+
+body.lc-body .lc-workflow .lc-inv-role-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 角色勾选框：图形保持 18px，真实可点击区域（label）≥44×44 */
+body.lc-body .lc-workflow .lc-inv-role-hit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+body.lc-body .lc-workflow .lc-inv-role-hit input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--lime);
+  cursor: pointer;
+  margin: 0;
+}
+
+body.lc-body .lc-workflow .lc-inv-role-hit input[type="checkbox"][aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+body.lc-body .lc-workflow .lc-inv-role-hit:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* --------------------------------------------------------------------------
+   表单里复用的 select / textarea（.lc-input 由 team.css 提供基础外观）
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow select.lc-input {
+  appearance: auto;
+  padding-right: 12px;
+  color-scheme: dark;
+}
+
+body.lc-body .lc-workflow input.lc-input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+body.lc-body .lc-workflow .lc-toolbar > .lc-field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   类别映射：推荐关系预览 + 类别快捷选择
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow .lc-inv-reco {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.lc-body .lc-workflow .lc-inv-reco-item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+
+body.lc-body .lc-workflow .lc-inv-reco-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+body.lc-body .lc-workflow .lc-inv-reco-cat {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-reco-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+body.lc-body .lc-workflow .lc-inv-reco-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-arrow {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+body.lc-body .lc-workflow .lc-inv-chip {
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+body.lc-body .lc-workflow .lc-inv-chip:hover {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+body.lc-body .lc-workflow .lc-inv-chip:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   未决提交（结果未知）恢复区：三个管理页共用；materials 的建档锁复用同一套类
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow .lc-inv-lock-head {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-lock-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.lc-body .lc-workflow .lc-inv-lock-item {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 75, 62, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 75, 62, 0.06);
+}
+
+body.lc-body .lc-workflow .lc-inv-lock-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-lock-item .lc-hint {
+  margin-top: 6px;
+}
+
+body.lc-body .lc-workflow .lc-inv-lock-item .lc-actions {
+  margin-top: 10px;
+}
+
+/* 窄屏：未决区的三个按钮换行整宽，避免 375px 被挤出容器 */
+@media (max-width: 560px) {
+  body.lc-body .lc-workflow .lc-inv-lock-item .lc-actions .lc-btn {
+    flex: 1 1 100%;
+    text-align: left;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   器件档案：详情 kv / 候选档案 / 参数行
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow .lc-inv-tmpl {
+  margin: 2px 0;
+  font-size: 13px;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-candidates {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(217, 180, 106, 0.45);
+  border-radius: 10px;
+  background: rgba(217, 180, 106, 0.08);
+}
+
+/* 建档未知结果时的锁定横幅（.lc-alert 由 team.css 提供基础外观） */
+body.lc-body .lc-workflow .lc-alert > p + p,
+body.lc-body .lc-workflow .lc-alert > .lc-hint {
+  margin-top: 8px;
+}
+
+body.lc-body .lc-workflow .lc-alert > .lc-actions {
+  margin-top: 12px;
+}
+
+body.lc-body .lc-workflow .lc-inv-candidate-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.lc-body .lc-workflow .lc-inv-candidate .lc-inline {
+  gap: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-candidate input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   管理页：说明列表
+   -------------------------------------------------------------------------- */
+body.lc-body .lc-workflow .lc-inv-plain {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   窄屏（375px）：工具条与操作按钮换成整行、正文不横向溢出
+   -------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+  body.lc-body .lc-workflow .lc-inv-toolbar .lc-field,
+  body.lc-body .lc-workflow .lc-toolbar > .lc-field {
+    flex: 1 1 100%;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-btn-sm {
+    /* 触控目标不小于 44px（方案 §三 组件清单） */
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-actions {
+    gap: 4px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-reco-chain {
+    gap: 6px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-reco-chip {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 375px) {
+  body.lc-body .lc-workflow .lc-inv-reco-item,
+  body.lc-body .lc-workflow .lc-inv-candidates {
+    padding: 10px 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   打印：只留数据区（本 domain 无打印任务，避免纸张上出现按钮）
+   -------------------------------------------------------------------------- */
+@media print {
+  body.lc-body .lc-workflow .lc-toolbar,
+  body.lc-body .lc-workflow .lc-inv-actions {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   窄屏（≤760px）列表改"摘要卡"：字段标签来自每行表头（JS 写入 data-label），
+   操作按钮留在卡内，无需横向滚动。
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  body.lc-body .lc-workflow .lc-table-wrap {
+    overflow-x: visible;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] {
+    /* table 自己也要变 block：否则表格布局仍按列宽撑开，卡片会比视口宽 */
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody {
+    display: block;
+    width: 100%;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel-2);
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: auto;
+    max-width: 100%;
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-num {
+    text-align: left;
+  }
+
+  /* 角色勾选：标签在左，勾选在右，整行 ≥44px 可点 */
+  body.lc-body .lc-workflow .lc-inv-role-cell {
+    align-items: center;
+    text-align: left;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-btn-sm {
+    min-height: 44px;
+    padding: 0 14px;
+  }
+}

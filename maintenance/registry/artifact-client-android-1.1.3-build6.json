@@ -1,0 +1,20 @@
+{
+  "file": "clients/android/releases/1.1.3+6/LC_ELC-Android-1.1.3+6.apk",
+  "bytes": 74777513,
+  "sha256": "7c900701ad781c18885e691eb45a0aba56a4b1141ff022104ace276668e40d3f",
+  "version": "1.1.3+6",
+  "source_manifest": "maintenance/registry/source-client-android-install-fix-final-20261019.json",
+  "source_tree_sha256": "9e58aac731d66afe708896ed2142cfae469fc3c4d2b557c785af8cc980a5a187",
+  "validation": "275 Flutter passed/5 skipped, 9 real JVM path checks, APK version/certificate/source and HTTP full download verified. Physical installation unverified; user reported old installer failure.",
+  "source_commit": "11f03807015c2d811784c13b4b47a34e0d7d4afc",
+  "source_manifest_sha256": "9d1385b107b40996c309e1ed2070fdb34ec3f8c2e6cfdac72ffb550da4c240f1",
+  "archived_source_manifest": "clients/android/releases/1.1.3+6/SOURCE_MANIFEST.json",
+  "signing_certificate_sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+  "update_signing_key_id": "release-20261019",
+  "channel": "stable",
+  "release_id": "android-1.1.3-build6-20261019",
+  "release_sequence": 2,
+  "environment": "WSL Ubuntu22.04, Flutter3.47.7, JDK17, Android SDK36, existing debug signing identity",
+  "build_exit_code": 0,
+  "build_evidence": "maintenance/audit/android-install-fix-20261019.json"
+}

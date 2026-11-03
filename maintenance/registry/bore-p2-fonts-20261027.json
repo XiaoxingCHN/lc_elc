@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "bore-p2-noto-cjk",
+  "purpose": "Chinese glyph rendering in isolated Chrome acceptance only",
+  "validated_at": "2026-10-27",
+  "package": {
+    "name": "fonts-noto-cjk",
+    "version": "1:20220127+repack1-1",
+    "architecture": "all",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-noto-cjk/fonts-noto-cjk_20220127+repack1-1_all.deb",
+    "size_bytes": 61220346,
+    "sha256": "e804b3474a79bd70d5f03f590e2d06dbc5ce17f48be7cfaf6c48086471edd5be"
+  },
+  "license": {
+    "spdx": "OFL-1.1",
+    "copyright_path": "usr/share/doc/fonts-noto-cjk/copyright",
+    "upstream": "https://github.com/googlefonts/noto-cjk"
+  },
+  "official_metadata": {
+    "index_url": "https://archive.ubuntu.com/ubuntu/dists/jammy/main/binary-amd64/Packages.xz",
+    "checks": [
+      "version",
+      "size",
+      "sha256"
+    ],
+    "matched": true
+  },
+  "runtime": {
+    "installation": "extract only; no apt/dpkg install or global changes",
+    "root": "$HOME/lc-elc-team-web/runtime-fonts",
+    "fontconfig_file": "$HOME/lc-elc-team-web/runtime-fonts/fontconfig/fonts.conf",
+    "fontconfig_path": "$HOME/lc-elc-team-web/runtime-fonts/fontconfig",
+    "family": "Noto Sans CJK SC",
+    "matched_sample_glyphs": 12,
+    "total_sample_glyphs": 12
+  },
+  "evidence": "local/build/p2-fonts-20261027/provenance.json",
+  "evidence_sha256": "bec8c0609613f7eafd7c49a80c02f5db3ba27d1c48de455ec05dfbcb6891b9cf"
+}

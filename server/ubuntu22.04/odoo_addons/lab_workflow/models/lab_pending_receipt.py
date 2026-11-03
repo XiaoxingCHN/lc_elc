@@ -245,6 +245,11 @@ class LabPendingReceiptService(models.AbstractModel):
                     'product_template_id': record.product_tmpl_id.id,
                     'trace_code': record.trace_code, 'quantity': quantity,
                     'location_id': params.get('location_id'), 'note': record.note or '',
+                    # 扫码上架时允许把立创原厂袋二维码/SN 一并带上：
+                    # 直连 receipt 早就有这两个参数，两阶段路径此前漏传，
+                    # 导致"先制袋再扫码"永远记不到供应商订单号（backend-audit G1）。
+                    'supplier_qr': (params.get('supplier_qr') or None),
+                    'sn': (params.get('sn') or None),
                 }, prepared=record)
                 record.sudo().write({'state': 'done', 'selected': False, 'quantity': quantity,
                     'bag_id': receipt['bag']['id'], 'confirmed_by': self.env.uid,
@@ -268,20 +273,37 @@ class LabPendingReceiptService(models.AbstractModel):
         template = record.product_tmpl_id
         templates = (self.lab_candidate_templates(template.lab_lcsc_code)
                      if template.lab_lcsc_code else template)
-        # Same material first, then the same non-generic product category.
+        # 推荐顺序（Lead decision 4）：相同器件 → 类别映射(priority) → 同类器件。
+        # 映射只是**排序参考**：不会自动选中库位，也不写任何库存。
+        recommendations = []
+        seen_locations = set()
+
+        def _add(location, reason):
+            if not location or location.id in seen_locations:
+                return
+            seen_locations.add(location.id)
+            recommendations.append({
+                'id': location.id,
+                'name': location.display_name,
+                'reason': reason,
+            })
+
         bags = self.env['lab.bag'].search([
             ('company_id', '=', self.env.company.id),
             ('location_id.usage', '=', 'internal'), ('product_tmpl_id', 'in', templates.ids)])
         bags = bags.filtered(lambda bag: self.lab_bag_display_quantity(bag) > 0)
-        locations = bags.mapped('location_id')
-        recommendations = [{'id': loc.id, 'name': loc.display_name, 'reason': '相同器件'}
-                           for loc in locations]
+        for location in bags.mapped('location_id'):
+            _add(location, '相同器件')
+        mapping_locations = self.env['lab.location.mapping'].lab_mapping_locations_for_category(
+            template.categ_id, limit=20)
+        for location, _mapping in mapping_locations:
+            _add(location, '类别映射')
         if template.categ_id.parent_id:
             peers = self.env['lab.bag'].search([
                 ('company_id', '=', self.env.company.id),
                 ('location_id.usage', '=', 'internal'),
                 ('product_tmpl_id.categ_id', '=', template.categ_id.id)], limit=200)
             peers = peers.filtered(lambda bag: self.lab_bag_display_quantity(bag) > 0)
-            recommendations += [{'id': loc.id, 'name': loc.display_name, 'reason': '同类器件'}
-                                for loc in peers.mapped('location_id') - locations]
+            for location in peers.mapped('location_id'):
+                _add(location, '同类器件')
         return {'record': record._lab_pending_dict(), 'recommendations': recommendations[:20]}

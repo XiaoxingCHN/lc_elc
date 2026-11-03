@@ -1,0 +1,321 @@
+{
+  "result": "FAIL",
+  "passed_checks": 49,
+  "git_candidate_files": 2823,
+  "errors": [
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/_colorize.py",
+      "line": 7
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/annotationlib.py",
+      "line": 362
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/argparse.py",
+      "line": 95
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/collections/__init__.py",
+      "line": 35
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/concurrent/futures/__init__.py",
+      "line": 20
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/contextlib.py",
+      "line": 9
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/ctypes/__init__.py",
+      "line": 7
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/ctypes/_layout.py",
+      "line": 12
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/ctypes/util.py",
+      "line": 4
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/dataclasses.py",
+      "line": 8
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/difflib.py",
+      "line": 36
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/doctest.py",
+      "line": 109
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/http/cookies.py",
+      "line": 135
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/http/server.py",
+      "line": 88
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/inspect.py",
+      "line": 156
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/pathlib/__init__.py",
+      "line": 20
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/pickletools.py",
+      "line": 19
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/pkgutil.py",
+      "line": 12
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/pprint.py",
+      "line": 813
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/profiling/sampling/live_collector/collector.py",
+      "line": 12
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/profiling/sampling/pstats_collector.py",
+      "line": 4
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/profiling/sampling/sample.py",
+      "line": 9
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/site.py",
+      "line": 51
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/string/templatelib.py",
+      "line": 3
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/tokenize.py",
+      "line": 38
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/traceback.py",
+      "line": 21
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/typing.py",
+      "line": 31
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/unittest/runner.py",
+      "line": 10
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/webbrowser.py",
+      "line": 5
+    },
+    {
+      "check": "python-syntax",
+      "path": "Python/pythoncore-3.15-64/Lib/xml/utils.py",
+      "line": 1
+    }
+  ],
+  "warnings": [
+    {
+      "check": "known-payload-not-built",
+      "id": "production-py312-rebuild",
+      "recovery": "See registered preparation commands; this is not a complete offline closure."
+    }
+  ],
+  "checks": [
+    {
+      "check": "component-source:client"
+    },
+    {
+      "check": "component-tracked:client"
+    },
+    {
+      "check": "component-source:odoo"
+    },
+    {
+      "check": "component-tracked:odoo"
+    },
+    {
+      "check": "component-source:server-ops"
+    },
+    {
+      "check": "component-tracked:server-ops"
+    },
+    {
+      "check": "component-source:eda"
+    },
+    {
+      "check": "component-tracked:eda"
+    },
+    {
+      "check": "component-source:crawler"
+    },
+    {
+      "check": "component-tracked:crawler"
+    },
+    {
+      "check": "component-source:catalog-import"
+    },
+    {
+      "check": "component-tracked:catalog-import"
+    },
+    {
+      "check": "component-source:maintenance"
+    },
+    {
+      "check": "component-tracked:maintenance"
+    },
+    {
+      "check": "odoo-manifest:lab_inventory",
+      "details": "19.0.1.0.0"
+    },
+    {
+      "check": "odoo-manifest:lab_catalog",
+      "details": "19.0.2.0.4"
+    },
+    {
+      "check": "odoo-manifest:lab_workflow",
+      "details": "19.0.1.2.0"
+    },
+    {
+      "check": "frozen-source:client",
+      "details": 166
+    },
+    {
+      "check": "frozen-source:server",
+      "details": 132
+    },
+    {
+      "check": "frozen-source:eda",
+      "details": 63
+    },
+    {
+      "check": "payload-method:flutter-windows"
+    },
+    {
+      "check": "payload-method:flutter-linux"
+    },
+    {
+      "check": "payload-method:android-cmdline-tools"
+    },
+    {
+      "check": "payload-method:android-jdk17"
+    },
+    {
+      "check": "payload-method:android-platform36"
+    },
+    {
+      "check": "payload-method:android-buildtools36"
+    },
+    {
+      "check": "payload-method:android-ndk28"
+    },
+    {
+      "check": "payload-method:windows-vc-runtime"
+    },
+    {
+      "check": "payload-method:odoo-source"
+    },
+    {
+      "check": "payload-method:ubuntu-server-debs"
+    },
+    {
+      "check": "payload-method:odoo-py310-wheels"
+    },
+    {
+      "check": "payload-method:crawler-wheels"
+    },
+    {
+      "check": "payload-method:barcode-py312"
+    },
+    {
+      "check": "payload-method:flutter-expanded-toolchains"
+    },
+    {
+      "check": "payload-method:pub-caches"
+    },
+    {
+      "check": "payload-method:gradle-cache"
+    },
+    {
+      "check": "payload-method:linux-runtime-debs"
+    },
+    {
+      "check": "payload-method:eda-node-windows"
+    },
+    {
+      "check": "payload-method:eda-npm-cache"
+    },
+    {
+      "check": "payload-method:current-client-releases"
+    },
+    {
+      "check": "payload-method:current-eda-release"
+    },
+    {
+      "check": "payload-method:current-server-release"
+    },
+    {
+      "check": "payload-method:catalog-checkpoint"
+    },
+    {
+      "check": "payload-method:production-backup"
+    },
+    {
+      "check": "payload-method:windows-msvc"
+    },
+    {
+      "check": "payload-method:android-signing-key"
+    },
+    {
+      "check": "payload-method:wsl-build-tools"
+    },
+    {
+      "check": "payload-method:production-py312-rebuild"
+    },
+    {
+      "check": "payload-method:catalog-sqlite-file"
+    }
+  ],
+  "production_access": false,
+  "payload_verification": false
+}

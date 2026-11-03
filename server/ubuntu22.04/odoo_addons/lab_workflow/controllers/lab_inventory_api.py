@@ -70,7 +70,9 @@ class LabInventoryApi(http.Controller):
         @envelope
         def handler():
             require_lab_access()
-            return request.env['lab.workflow.common'].lab_locations()
+            data = params()
+            return request.env['lab.workflow.common'].lab_locations(
+                with_stats=data.get('with_stats', False))
         return handler()
 
     @http.route(API + '/inventory/location_create', type='jsonrpc', auth='user',
@@ -151,7 +153,7 @@ class LabInventoryApi(http.Controller):
                 query=data.get('query') or '',
                 outstanding_only=bool(data.get('outstanding_only', True)),
                 cursor=data.get('cursor'),
-                limit=int(data.get('limit') or 50),
+                limit=data.get('limit') or 50,
                 viewer_only_self=viewer_only_self,
             )
         return handler()
@@ -166,7 +168,13 @@ class LabInventoryApi(http.Controller):
                 item_key=data.get('item_key'),
                 bag_id=data.get('bag_id'),
                 cursor=data.get('cursor'),
-                limit=int(data.get('limit') or 50),
+                limit=data.get('limit') or 50,
+                # P3 新增可选过滤（不传 = 旧行为）
+                operation_type=data.get('operation_type'),
+                date_from=data.get('date_from'),
+                date_to=data.get('date_to'),
+                actor_id=data.get('actor_id'),
+                borrower_id=data.get('borrower_id'),
             )
         return handler()
 

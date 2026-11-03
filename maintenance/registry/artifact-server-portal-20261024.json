@@ -1,0 +1,12 @@
+{
+  "file": "server/releases/2026-10-24-portal/server-portal-19.0.1.0.0.tar.gz",
+  "bytes": 12611497,
+  "sha256": "8e54e2e1e51c63ca792ab8888010f958ba4feaa0baea0b09f48228b1af2c77e7",
+  "version": "19.0.1.0.0",
+  "source_manifest": "maintenance/registry/source-server-portal-final-20261024.json",
+  "source_tree_sha256": "3e097d12bfee93577b3d8a7ba954f2260a2fbd91844f60b89d3eb340978820bd",
+  "validation": "Isolated install and error login passed; production homepage/native login/13 static asset hashes/authenticated redirect/backend verified; visual and real password login unverified",
+  "environment": "Existing Ubuntu22.04 Odoo19 Python3.12; no new system dependencies",
+  "signing": "Server source archive: SHA256 verified over trusted SSH; no client signature applicable",
+  "deployment_audit": "maintenance/audit/portal-deploy-20261024.json"
+}

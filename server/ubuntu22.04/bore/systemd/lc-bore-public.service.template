@@ -1,0 +1,31 @@
+# LC_ELC managed IPv4 public tunnel; generated from a frozen source manifest.
+[Unit]
+Description=LC_ELC IPv4 bore public gateway
+After=network-online.target nginx.service
+Wants=network-online.target
+Requires=nginx.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+ExecStart=@BORE_BIN@ local @LOCAL_PORT@ --local-host 127.0.0.1 --to @RELAY_IPV4@ --port @PUBLIC_PORT@
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+UMask=0077
+Environment=RUST_LOG=info
+Environment=NO_COLOR=1
+
+[Install]
+WantedBy=multi-user.target

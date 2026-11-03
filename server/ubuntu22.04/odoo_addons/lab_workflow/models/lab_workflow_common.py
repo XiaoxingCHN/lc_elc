@@ -638,7 +638,8 @@ class LabWorkflowCommon(models.AbstractModel):
     def lab_location_by_id(self, location_id, require_internal=True):
         if not location_id:
             raise LabApiError.validation('缺少 location_id（库位）', {'location_id': 'required'})
-        location = self.env['stock.location'].browse(int(location_id)).exists()
+        location = self.env['stock.location'].browse(
+            self.lab_int(location_id, 'location_id', minimum=1)).exists()
         if not location:
             raise LabApiError.not_found('库位不存在或无权访问：%s' % location_id,
                                         {'location_id': 'not_found'})
@@ -647,6 +648,12 @@ class LabWorkflowCommon(models.AbstractModel):
                 '库位「%s」类型是 %s，不是内部库位，不能存放库存'
                 % (location.display_name, location.usage),
                 {'location_id': 'not_internal'})
+        if require_internal and not location.active:
+            # security-review S5：停用库位仍能入库/领用会造成"袋在 UI 里找不到库位"。
+            raise LabApiError.validation(
+                '库位「%s」已停用，不能用于入库/领用；请启用或改用其他库位'
+                % (location.display_name or location.name or location.id),
+                {'location_id': 'inactive'})
         company = self.env.company
         if location.company_id and location.company_id != company:
             raise LabApiError.forbidden('库位「%s」属于其他公司，当前账号无权使用'
@@ -669,7 +676,8 @@ class LabWorkflowCommon(models.AbstractModel):
     def lab_bag_by_id(self, bag_id):
         if not bag_id:
             raise LabApiError.validation('缺少 bag_id（袋）', {'bag_id': 'required'})
-        bag = self.env['lab.bag'].browse(int(bag_id)).exists()
+        bag = self.env['lab.bag'].browse(
+            self.lab_int(bag_id, 'bag_id', minimum=1)).exists()
         if not bag:
             raise LabApiError.not_found('袋不存在或无权访问：%s' % bag_id, {'bag_id': 'not_found'})
         return bag
@@ -801,6 +809,59 @@ class LabWorkflowCommon(models.AbstractModel):
                 '数量 %s 四舍五入到物料单位精度后为 %s，不能记账' % (value, rounded),
                 {field: 'rounds_to_zero'})
         return rounded
+
+    @api.model
+    def lab_int(self, value, field, minimum=None, maximum=None, default=None,
+                required=False):
+        """把客户端传来的 id/计数安全转成 int。
+
+        security-review S2：边界上的裸 ``int()`` 会让畸形入参变成
+        ``INTERNAL_ERROR``（"请把错误编号给管理员"），而这类错误本应可纠正。
+        统一在这里转成 ``VALIDATION_ERROR`` + fields。
+        """
+        if isinstance(value, bool):
+            raise LabApiError.validation('%s 必须是整数，不能是布尔值' % field,
+                                         {field: 'not_a_number'})
+        if value is None or value == '':
+            if required:
+                raise LabApiError.validation('缺少 %s' % field, {field: 'required'})
+            return default
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            raise LabApiError.validation('%s 必须是整数，收到 %r' % (field, value),
+                                         {field: 'not_a_number'})
+        if minimum is not None and number < minimum:
+            raise LabApiError.validation('%s 不能小于 %s' % (field, minimum),
+                                         {field: 'too_small'})
+        if maximum is not None and number > maximum:
+            raise LabApiError.validation('%s 不能大于 %s' % (field, maximum),
+                                         {field: 'too_large'})
+        return number
+
+    @api.model
+    def lab_float(self, value, field, default=None, minimum=None, maximum=None):
+        """把客户端传来的尺寸/份数安全转成 float（拒绝 NaN/Infinity）。"""
+        if isinstance(value, bool):
+            raise LabApiError.validation('%s 必须是数字，不能是布尔值' % field,
+                                         {field: 'not_a_number'})
+        if value is None or value == '':
+            return default
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            raise LabApiError.validation('%s 必须是数字，收到 %r' % (field, value),
+                                         {field: 'not_a_number'})
+        if math.isnan(number) or math.isinf(number):
+            raise LabApiError.validation('%s 必须是有限数字' % field,
+                                         {field: 'not_finite'})
+        if minimum is not None and number < minimum:
+            raise LabApiError.validation('%s 不能小于 %s' % (field, minimum),
+                                         {field: 'too_small'})
+        if maximum is not None and number > maximum:
+            raise LabApiError.validation('%s 不能大于 %s' % (field, maximum),
+                                         {field: 'too_large'})
+        return number
 
     @api.model
     def lab_total_on_hand(self, product, domain_extra=None):

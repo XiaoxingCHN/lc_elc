@@ -1,0 +1,12 @@
+{
+  "file": "server/releases/2026-10-24/server-dark-theme-19.0.2.0.4.tar.gz",
+  "bytes": 11538137,
+  "sha256": "c76c2f8d7e5b5ca31c2940d80749aa66d819c8e84d0377312f92aa0a7d0329d9",
+  "version": "19.0.2.0.4",
+  "source_manifest": "maintenance/registry/source-server-dark-theme-final-20261024.json",
+  "source_tree_sha256": "f265ae1e5548023d93a4bd8e22f454a5d2533adb7190f4e59189608967226cb6",
+  "validation": "Deployed lab_catalog only; production SCSS compile, authenticated backend/CSS HTTP200, 108 source matches, unchanged inventory/update channel; visual/mobile/printing unverified",
+  "environment": "Existing Ubuntu22.04 Odoo19 Python3.12 libsass",
+  "signing": "Not applicable to server source archive; SHA256 verified over trusted SSH",
+  "deployment_audit": "maintenance/audit/dark-theme-deploy-20261024.json"
+}

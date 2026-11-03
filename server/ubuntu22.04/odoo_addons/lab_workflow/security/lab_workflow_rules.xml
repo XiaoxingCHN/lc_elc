@@ -149,5 +149,13 @@
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
 
+        <!-- 类别→库位推荐映射（P3）：跨公司隔离；读由 ACL 控制，写仅管理员 -->
+        <record id="rule_lab_location_mapping_company" model="ir.rule">
+            <field name="name">类别→库位映射：仅本公司</field>
+            <field name="model_id" ref="model_lab_location_mapping"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
     </data>
 </odoo>

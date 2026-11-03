@@ -1,3 +1,19 @@
+# 最新上线状态
+
+2026-10-25 HTTPS更新：**https://team.l-creation.club/**已可用，HTTP308跳转、正常证书验证及页面/旧更新接口12项独立检查通过。自动续期未配置，HTTPS真实登录待复验；离开内网后的DSH最终审计待恢复核验。见[最新交接](../maintenance/handoffs/2026-10-25-team-https-current.md)。
+
+2026-10-25 登录补修：team认证代理已单独清除选库请求头，修复首次会话不能保存Cookie的问题；隔离断言通过，Nginx校验/reload成功。用户随后确认登录可用，刷新保持会话及退出未追加实测，见[登录审计](../maintenance/audit/team-login-cold-session-20261025.md)。
+
+2026-10-25：管理域名 **http://team.l-creation.club/** 的HTTP阶段已接通，欢迎/登录/仓库保护使用根业务路径并自动选生产库。服务器自身DNS已指向路由器，旧dnsmasq已停用并取消自启。HTTPS/LE账号协议及自动续期待处理；旧站与API保留。见[域名审计](../maintenance/audit/team-domain-http-deploy-20261025.md)与[DNS审计](../maintenance/audit/team-domain-dns-repair-20261025.md)。
+
+2026-10-25：**lab_team_web 19.0.1.0.0 已安装生产**。仅新增18文件模块，旧五模块133文件及库存基线不变；欢迎/登录/匿名保护和静态资源HTTP通过，原页面及更新通道正常。首次多库入口为 `/web/login?db=LcHardwareHouse&redirect=/team/lab`，之后使用 `/team/*`；管理根Host、根别名和DNS未切换。真实账号完整流程、生产大目录和真机未重测。见[生产审计](../maintenance/audit/team-web-production-20261025.md)和[发布核验](../maintenance/audit/team-web-publish-codex-review.md)。
+
+2026-10-24：lab_portal 方案已废弃、源码已移除，最近生产审计为 uninstalled；[门户交接](../maintenance/handoffs/2026-10-24-portal-deploy.md)仅保留历史安装证据。
+
+2026-10-24：**lab_catalog19.0.2.0.4 暗色主题已上线**。仅更新主题与资产配置，服务active、认证后台/主题CSS200、库存计数和更新通道不变；视觉及手机验收尚未完成。备份与验证见[主题交接](../maintenance/handoffs/2026-10-24-dark-theme-deploy.md)。
+
+lab_workflow19.0.1.2.0更新接口已按本轮明确授权上线，服务active，Android manifest200（1.1.3+6 stable）、Windows/Linux204；备份、权限和库存不变证据见[交接](../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。以下此前候选/部署说明为各自时点。
+
 # Odoo服务端唯一维护入口
 
 当前源码和部署工具在[ubuntu22.04](ubuntu22.04/)；三个自定义模块在odoo_addons。保持内部布局，升级脚本会按自身目录导入lc_odoo_conf.py，安装器会寻找tools/crawler/odoo_addons。不要只移动一个脚本。
@@ -5,6 +21,7 @@
 - lab_inventory 19.0.1.0.0：依赖stock/product/mrp，属于必要业务底层。
 - lab_catalog 19.0.2.0.3：资料与统一网页仓库。
 - lab_workflow 19.0.1.1.0：库存工作流、两阶段入库、追溯标签和角色显示；2026-10-19已上线，实际版本、备份和验收见[本轮交接](../maintenance/handoffs/2026-10-19-server-deploy.md)。
+- 当前维护源为19.0.1.2.0候选，新增客户端更新只读分发接口，尚未部署，见[更新器实现](../docs/development/CLIENT_UPDATE_IMPLEMENTATION.md)。分发根取Odoo真实data_dir，不与库存附件混放。
 
 归档成品修复包在releases/2026-10-18，导入时与源102文件hash逐项一致；后续候选源码已变更，不能再把该旧包当作新源码构建物。旧Ubuntu整包在local/archive/packages，仅是20261015历史，不能拿旧包覆盖当前模块。
 

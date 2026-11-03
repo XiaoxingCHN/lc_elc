@@ -69,3 +69,13 @@ local.properties
 
 # Local TOMC project notebooks and machine-specific configuration.
 /.tomc/
+
+# Machine-local materials that must never be committed: bundled Python
+# distribution, 3D exports, and projectgraph generated artifacts/backups.
+/Python/
+clients/app/t.obj
+/docs/architecture/.projectgraph-mcp-backups/
+/docs/architecture/warehouse-readable/
+/docs/architecture/*.prg
+/docs/architecture/WAREHOUSE_PATH_*.md
+/docs/architecture/warehouse-path-calls-*.json

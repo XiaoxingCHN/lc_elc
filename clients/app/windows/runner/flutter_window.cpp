@@ -1,6 +1,9 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+#include <netlistmgr.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -25,6 +28,27 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  flutter::MethodChannel<flutter::EncodableValue> updates(
+      flutter_controller_->engine()->messenger(), "lab/client_update",
+      &flutter::StandardMethodCodec::GetInstance());
+  updates.SetMethodCallHandler([](const auto& call, auto result) {
+    if (call.method_name() == "facts") {
+      // GetVersionEx reports the supported OS version from our application manifest.
+      OSVERSIONINFOW version{}; version.dwOSVersionInfoSize = sizeof(version);
+#pragma warning(suppress: 4996)
+      GetVersionExW(&version);
+      result->Success(flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("windows_build"), flutter::EncodableValue(static_cast<int>(version.dwBuildNumber))}}));
+    } else if (call.method_name() == "unmetered") {
+      INetworkCostManager* manager = nullptr;
+      DWORD cost = NLM_CONNECTION_COST_UNKNOWN;
+      if (SUCCEEDED(CoCreateInstance(CLSID_NetworkListManager, nullptr, CLSCTX_ALL,
+          IID_PPV_ARGS(&manager)))) {
+        manager->GetCost(&cost, nullptr); manager->Release();
+      }
+      result->Success(flutter::EncodableValue(cost == NLM_CONNECTION_COST_UNRESTRICTED));
+    } else { result->NotImplemented(); }
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

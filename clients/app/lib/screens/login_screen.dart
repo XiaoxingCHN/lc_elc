@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/odoo_config.dart';
+import '../updates/update_ui.dart';
 import '../features/unified/unified_routes.dart';
 import '../providers/auth_provider.dart';
 import '../routes/offline_access.dart';
@@ -253,6 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         title: Text(title),
         content: Text(message),
         actions: [
+          const ClientUpdateButton(),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('取消'),

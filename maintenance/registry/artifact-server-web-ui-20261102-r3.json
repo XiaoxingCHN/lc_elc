@@ -1,0 +1,392 @@
+{
+  "file": "local/build/web-ui-20261102/candidates/server-web-ui-20261102-r3-source.zip",
+  "bytes": 13251571,
+  "sha256": "3800e2a210a1c0fdad562112b4682ed02d83ae466f678443bfafb1923a02d4f7",
+  "version": "lab_workflow19.0.2.0.0+lab_team_web19.0.1.2.0+server-ops2026.11.02.1",
+  "source_manifest": "maintenance/registry/source-server-web-ui-20261102-r3.json",
+  "source_tree_sha256": "95baea916fbe4c8504e9a3bc2ce1c18235cf53689373d323b32d914d1e1fe8de",
+  "candidate_entries": 259,
+  "validation": "r3 为第二次重新冻结：在 r2 之后又修了两处深色视觉缺陷，并补齐了 r2 时 3 项 blocked 的真实浏览器检查。相对 r2 只改 lab_team_web/static/src/css/team.css（258 个源文件数量不变，无文件增删）：① 在 body.lc-body 令牌块内（team.css:38-41，--lc-ease 之后、display:flex 之前）新增 color-scheme: dark，使原生滚动条/select/input 按深色 UA 渲染；② team.css:2181 的 .lc-combobox-pop 由 max-width: min(540px, calc(100vw - 28px)) 改为 min(780px, calc(100vw - 28px))，桌面 1440 时候选弹层与 770px 输入框同左同宽，窄屏仍受视口约束；注释补句在 team.css:2166。其余 CSS 属性、JS、XML、Python 均未改。本轮在隔离的 WSL Odoo 19 实例上以 -u lab_team_web 跑模块测试 RUN=upgrade-keepdb-20261102T134429Z，ODOO_EXIT=0、52 tests、FAIL:/ERROR: 计数 0；下拉截图断言 53/53 pass、0 fail（1440 视口 input=770px、pop=770px，gap 0；375 视口 input=pop=277px 且 document.scrollWidth=375 无横向溢出；5 个用例 colorScheme 实测均为 dark）；完整真实浏览器套件 55/55 全绿（fail 0、blocked 0、exitCode 0），静态袋详情与动态袋详情均按 1440/375 实跑；另有 --only=pages 复跑 35 项 32 pass / 0 fail / 3 blocked（3 个 blocked 为 --only 主动跳过标记），用于留下未被子动态袋覆盖的静态袋 41 截图。repo_check PASS 52 checks / 0 errors / 1 known warning（production-py312-rebuild），git diff --check 退出 0。未部署到生产；本轮未接触生产主机、未使用凭据，部署包仅在本机构建。 【2026-11-03 更新】上述「未部署到生产；未接触生产主机、未使用凭据」描述的是 r3 候选验证时点的状态；该候选已于 2026-11-03T003543Z 部署到生产 LcHardwareHouse（DEPLOY_STATE=completed），部署实测见本文件的 production_deployment 与 validation_results.production_post_verify / public_regression。",
+  "source_manifest_sha256": "2192a3545ebbe2ea3293072d1cc971a8deab1e524a4e39c20503d760888a7224",
+  "source_commit": "b3bcbf244e44939c6d481e3f97f11579cdf9ee99",
+  "source_worktree": "未提交的候选工作区（本轮不 commit / 不 push）；以冻结的 r3 源清单 maintenance/registry/source-server-web-ui-20261102-r3.json 为准",
+  "kind": "source-only-local-candidate",
+  "production_deployed": true,
+  "build_environment": {
+    "os": "Windows 11",
+    "python": "3.15.0",
+    "packaging": "stdlib zipfile 确定性打包（同 r2 口径）：entries 排序（MANIFEST.json 在首）、固定 1980-01-01 元数据、mode 0644、deflate 9；逐文件 raw 与 LF 归一化 SHA256 校验，写入后回读归档复核",
+    "source_files": 258,
+    "archive_entries": 259
+  },
+  "signing": {
+    "status": "not_applicable",
+    "reason": "纯源码候选，未签名（非可执行应用、非签名生产发布物）"
+  },
+  "build_report": "local/build/web-ui-20261102/candidates/build-summary-20261102-r3.json",
+  "notes": [
+    "r3 相对 r2 的源码变更共 2 处，均在 lab_team_web/static/src/css/team.css：",
+    "① team.css:38-41（body.lc-body 令牌块内，--lc-ease 之后、display:flex 之前）新增 color-scheme: dark，使原生滚动条/select/input 按深色 UA 渲染（修复 r2 记录的遗留 B：缺 color-scheme 导致原生控件在 Windows 上按浅色渲染）。",
+    "② team.css:2181 的 .lc-combobox-pop 由 max-width: min(540px, calc(100vw - 28px)) 改为 min(780px, calc(100vw - 28px))，桌面 1440 时候选弹层与 770px 输入框同左同宽，窄屏仍受视口约束（修复 r2 记录的遗留 C：1440 下拉偏窄）。注释补句在 team.css:2166。",
+    "其余 CSS 属性、JS、XML、Python 均未改；manifest 差异仅 team.css 一个文件，258 个源文件数量不变（无增删）。",
+    "r2 的 3 项 blocked 本轮已补齐为真实检查：真实浏览器套件 55/55 全绿、fail 0、blocked 0。"
+  ],
+  "supersedes": "maintenance/registry/artifact-server-web-ui-20261102-r2.json",
+  "deploy_bundle": {
+    "file": "local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102-r3.tar.gz",
+    "bytes": 93486,
+    "sha256": "34a485101b3a1725e45375a1b97cf94079a80414166dc2ff24c4cc726824f67a",
+    "entries": 27,
+    "freeze_entries": 18,
+    "bundle_meta_shipped_scripts": 15,
+    "bundle_meta_freeze_sha256": "f0dce4080e6170587bbda6e3836ab4f88c62ded4e7ef0dc5c76bbeff5e21401b",
+    "packed_against_manifest": "source-server-web-ui-20261102-r3",
+    "params": "local/build/web-ui-20261102/candidates/params.env",
+    "params_contains_secrets": false,
+    "freeze_file": "FROZEN-20261102.sha256",
+    "pack_command": "python local/web-ui-implementation/scripts/pack-bundle.py --out local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102-r3.tar.gz --params local/build/web-ui-20261102/candidates/params.env",
+    "pack_rc": 0,
+    "contents": "lc_root.py + remote/（14 个脚本、params.env、params.env.example）+ tools/（5 个脚本）+ gateway_source/（4 个文件）+ FROZEN-20261102.sha256 + bundle-meta.json",
+    "integrity_note": "用 python tarfile 回读：27 个成员、归档 sha256 一致；FROZEN-20261102.sha256 共 18 条 hash（15 条随包脚本 + 3 个仅本机使用的辅助脚本 check-scripts.py / pack-bundle.py / askpass.cmd，后者按设计不在归档内）；bundle-meta.json 记 freeze_sha256=f0dce408…、shipped_script_count=15。本块数值为 2026-11-03 生产部署实际使用的最终包；部署期修复 5 个脚本缺陷后 FROZEN-20261102.sha256 已同步，故 freeze sha 由 r3 打包时的 93b07b02… 变为 f0dce408…。",
+    "intermediate_bundles": [
+      {
+        "bytes": 91307,
+        "sha256": "8215a7958fe227452f19f3458a149509169cfd3cf26fadfbd6ecad82b6e8f02d",
+        "sha256_partial": false
+      },
+      {
+        "bytes": 91586,
+        "sha256_prefix": "e453db43",
+        "sha256_partial": true
+      },
+      {
+        "bytes": 92857,
+        "sha256_prefix": "085945a2",
+        "sha256_partial": true
+      }
+    ],
+    "intermediate_note": "以上三包为部署前中途打包，均**非最终**、未用于部署、不得当作最终值引用；最终包为 93,486 B / 34a48510…（27 条目 / FROZEN 18 / shipped 15 / freeze f0dce408…）。 其中 91,586 B 与 92,857 B 两包的事实表只记录 sha256 前缀（e453db43… / 085945a2…），未保留完整 hash，故以 sha256_prefix 记录、不伪造全长值。"
+  },
+  "production_deployment": {
+    "deployed": true,
+    "completed_utc": "20261103T003543Z",
+    "window_utc": "2026-11-03 00:16–00:36Z",
+    "deploy_state": "completed",
+    "facts_proven": 43,
+    "host": {
+      "alias": "lc-nas",
+      "address": "192.168.31.105",
+      "user": "hbut",
+      "environment": "production",
+      "odoo": "19",
+      "odoo_bin": "/opt/odoo/odoo-19/odoo-bin",
+      "python": "3.12.15（/opt/odoo/venv/bin/python3）",
+      "config": "/etc/odoo.conf",
+      "addons": "/opt/odoo/custom-addons",
+      "data_dir": "/opt/odoo/.local/share/Odoo",
+      "db": "LcHardwareHouse",
+      "base_version": "19.0.1.3",
+      "modules_installed": 55,
+      "nginx_version": "1.18.0"
+    },
+    "backup": {
+      "dir": "/opt/odoo/backups/20261103T001648Z-p3-web-20261103T000658Z/",
+      "db_dump": {
+        "bytes": 110944415,
+        "sha256": "40c76d0679d2a7915ba5857d5009c291c18f17fdf239803a484246228993ba19"
+      },
+      "filestore_tar_gz": {
+        "bytes": 12819190,
+        "sha256": "305b841f50f0b3417b120a3ff0b52e61800d533f3a2337418f3114a2d85abfda",
+        "entries": 611
+      },
+      "manifest": "MANIFEST.json",
+      "odoo_log_tail": "odoo.log.tail",
+      "store_fname_distinct": 139,
+      "filestore_entries": 140,
+      "store_fname_missing": 0,
+      "service_was_active": false,
+      "consistency_note": "停服态一致备份：service_was_active=false 证明 dump 前服务已停；store_fname 差集 139/140/缺失 0。"
+    },
+    "source_rollback_snapshot": "/opt/odoo/backups/module-source-before-20261103T000658Z/{lab_site,lab_team_web,lab_theme}",
+    "module_upgrade": {
+      "deploy_modules": [
+        "lab_site",
+        "lab_team_web",
+        "lab_theme"
+      ],
+      "upgrade_modules": [
+        "lab_team_web"
+      ],
+      "lab_site_note": "仅权限归一，内容 = 冻结内容",
+      "lab_theme_note": "仅由 deploy-theme.sh 换成冻结版",
+      "lab_team_web_before": "19.0.1.1.0",
+      "lab_team_web_after": "19.0.1.2.0",
+      "unchanged_versions": {
+        "lab_workflow": "19.0.2.0.0",
+        "lab_catalog": "19.0.2.0.5",
+        "lab_inventory": "19.0.1.0.0"
+      },
+      "upgrade_exit": 0,
+      "error_lines": 0
+    },
+    "menus": {
+      "before_rows": 234,
+      "before_lab_rows": 21,
+      "before_sha256": "3eb392d032ae1c0ed7a78456cd837c89aa1dc9f7ffc3f167c2e211b24a5e7c2a",
+      "removed": 0,
+      "added": 1,
+      "changed": 12,
+      "match": 1,
+      "added_xmlid": "lab_team_web.menu_legacy_label_wizard",
+      "added_id": 382,
+      "added_parent": "lab_workflow.menu_lab_config",
+      "added_action": "lab_workflow.action_lab_label_open",
+      "changed_note": "12 条仅 action 字段变化（旧入口改指），菜单结构不变",
+      "tree_stable_sha256": "bafa905fc5f5fdb65fe3ea72af42647e78300b685d5323b9764db26e9ec64b8c"
+    },
+    "gateway": {
+      "release_dir": "/var/lib/lc-elc-bore/releases/p3-web-20261103T002651Z",
+      "include_file": "/etc/nginx/conf.d/lc-bore-netlify.conf",
+      "include_sha256_after": "34289f2612c9adb460c787c6765f72525bd1db5359eff515164cbb1ab42508ef",
+      "include_sha256_before": "bb3164e5630cc70cb24e9a1f95bdf8b5e40492ddee721c5ec5d01de2f2d8c4e9",
+      "rollback_point": "/var/lib/lc-elc-bore/releases/p3-web-20261103T002651Z/rollback/project-include.before",
+      "allowlist": {
+        "pages": 24,
+        "apis": 5,
+        "legacy": 13
+      },
+      "untouched": [
+        "lc-bore-public.conf",
+        "DNS",
+        "Docker",
+        "其他服务"
+      ]
+    },
+    "verify": {
+      "result": "PASS",
+      "checks": 129,
+      "failed": 0,
+      "json": "/var/tmp/lc-deploy/verify-20261103T003528Z.json",
+      "facts_env": "/var/tmp/lc-deploy/verify-facts-20261103T003528Z.env",
+      "module_byte_equal_files": {
+        "lab_site": 19,
+        "lab_team_web": 58,
+        "lab_theme": 6
+      },
+      "legacy_actions": "13 条 legacy action 全部 GET/HEAD 可过、POST 全部被拒",
+      "blocked_paths": "/web/login、/database、/jsonrpc、ORM 路径均 404",
+      "public_probe": "通过",
+      "workflow_core_js_sha256": "6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936"
+    },
+    "close": {
+      "deploy_state": "completed",
+      "completed_utc": "20261103T003543Z",
+      "facts_proven": 43,
+      "run_env": "/var/tmp/lc-deploy/run-20261103T001600Z.env",
+      "run_env_sha256": "20f5b3fe34c2ed6c1c3f35a6141368a729a4e3baf4532ccdafe5dfb7905ec008",
+      "log": "/var/tmp/lc-deploy/close-20261103T003543Z.log",
+      "service_active": true,
+      "http_login_code": 200
+    },
+    "public_regression_summary": "team.l-creation.club（Netlify→bore→网关）全项通过：/ 200、/login 200、/team/login 200、/team/lab/receipts 303、/team/scan 303、/lab/bags 303、两条旧 action 303、/web/login 404、GET /lab/api/inventory/bags 403、POST /team/lab/receipts 403、POST /lab/api/catalog/search 415、workflow_core.js sha 一致、pages/receipts.js 200、workflow_receipt.css 200。",
+    "evidence": {
+      "archive": "local/web-ui-implementation/evidence/production/p3-deploy-evidence-20261103.tar.gz",
+      "bytes": 21344,
+      "sha256": "53433008c3bb6ae48da899105e64d2fd6e814b24a47d5b2617a3fe9cdc8069b5",
+      "entries": 20
+    },
+    "credentials": {
+      "dpapi_blob": "local/private/web-ui-20261102.dpapi",
+      "status": "BLOB_DELETED",
+      "note": "部署后已删除；本机不再存生产口令，仓库内无凭据"
+    },
+    "not_done": [
+      "未 commit / push（分支 codex/receipt-search-feedback 仍在工作区）",
+      "未建或发布客户端包（客户端 1.1.3+6 不变）",
+      "未做真实业务写入（部署后仅只读验收）",
+      "未动 DNS / Docker / 其他服务 / 其他库",
+      "未执行回滚（回滚点已备）",
+      "未读 CI"
+    ]
+  },
+  "validation_results": {
+    "module_suite_on_upgrade": {
+      "command": "bash local/web-ui-implementation/browser/upgrade-only-test.sh (-u lab_team_web --test-enable --test-tags=/lab_team_web --stop-after-init --http-port=18071)",
+      "run": "upgrade-keepdb-20261102T134429Z",
+      "odoo_exit": 0,
+      "tests": 52,
+      "failed": 0,
+      "errors": 0,
+      "log": "local/web-ui-implementation/evidence/upgrade-keepdb-20261102T134429Z.log",
+      "at_install_note": "日志内 FAIL: / ERROR: 计数均为 0；隔离实例 db p3_ui_20261102，模块 lab_team_web 52 tests"
+    },
+    "db_version_after_upgrade": {
+      "db": "p3_ui_20261102（隔离 WSL 实例）",
+      "lab_team_web": "19.0.1.2.0 installed",
+      "lab_workflow": "19.0.2.0.0 installed",
+      "lab_catalog": "19.0.2.0.5 installed",
+      "note": "r3 只改 CSS，模块版本未再 bump；升级前的起始状态与 r2 时相同"
+    },
+    "dropdown_capture": {
+      "total": 53,
+      "pass": 53,
+      "fail": 0,
+      "failed_ids": [],
+      "exit": 0,
+      "evidence": "local/web-ui-implementation/out/receipt-dropdown-20261102/evidence.json",
+      "command": "node local/web-ui-implementation/browser/capture-receipt-dropdown.mjs",
+      "measured": {
+        "viewport_1440": {
+          "input_width_px": 770,
+          "pop_width_px": 770,
+          "gap_px": 0,
+          "note": "修复前 pop=540px"
+        },
+        "viewport_375": {
+          "input_width_px": 277,
+          "pop_width_px": 277,
+          "document_scrollWidth": 375,
+          "horizontal_overflow": false
+        },
+        "color_scheme_cases": {
+          "cases": 5,
+          "all_dark": true,
+          "note": "修复前实测为 normal"
+        },
+        "chrome": "headless Chrome 156.0.8078.74"
+      },
+      "screenshots": [
+        "local/web-ui-implementation/out/receipt-dropdown-20261102/width-fix-1440.png (118,206 B, 1440×900)",
+        "local/web-ui-implementation/out/receipt-dropdown-20261102/width-fix-375.png (67,712 B, 375×812)",
+        "local/web-ui-implementation/out/receipt-dropdown-20261102/width-fix-measure.json (度量原始数据)"
+      ],
+      "note": "断言覆盖真实 POST /lab/api/catalog/search 流量、候选项展示 code/name/model/package 且无内部前缀、弹层完全在视口内且每个可见项可命中、选定后输入已提交键值、重复本地档案显式选择、深色令牌与 lime hover 强调色"
+    },
+    "full_real_ui_suite": {
+      "total": 55,
+      "pass": 55,
+      "fail": 0,
+      "blocked": 0,
+      "exit_code": 0,
+      "report": "local/web-ui-implementation/out/run-real-2026-11-02T13-38-39-691Z/report.json",
+      "command": "node local/web-ui-implementation/run-real-ui.mjs (meta.only = env, pages, interactions, drawer, manager)",
+      "write_gate": "writeGate 全 true（envDbPrefixOk / allowWrite / sessionDbChecked / sessionDbMatched / sessionDbSynthetic）",
+      "chrome": "156.0.8078.74；target http://127.0.0.1:18069；playwright 1.62.1",
+      "delta_vs_previous": "上一轮 54 项 = 51 pass / 0 fail / 3 blocked：本轮 deferred 项消失，静态袋详情按 1440/375 真跑出 2 条，故 55 项全绿",
+      "key_evidence": {
+        "real-bag-detail-1440 / real-bag-detail-375": "访问 /team/lab/bags/41（lab.bag id=41，trace TRC00000045，company=1）：httpStatus 200、errCount 0、horizontalOverflow false、smallTargetCount 0",
+        "real-receipt-multi-create-lock": "archiveId=13（product.template 13，C990000001，tracking=none，无批次库存 12.00）：createPosts=1、payloadTemplate=13、payloadMatch true、trace TRC00000046",
+        "real-receipt-legacy-precondition": "code=PRECONDITION_FAILED、fieldsItemKey=legacy_untracked_stock、库存 12→12 未变、hasBag false、界面提示可见"
+      }
+    },
+    "pages_only_rerun": {
+      "total": 35,
+      "pass": 32,
+      "fail": 0,
+      "blocked": 3,
+      "exit_code": 3,
+      "report": "local/web-ui-implementation/out/run-real-2026-11-02T13-40-31-993Z/report.json",
+      "only": [
+        "pages"
+      ],
+      "purpose": "留下未被动态袋覆盖的静态袋 41 截图",
+      "blocked_note": "3 个 blocked 全部是 --only 主动跳过 interactions / drawer / manager 的标记，非失败",
+      "shot": "local/web-ui-implementation/out/run-real-2026-11-02T13-40-31-993Z/shots/real-bag-detail-1440.png (172,807 B, 1440×2258)"
+    },
+    "repo_check": {
+      "result": "PASS",
+      "passed_checks": 52,
+      "errors": 0,
+      "warnings": 1,
+      "warning_ids": [
+        "production-py312-rebuild"
+      ],
+      "evidence": "local/web-ui-implementation/evidence/repo-check-20261102-r3.json",
+      "exit": 0
+    },
+    "git_diff_check": {
+      "exit": 0,
+      "note": "仅 stderr 上有 CRLF 归一化提示（core.autocrlf=true，与 10-28 清单一致）"
+    },
+    "reused_results": {
+      "note": "以下为本轮未重跑、且与 r3 的 CSS 改动无关的既有结果，沿用上一轮记录（非 r3 新测）",
+      "combobox": {
+        "total": 20,
+        "pass": 20,
+        "fail": 0
+      },
+      "workflow_core": {
+        "total": 19,
+        "pass": 19,
+        "fail": 0
+      },
+      "legacy_action_gateway_contract": {
+        "ran": 19,
+        "skipped": 7,
+        "failed": 0,
+        "note": "unittest 报 OK (skipped=7)，skips 与环境相关（本机无 live gateway/nginx）"
+      },
+      "client_flutter": {
+        "tests": "295 passed / 5 skipped",
+        "analyze": "0 error / 0 warning / 119 info",
+        "source_manifest": "169 files，tree ee5adebdaa0c3e81dfa616b8dc55243d6419790422b93b010f9126f3aaa70072，清单 sha256 d703e507cd04bbe6bad648a3bf263b79d6626bf34ae77bba45cae88d6d37952f",
+        "version": "1.1.3+6（本轮未构建、未发布 APK）"
+      }
+    },
+    "production_post_verify": {
+      "command": "remote/50-verify.py（只读验收，生产 192.168.31.105，DB LcHardwareHouse）",
+      "result": "PASS",
+      "checks": 129,
+      "failed": 0,
+      "evidence": "/var/tmp/lc-deploy/verify-20261103T003528Z.json",
+      "facts_env": "/var/tmp/lc-deploy/verify-facts-20261103T003528Z.env",
+      "module_byte_equal_files": {
+        "lab_site": 19,
+        "lab_team_web": 58,
+        "lab_theme": 6
+      },
+      "legacy_action_guard": "13 条 legacy action GET/HEAD 全过、POST 全拒",
+      "blocked_paths": "/web/login、/database、/jsonrpc、ORM 404",
+      "workflow_core_js_sha256": "6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936",
+      "close": {
+        "deploy_state": "completed",
+        "completed_utc": "20261103T003543Z",
+        "facts_proven": 43,
+        "run_env_sha256": "20f5b3fe34c2ed6c1c3f35a6141368a729a4e3baf4532ccdafe5dfb7905ec008",
+        "service_active": true,
+        "http_login_code": 200
+      }
+    },
+    "public_regression": {
+      "chain": "team.l-creation.club → Netlify → bore → 网关（release p3-web-20261103T002651Z）",
+      "result": "PASS",
+      "checks": {
+        "GET /": 200,
+        "GET /login": 200,
+        "GET /team/login": 200,
+        "GET /team/lab/receipts": 303,
+        "GET /team/scan": 303,
+        "GET /lab/bags": 303,
+        "GET /odoo/action-lab_workflow.action_lab_scan_console": 303,
+        "GET /odoo/action-lab_inventory.action_lab_mapping": 303,
+        "GET /web/login": 404,
+        "GET /lab/api/inventory/bags": 403,
+        "POST /team/lab/receipts": 403,
+        "POST /lab/api/catalog/search": 415,
+        "GET pages/receipts.js": 200,
+        "GET workflow_receipt.css": 200,
+        "workflow_core.js sha256": "6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936（与冻结一致）"
+      }
+    }
+  },
+  "limitations": [
+    "隔离运行环境为 WSL 内 Python 3.10.12 + Odoo 19，生产为 Python 3.12.15；不声称运行时等价；生产 cp312 离线闭包仍缺（repo_check 的 production-py312-rebuild 警告）。",
+    "本轮未做真实业务写入：生产只有只读验收与公网只读回归，业务单据与库存对账未在生产走过。",
+    "未执行回滚（含演练）：回滚点（一致备份、模块源码快照、网关 include 备份）均在位，但本轮未实际演练。",
+    "真实浏览器套件存在自身证据缺陷（工具问题，非产品缺陷）：给了 WEBUI_BAG_ID 后，静态袋页与交互节动态袋详情共用测试 id 前缀 real-bag-detail-<1440|375>，同一 id 出现两次且截图按 id 命名互相覆盖，13-38-39Z 目录里 real-bag-detail-1440.png 实际是动态袋 42；已用 --only=pages 复跑留下静态袋 41 截图。建议后续把静态页 id 改成 real-page-bag-detail-<vw>，本轮不改工具源码。",
+    "同库并发跑浏览器套件会互相污染合成数据，只能串行执行。",
+    "纯源码候选未签名（signing.status=not_applicable），无签名公证书；不得声称已签名。",
+    "r1/r2 候选包与各自 artifact 登记保留为历史，不覆盖；r3 为当前候选且已部署。"
+  ]
+}

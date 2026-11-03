@@ -1,0 +1,75 @@
+{
+  "file": "local/build/p3-web-20261028/candidates/server-p3-web-20261028-source.zip",
+  "bytes": 13186981,
+  "sha256": "9070800b65b8fa3c751b5d4ac0dc5d94910a97e27128adbd0ff4370c4549e564",
+  "version": "lab_workflow19.0.2.0.0+lab_team_web19.0.1.1.0+server-ops2026.10.28.1",
+  "source_manifest": "maintenance/registry/source-server-p3-web-20261028.json",
+  "source_tree_sha256": "fc2d538da7965c2def6b66f8e551948e19d282641f40883bcd45e40dddf5ab43",
+  "validation": "Local candidate verified: repo_check 52/0; current-source business ORM 82/0/0; HttpCase 21/0/0; real API 54 pass/0 fail/1 blocked; browser 28 pass/0 fail/3 blocked; standalone concurrent scenarios 6/6 with negative control detected; two real Nginx versions 34/34 each. See validation_results and handoff for limits.",
+  "source_manifest_sha256": "0bfc1e3f581d90109c3e8942ff85cd9880a22ceac950d3c6fd93c0e90389c164",
+  "source_commit": "14cf1ef44c6da1a1c1e4a77bbe51c446023a1e71",
+  "source_worktree": "uncommitted candidate; immutable source manifest is authoritative",
+  "kind": "source-only-local-candidate",
+  "production_deployed": false,
+  "build_environment": {
+    "os": "Windows 11",
+    "python": "3.15.0",
+    "packaging": "stdlib zipfile; sorted entries, fixed metadata; per-file raw and LF-normalized SHA256 verified",
+    "source_files": 250,
+    "archive_entries": 251
+  },
+  "signing": {
+    "status": "not_applicable",
+    "reason": "Source-only ZIP, not an executable application or a signed production release"
+  },
+  "build_report": "local/build/p3-web-20261028/candidates/build-summary-20261028.json",
+  "validation_results": {
+    "business_orm": {
+      "total": 82,
+      "failed": 0,
+      "errors": 0,
+      "evidence": "local/build/p3-web-20261028/backend-orm-final.log"
+    },
+    "httpcase": {
+      "total": 21,
+      "failed": 0,
+      "errors": 0,
+      "evidence": "local/build/p3-web-20261028/httpcase-r8.log"
+    },
+    "api": {
+      "total": 55,
+      "pass": 54,
+      "fail": 0,
+      "blocked": 1,
+      "reason": "No P3_GATE_URL supplied; real Nginx gate checked independently"
+    },
+    "browser": {
+      "total": 31,
+      "pass": 28,
+      "fail": 0,
+      "blocked": 3,
+      "evidence": "local/build/p3-web-20261028/runs/browser-20261028T065311Z/browser-p3.json"
+    },
+    "standalone_concurrency": {
+      "total": 6,
+      "pass": 6,
+      "negative_control_detected": true,
+      "evidence": "local/build/p3-web-20261028/concurrency-standalone-r3.json"
+    },
+    "test_enable_concurrency": "BLOCKED by Odoo Registry lock; not counted as PASS; wrapper exits 1 despite 82 business cases passing",
+    "nginx": {
+      "1.26.2": 34,
+      "1.30.6": 34
+    },
+    "repo_check": {
+      "checks_passed": 52,
+      "errors": 0
+    }
+  },
+  "limitations": [
+    "Browser DOM cross-user return, different payload with same key and injected network-loss retry not executed; other-layer coverage is separate",
+    "Isolated Odoo19/Python3.10.12 is not production Python3.12.15 equivalence",
+    "Physical camera/printed labels and mobile-data/no-VPN acceptance not performed",
+    "Source-only candidate is not a complete offline recovery or deployment bundle; production-py312-rebuild remains open"
+  ]
+}

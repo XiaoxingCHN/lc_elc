@@ -156,8 +156,25 @@ def main():
         raise OpsError('备份目录已存在，拒绝覆盖：%s' % target)
 
     filestore = conf_mod.filestore_path(conf, dbname)
+    candidates = [p for p in conf_mod.filestore_candidates(conf, dbname) if p.is_dir()]
+    if candidates:
+        filestore = max(candidates, key=lambda p: sum(
+            1 for f in p.rglob('*') if f.is_file()))
     fs_size = sum(f.stat().st_size for f in filestore.rglob('*') if f.is_file()) \
         if filestore.is_dir() else 0
+    # 附件完整性：库里有 store_fname 但归档为空 → 拒绝产出“看似成功”的备份
+    stored = int(run_psql(conf, "SELECT count(DISTINCT store_fname) FROM ir_attachment "
+                               "WHERE store_fname IS NOT NULL AND store_fname <> ''",
+                          None, dbname) or 0)
+    fs_files = sum(1 for f in filestore.rglob('*') if f.is_file()) if filestore.is_dir() else 0
+    print('  filestore %s（%d 个文件；库内引用 %d 个）' % (filestore, fs_files, stored))
+    if stored and not fs_files:
+        raise OpsError('附件完整性校验失败：数据库有 %d 个文件附件，但 filestore 目录为空：%s\n'
+                       '  请确认 data_dir（Odoo 未配置时默认 ~/.local/share/Odoo），'
+                       '  不要用空归档冒充完整备份' % (stored, filestore))
+    if stored and fs_files < stored:
+        print('  !! 警告：filestore 文件数 %d 少于库内唯一引用 %d（可能有去重/残留）'
+              % (fs_files, stored))
     need = int((db_size + fs_size) * 1.6) + 64 * 1024 * 1024
     free = shutil.disk_usage(out_root_real.anchor or '/').free
     if free < need:
