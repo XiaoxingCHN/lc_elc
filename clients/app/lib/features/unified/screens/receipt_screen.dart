@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import '../models/detail_models.dart';
 import '../models/identity.dart';
 import '../models/inventory.dart';
+import '../models/unified_item.dart';
 import '../providers/catalog_providers.dart';
 import '../providers/inventory_providers.dart';
 import '../unified_routes.dart';
+import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
 import '../widgets/status_views.dart';
@@ -51,6 +53,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   final TextEditingController _note = TextEditingController();
   bool _prefilled = false;
 
+  /// The card committed by the LAST inline suggestion pick.
+  ///
+  /// It lets a later keystroke in the same field drop that pick instead of
+  /// leaving a stale card armed while the operator searches for another one.
+  String? _suggestPicked;
+
   @override
   void initState() {
     super.initState();
@@ -91,6 +99,30 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           itemKey: item.itemKey,
           itemName: item.title,
         );
+  }
+
+  void _commitSuggestion(UnifiedItem item) {
+    _suggestPicked = item.itemKey;
+    ref.read(receiptControllerProvider.notifier).setItem(
+          itemKey: item.itemKey,
+          itemName: item.name.isNotEmpty
+              ? item.name
+              : (item.mpn.isNotEmpty ? item.mpn : item.catalogCode),
+        );
+  }
+
+  /// Drops a card committed by an earlier suggestion pick as soon as the
+  /// operator types in the field again.
+  ///
+  /// Without this a half-typed query would leave the previous card armed and
+  /// the operator could submit a receipt for a card the query no longer names.
+  /// A pick that has since been replaced (scan / picker / reset) is ignored.
+  void _releaseSuggestion(String _) {
+    final picked = _suggestPicked;
+    if (picked == null) return;
+    _suggestPicked = null;
+    if (ref.read(receiptControllerProvider).itemKey.trim() != picked) return;
+    ref.read(receiptControllerProvider.notifier).setItem(itemKey: '');
   }
 
   Future<void> _confirmAndSubmit() async {
@@ -186,9 +218,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
     // The card's local archives: needed so a multi-archive C code makes the
     // operator choose the SN BEFORE anything is submitted.
-    if (itemKey.isNotEmpty) {
-      final detail = ref.watch(catalogDetailProvider(itemKey));
-      final materials = detail.valueOrNull?.detail.materials ?? const <LabMaterial>[];
+    final detail =
+        itemKey.isEmpty ? null : ref.watch(catalogDetailProvider(itemKey));
+    if (detail != null) {
+      final materials =
+          detail.valueOrNull?.detail.materials ?? const <LabMaterial>[];
       if (materials.isNotEmpty && !_sameMaterials(materials, state.materials)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -196,6 +230,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         });
       }
     }
+
+    // Archives of a freshly picked card are still on their way: hold the submit
+    // so this C code cannot be received against an implicitly guessed archive.
+    final archivesLoading = itemKey.isNotEmpty &&
+        state.materials.isEmpty &&
+        (detail?.isLoading ?? false);
 
     return Scaffold(
       appBar: LabAppBar(fallbackLocation: '/catalog',
@@ -259,6 +299,27 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  CatalogSuggestField(
+                    enabled: !state.isBusy,
+                    onSelected: _commitSuggestion,
+                    onQueryChanged: _releaseSuggestion,
+                  ),
+                  if (archivesLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: <Widget>[
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('正在读取本地档案…', style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
                   if (state.itemKey.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 8),
                     _ArchiveSelector(
@@ -347,7 +408,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             ),
 
           FilledButton.icon(
-            onPressed: state.isBusy ? null : _confirmAndSubmit,
+            onPressed:
+                state.isBusy || archivesLoading ? null : _confirmAndSubmit,
             icon: state.submitting
                 ? const SizedBox(
                     width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))

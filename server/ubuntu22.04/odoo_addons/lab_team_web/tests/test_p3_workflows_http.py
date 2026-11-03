@@ -157,8 +157,17 @@ class LabTeamWebP3WorkflowTest(HttpCase):
 
     @classmethod
     def _create_user(cls, env, login, group_xmlids):
+        """幂等：同一隔离库重复升级/跑用例时必须复用已有账号。
+
+        夹具在 super().setUpClass() 之前就 commit（HttpCase 的要求），因此
+        重跑同一库时 login 已存在；这里先按 login（含归档账号）查找，存在就
+        覆盖成期望状态，不存在才创建。不会删除或复用到别的账号。
+        """
         group_ids = [env.ref(xmlid).id for xmlid in group_xmlids]
-        user = env['res.users'].with_context(no_reset_password=True).create({
+        users = env['res.users'].sudo().with_context(
+            active_test=False, no_reset_password=True)
+        user = users.search([('login', '=', login)], limit=1)
+        values = {
             'name': login,
             'login': login,
             'email': '%s@example.invalid' % login,
@@ -166,7 +175,12 @@ class LabTeamWebP3WorkflowTest(HttpCase):
             'company_id': cls.company_id,
             'company_ids': [(6, 0, [cls.company_id])],
             'group_ids': [(6, 0, group_ids)],
-        })
+            'active': True,
+        }
+        if user:
+            user.write(values)
+        else:
+            user = users.create(values)
         return user.id
 
     @classmethod
@@ -178,6 +192,12 @@ class LabTeamWebP3WorkflowTest(HttpCase):
         parent_id = parent.location_id.id if parent else False
         ids = []
         for name in ('P3-HTTP-A', 'P3-HTTP-B'):
+            # 幂等：重跑同一隔离库时复用同名库位，避免每次升级都堆一份
+            found = env['stock.location'].search([
+                ('name', '=', name), ('company_id', '=', cls.company_id)], limit=1)
+            if found:
+                ids.append(found.id)
+                continue
             ids.append(env['stock.location'].create({
                 'name': name,
                 'usage': 'internal',

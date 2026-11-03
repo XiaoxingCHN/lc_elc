@@ -168,7 +168,7 @@
         refreshLocks();
         LC.status.show({ kind: 'success',
           message: '未决提交已确认生效（' + spec.label + '）' +
-            (res && res.replayed ? '；服务端判定为重放，未重复执行' : '') });
+            (res && res.replayed ? '；系统判定为重复提交，未重复执行' : '') });
         load();
       }).catch(function (err) {
         if (err && (err.unknown || isPendingConflict(err))) {
@@ -260,6 +260,27 @@
       return LC.el('td', {}, [LC.el('div', { class: 'lc-inv-actions' }, children)]);
     }
 
+    /* 窄屏卡片化：把表头文案复制到每个单元格的 data-label，
+     * CSS 在 ≤760px 用 ::before 显示（操作按钮不用横向滚动找）。 */
+    function labelCells() {
+      var table = root.querySelector('[data-lc-table="mappings"]');
+      if (!table) return;
+      var heads = table.querySelectorAll('thead th');
+      var labels = [];
+      for (var i = 0; i < heads.length; i += 1) {
+        labels.push(String(heads[i].textContent || '').trim());
+      }
+      var rows = table.querySelectorAll('tbody tr');
+      for (var r = 0; r < rows.length; r += 1) {
+        var cells = rows[r].children;
+        for (var c = 0; c < cells.length; c += 1) {
+          if (labels[c] && !cells[c].getAttribute('data-label')) {
+            cells[c].setAttribute('data-label', labels[c]);
+          }
+        }
+      }
+    }
+
     function row(item) {
       return LC.el('tr', {}, [
         LC.el('td', { text: item.category_path || ('类别 #' + item.category_id) }),
@@ -339,6 +360,7 @@
 
     function render() {
       LC.renderRows(nodes.rows, mappings, row);
+      labelCells();
       LC.setText(nodes.count, String(mappings.length));
       LC.show(nodes.empty, mappings.length === 0);
       renderReco();

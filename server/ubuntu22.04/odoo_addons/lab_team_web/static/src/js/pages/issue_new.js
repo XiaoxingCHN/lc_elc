@@ -338,7 +338,7 @@
       }
       els.scanRows.appendChild(LC.el('p', {
         class: 'lc-hint',
-        text: '下面是该器件的在库袋（数量为服务端实时可用）：'
+        text: '下面是该器件的在库袋（数量为系统实时可用）：'
       }));
       var list = LC.el('div', { class: 'lc-issue-results-list' });
       bags.forEach(function (bag) {
@@ -452,15 +452,17 @@
       LC.clear(els.cartRows);
       state.cart.forEach(function (line) {
         var tr = LC.el('tr', { 'data-cart-bag-id': line.bag_id });
-        tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(line.trace_code) }));
-        var itemCell = LC.el('td');
+        tr.appendChild(LC.el('td', {
+          'data-label': '袋码', class: 'lc-mono', text: showText(line.trace_code)
+        }));
+        var itemCell = LC.el('td', { 'data-label': '器件' });
         itemCell.appendChild(LC.el('div', { text: showText(line.name) }));
         if (line.mpn) {
           itemCell.appendChild(LC.el('div', { class: 'lc-hint', text: 'MPN ' + line.mpn }));
         }
         tr.appendChild(itemCell);
-        tr.appendChild(LC.el('td', { text: showText(line.location_path) }));
-        var availableCell = LC.el('td');
+        tr.appendChild(LC.el('td', { 'data-label': '库位', text: showText(line.location_path) }));
+        var availableCell = LC.el('td', { 'data-label': '可用数量' });
         availableCell.appendChild(LC.el('span', {
           class: 'lc-badge', 'data-tone': 'ok', text: qtyText(line.available, line.uom)
         }));
@@ -470,7 +472,7 @@
             ' / 预留 ' + qtyText(line.reserved, line.uom)
         }));
         tr.appendChild(availableCell);
-        var qtyCell = LC.el('td');
+        var qtyCell = LC.el('td', { 'data-label': '领用数量' });
         qtyCell.appendChild(LC.el('input', {
           class: 'lc-input lc-issue-qty', type: 'number', step: 'any', min: '0',
           inputmode: 'decimal', 'data-lc-cart-qty': '', 'data-bag-id': line.bag_id,
@@ -481,7 +483,7 @@
           class: 'lc-hint', text: '最多 ' + qtyText(line.available, line.uom)
         }));
         tr.appendChild(qtyCell);
-        var actionCell = LC.el('td');
+        var actionCell = LC.el('td', { 'data-label': '操作' });
         actionCell.appendChild(LC.el('button', {
           class: 'lc-btn lc-btn-ghost', type: 'button',
           'data-lc-action': 'remove-bag', 'data-bag-id': line.bag_id, text: '移除',
@@ -524,7 +526,7 @@
       LC.status.clear();
     }
 
-    /* -------------------------------------------------- 刷新实时数量（重新拉） */
+    /* -------------------------------------------------- 刷新数量（重新拉真实可用） */
     function refreshLive() {
       if (!state.cart.length) {
         LC.status.show({ kind: 'empty', message: '领用明细为空，没有需要刷新的数量。' });
@@ -559,7 +561,7 @@
         } else {
           LC.status.show({
             kind: 'success',
-            message: '已按服务端实时库存刷新 ' + state.cart.length + ' 条明细。'
+            message: '已按系统实时库存刷新 ' + state.cart.length + ' 条明细。'
           });
         }
       });
@@ -691,8 +693,8 @@
       if (els.unknownDetail) {
         var count = payload && payload.lines ? payload.lines.length : 0;
         LC.setText(els.unknownDetail,
-          '重试会用完全相同的明细（' + count + ' 条）、领用人、项目与备注，并复用同一个 ' +
-          'request_key；服务端若已处理会返回「已处理过（未重复入账）」。' +
+          '重试会用完全相同的明细（' + count + ' 条）、领用人、项目与备注，并复用同一个' +
+          '提交编号；系统若已处理会返回「已处理过（未重复入账）」。' +
           '在此期间改动数量或换袋都不会发出请求。');
       }
     }
@@ -759,7 +761,7 @@
     function verifyResolve(verification) {
       if (!state.lock) return;
       var question = verification === 'absent'
-        ? '已到「领用记录」核对，并确认上一次提交【没有】入账？\n解除后可以重新提交（会生成新的 request_key），页面不会自动重发。'
+        ? '已到「领用记录」核对，并确认上一次提交【没有】入账？\n解除后可以重新提交（会生成新的提交编号），页面不会自动重发。'
         : '已到「领用记录」核对，并确认上一次提交【已经】入账？\n解除后页面不会重发，请勿重复领用。';
       if (!LC.confirmAction(question)) return;
       LC.resolveUnknown(ISSUE_SCOPE, ISSUE_ENDPOINT, {
@@ -779,7 +781,7 @@
           LC.status.show({
             kind: 'empty',
             message: '已按「上次未入账」解除未决锁。',
-            detail: '现在可以调整明细后重新提交（会生成新的 request_key）。'
+            detail: '现在可以调整明细后重新提交（会生成新的提交编号）。'
           });
         }
       }).catch(function (error) {
@@ -799,7 +801,7 @@
           (error.message || '请联系库存管理员。');
       }
       if (error && error.code === 'PRECONDITION_FAILED') {
-        message = message + '（库存未变动；请点「刷新实时数量」核对后再提交）';
+        message = message + '（库存未变动；请点「刷新数量」核对后再提交）';
       }
       LC.status.show({
         kind: 'error',
@@ -836,16 +838,21 @@
       LC.clear(els.successRows);
       lines.forEach(function (line) {
         var tr = LC.el('tr', { 'data-success-bag-id': line.bag_id });
-        tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(line.trace_code) }));
-        tr.appendChild(LC.el('td', { text: qtyText(line.quantity) }));
-        var outstandingCell = LC.el('td');
+        tr.appendChild(LC.el('td', {
+          'data-label': '袋码', class: 'lc-mono', text: showText(line.trace_code)
+        }));
+        tr.appendChild(LC.el('td', { 'data-label': '领用数量', text: qtyText(line.quantity) }));
+        var outstandingCell = LC.el('td', { 'data-label': '未归还（可归还）' });
         outstandingCell.appendChild(LC.el('span', {
           class: 'lc-badge', 'data-tone': 'warn',
           text: qtyText(line.outstanding_quantity)
         }));
         tr.appendChild(outstandingCell);
-        tr.appendChild(LC.el('td', { class: 'lc-mono', text: String(line.issue_line_id) }));
-        var liveCell = LC.el('td', { 'data-success-live': String(line.bag_id), text: '读取中…' });
+        // 领用明细 ID 不再进表格：归还由「领用记录」自动关联，普通用户不需要抄编号
+        var liveCell = LC.el('td', {
+          'data-label': '领用后实时在库',
+          'data-success-live': String(line.bag_id), text: '读取中…'
+        });
         tr.appendChild(liveCell);
         els.successRows.appendChild(tr);
       });
@@ -880,8 +887,8 @@
         kind: 'success',
         message: '领用成功：单号 ' + showText(operation.name) + '，共 ' + lines.length + ' 条明细。',
         detail: res && res.replayed
-          ? '该请求此前已处理过，本次未重复入账（replayed）。'
-          : '每行都已生成领用明细 ID，归还时按该 ID 关联原领用行。'
+          ? '该请求此前已处理过，本次未重复入账。'
+          : '每行都已入账；归还时到「领用记录」按原领用自动关联，不需要记编号。'
       });
     }
 
@@ -1016,6 +1023,11 @@
       }
       renderCart();
       loadBootstrap();
+      // 扫码枪默认落点：进页面即可扫；没有 prefill 时把焦点放到扫码框
+      if (canIssue && els.scan && !els.toolbar.getAttribute('data-lc-prefill-bag') &&
+          !els.toolbar.getAttribute('data-lc-prefill-item') && els.scan.focus) {
+        els.scan.focus();
+      }
       // 先恢复未决提示（跨刷新）：只提示 + 锁定，绝不自动重发
       restorePending();
       // 领用人列表失败时仍要有 uid：否则"只能为自己领用"的兜底无从判断

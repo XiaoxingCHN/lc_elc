@@ -85,7 +85,7 @@
                         <div class="lc-field">
                             <span class="lc-field-label">说明</span>
                             <p class="lc-hint">
-                                新建的是 <span class="lc-mono">internal</span> 内部库位，库码由服务端自动生成；
+                                新建的是「内部库位」，库码由系统自动生成；
                                 新建库位不会产生任何库存。
                             </p>
                         </div>
@@ -131,8 +131,8 @@
                         </div>
                     </form>
                     <p class="lc-hint">
-                        停用前置条件：该库位及其子库位必须已经搬空（袋数 0、数量 0），
-                        否则服务端返回 <span class="lc-mono">PRECONDITION_FAILED</span> 并给出剩余数量。
+                        停用前提：该库位及其子库位必须已经搬空（袋数 0、数量 0）；
+                        没搬空时系统会拒绝并告诉你还剩多少（页面显示「前置条件未满足」+ 剩余数量）。
                         停用后该库位不再出现在列表里；本页不提供物理删除库位记录。
                     </p>
                 </div>
@@ -152,20 +152,19 @@
                         <table class="lc-table" data-lc-table="locations">
                             <thead>
                                 <tr>
-                                    <th>库码</th>
-                                    <th>路径</th>
-                                    <th class="lc-inv-num">袋数</th>
-                                    <th class="lc-inv-num">袋内数量</th>
-                                    <th class="lc-inv-num">在库数量</th>
-                                    <th t-if="lc_workflow_permissions['can_manage_locations']">操作</th>
+                                    <th scope="col">库码</th>
+                                    <th scope="col">路径</th>
+                                    <th scope="col" class="lc-inv-num">袋数</th>
+                                    <th scope="col" class="lc-inv-num">袋内数量</th>
+                                    <th scope="col" class="lc-inv-num">在库数量</th>
+                                    <th scope="col" t-if="lc_workflow_permissions['can_manage_locations']">操作</th>
                                 </tr>
                             </thead>
                             <tbody data-lc-rows="locations"></tbody>
                         </table>
                     </div>
                     <p class="lc-hint">
-                        袋数 / 袋内数量 / 在库数量都由服务端按 stock.quant 与实物袋实时统计（本库位口径，
-                        不含子库位）；本页不提供任何修改数量的入口。
+                        袋数 / 袋内数量 / 在库数量按本库位实时统计（不含子库位）；本页不提供修改数量的入口。
                     </p>
                 </div>
             </section>
@@ -207,10 +206,10 @@
             </section>
 
             <div class="lc-toolbar">
-                <label class="lc-inline" for="lc-inv-map-inactive">
+                <label class="lc-check" for="lc-inv-map-inactive">
                     <input id="lc-inv-map-inactive" type="checkbox"
                            data-lc-field="include_inactive"/>
-                    显示已停用映射
+                    <span>显示已停用映射</span>
                 </label>
                 <button class="lc-btn lc-btn-outline" type="button"
                         data-lc-action="mappings-reload">刷新</button>
@@ -228,15 +227,15 @@
                           method="post" action="#">
                         <div class="lc-field">
                             <label class="lc-field-label" for="lc-inv-map-category">
-                                元器件类别（产品分类 ID）
+                                元器件类别
                             </label>
                             <input class="lc-input" id="lc-inv-map-category" type="number"
                                    min="1" step="1" name="category_id"
                                    data-lc-field="category_id" autocomplete="off"
                                    placeholder="例如 12"/>
                             <p class="lc-hint">
-                                可以从下面的「已有映射的类别」里点选，或手工填产品分类 ID
-                                （当前接口没有分类树读接口，本页不自造）。
+                                优先从下面的「已有映射的类别」里点选；也支持直接填类别编号
+                                （暂不支持按分类树筛选，本页不提供分类选择器）。
                             </p>
                         </div>
                         <div class="lc-field">
@@ -245,7 +244,7 @@
                                     name="location_id" data-lc-field="location_id">
                                 <option value="">（选择内部库位）</option>
                             </select>
-                            <p class="lc-hint">只接受内部库位（internal），同公司。</p>
+                            <p class="lc-hint">只能选本公司的内部库位。</p>
                         </div>
                         <div class="lc-field">
                             <label class="lc-field-label" for="lc-inv-map-priority">优先级</label>
@@ -262,10 +261,10 @@
                         </div>
                         <div class="lc-field">
                             <span class="lc-field-label">启用</span>
-                            <label class="lc-inline" for="lc-inv-map-active">
+                            <label class="lc-check" for="lc-inv-map-active">
                                 <input id="lc-inv-map-active" type="checkbox" name="active"
                                        data-lc-field="active" value="1" checked="checked"/>
-                                保存后参与推荐
+                                <span>保存后参与推荐</span>
                             </label>
                         </div>
                         <div class="lc-actions">
@@ -307,13 +306,13 @@
                         <table class="lc-table" data-lc-table="mappings">
                             <thead>
                                 <tr>
-                                    <th>类别</th>
-                                    <th>推荐库位</th>
-                                    <th>库码</th>
-                                    <th class="lc-inv-num">优先级</th>
-                                    <th>状态</th>
-                                    <th>备注</th>
-                                    <th>操作</th>
+                                    <th scope="col">类别</th>
+                                    <th scope="col">推荐库位</th>
+                                    <th scope="col">库码</th>
+                                    <th scope="col" class="lc-inv-num">优先级</th>
+                                    <th scope="col">状态</th>
+                                    <th scope="col">备注</th>
+                                    <th scope="col">操作</th>
                                 </tr>
                             </thead>
                             <tbody data-lc-rows="mappings"></tbody>
@@ -358,7 +357,7 @@
                         账号的其他组保持不变。
                     </p>
                     <p class="lc-hint">
-                        保护规则由服务端强制：不能撤销最后一名库存管理员；不能先撤销
+                        保护规则由系统强制：不能撤销最后一名库存管理员；不能先撤销
                         「用户」而账号仍是「操作员 / 管理员」（隐含层级），要降级请从上往下逐级撤销。
                     </p>
                 </div>
@@ -373,10 +372,10 @@
                 </div>
                 <button class="lc-btn lc-btn-primary" type="button"
                         data-lc-action="members-search">搜索</button>
-                <label class="lc-inline" for="lc-inv-mem-only-role">
+                <label class="lc-check" for="lc-inv-mem-only-role">
                     <input id="lc-inv-mem-only-role" type="checkbox"
                            data-lc-field="only_with_role"/>
-                    只看有库存角色
+                    <span>只看有库存角色</span>
                 </label>
                 <button class="lc-btn lc-btn-outline" type="button"
                         data-lc-action="members-reload">刷新</button>
@@ -398,12 +397,12 @@
                         <table class="lc-table" data-lc-table="members">
                             <thead>
                                 <tr>
-                                    <th>姓名</th>
-                                    <th>登录名</th>
-                                    <th>用户</th>
-                                    <th>操作员</th>
-                                    <th>管理员</th>
-                                    <th>状态</th>
+                                    <th scope="col">姓名</th>
+                                    <th scope="col">登录名</th>
+                                    <th scope="col">用户</th>
+                                    <th scope="col">操作员</th>
+                                    <th scope="col">管理员</th>
+                                    <th scope="col">状态</th>
                                 </tr>
                             </thead>
                             <tbody data-lc-rows="members"></tbody>
@@ -414,7 +413,7 @@
                                 data-lc-action="members-more" hidden="hidden">加载更多</button>
                     </div>
                     <p class="lc-hint">
-                        勾选/取消会立即提交到服务端；每次变更只动被勾选的那个库存组。
+                        勾选/取消会立即提交到系统；每次变更只动被勾选的那个库存组。
                         提交结果未知时会显示「结果未知」并提供重试（同一请求键），不会自动重发。
                     </p>
                 </div>
@@ -426,10 +425,10 @@
                 </div>
                 <div class="lc-panel-body">
                     <ul class="lc-inv-plain">
-                        <li>项目参数（站点标题、根级别名开关、管理 Host）只在维护端配置，本页不提供修改接口。</li>
+                        <li>项目参数（站点标题、根级别名开关、管理 Host）只在维护端配置，本页不提供修改入口。</li>
                         <li>系统管理员、ERP 管理员的授权仍走原生后台，且不属于库存角色的范围。</li>
                         <li>数据库、模块安装、密码复位不在本页；密码请走管理员复位或原生流程。</li>
-                        <li>每次库存角色变更由服务端记录操作人、目标账号、角色与开关值。</li>
+                        <li>每次库存角色变更由系统记录操作人、目标账号、角色与开关值。</li>
                     </ul>
                 </div>
             </section>
@@ -476,13 +475,13 @@
                                 <table class="lc-table" data-lc-table="materials">
                                     <thead>
                                         <tr>
-                                            <th>名称</th>
-                                            <th>MPN</th>
-                                            <th>封装</th>
-                                            <th>立创编号</th>
-                                            <th>本地档案</th>
-                                            <th class="lc-inv-num">本地在库</th>
-                                            <th>操作</th>
+                                            <th scope="col">名称</th>
+                                            <th scope="col">MPN</th>
+                                            <th scope="col">封装</th>
+                                            <th scope="col">立创编号</th>
+                                            <th scope="col">本地档案</th>
+                                            <th scope="col" class="lc-inv-num">本地在库</th>
+                                            <th scope="col">操作</th>
                                         </tr>
                                     </thead>
                                     <tbody data-lc-rows="materials"></tbody>
@@ -572,7 +571,7 @@
                                 <p class="lc-hint" data-lc-inv-create-lock-meta="">—</p>
                                 <p class="lc-hint">
                                     验收口径：列表里<strong>看不到</strong>不等于<strong>没提交</strong>
-                                    （服务端没有幂等键，创建也可能已生效）。请按立创编号或统一料号 / SN
+                                    （系统没有重复提交保护，创建也可能已生效）。请按立创编号或统一料号 / SN
                                     重新检索核对；同一浏览器另一个标签页不受此锁约束，若同时开过建档请一并核对。
                                 </p>
                                 <div class="lc-actions">
@@ -591,7 +590,7 @@
 
                             <p class="lc-hint">
                                 建档只建立本地档案（不复制任何库存）；期初数量必须通过入库流程录入。
-                                绑定与建档接口都没有幂等键，结果未知时不会自动重试；请先核对再操作。
+                                绑定与建档都不支持重复提交保护，结果未知时不会自动重试；请先核对再操作。
                             </p>
                         </div>
                     </section>

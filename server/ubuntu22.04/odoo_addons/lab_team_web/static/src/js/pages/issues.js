@@ -164,16 +164,18 @@
         'data-issue-line-id': item.issue_line_id,
         'data-outstanding': String(item.outstanding_quantity)
       });
-      tr.appendChild(LC.el('td', { text: LC.fmt.datetime(item.date) }));
-      tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(item.trace_code) }));
-      var itemCell = LC.el('td');
+      tr.appendChild(LC.el('td', { 'data-label': '日期', text: LC.fmt.datetime(item.date) }));
+      tr.appendChild(LC.el('td', {
+        'data-label': '袋码', class: 'lc-mono', text: showText(item.trace_code)
+      }));
+      var itemCell = LC.el('td', { 'data-label': '器件' });
       itemCell.appendChild(LC.el('div', { text: itemText(item) }));
       if (item.sn) itemCell.appendChild(LC.el('div', { class: 'lc-hint', text: 'SN ' + item.sn }));
       tr.appendChild(itemCell);
-      tr.appendChild(LC.el('td', { text: showText(item.location_path) }));
-      tr.appendChild(LC.el('td', { text: qtyText(item.quantity) }));
-      tr.appendChild(LC.el('td', { text: qtyText(item.returned_quantity) }));
-      var outstandingCell = LC.el('td');
+      tr.appendChild(LC.el('td', { 'data-label': '库位', text: showText(item.location_path) }));
+      tr.appendChild(LC.el('td', { 'data-label': '领用', text: qtyText(item.quantity) }));
+      tr.appendChild(LC.el('td', { 'data-label': '已还', text: qtyText(item.returned_quantity) }));
+      var outstandingCell = LC.el('td', { 'data-label': '可归还' });
       var outstanding = LC.parse.float(item.outstanding_quantity, 0);
       outstandingCell.appendChild(LC.el('span', {
         class: 'lc-badge',
@@ -181,7 +183,7 @@
         text: qtyText(item.outstanding_quantity)
       }));
       tr.appendChild(outstandingCell);
-      var borrowerCell = LC.el('td');
+      var borrowerCell = LC.el('td', { 'data-label': '领用人' });
       borrowerCell.appendChild(LC.el('div', { text: showText(item.borrower_name) }));
       if (state.uid && item.borrower_id === state.uid) {
         borrowerCell.appendChild(LC.el('div', { class: 'lc-hint', text: '本人' }));
@@ -189,9 +191,9 @@
         borrowerCell.appendChild(LC.el('div', { class: 'lc-hint', text: '他人（需管理员代还）' }));
       }
       tr.appendChild(borrowerCell);
-      tr.appendChild(LC.el('td', { text: showText(item.project) }));
+      tr.appendChild(LC.el('td', { 'data-label': '项目', text: showText(item.project) }));
 
-      var actions = LC.el('td');
+      var actions = LC.el('td', { 'data-label': '操作' });
       var actionsBox = LC.el('div', { class: 'lc-issue-row-actions' });
       if (state.canReturn && outstanding > 0) {
         actionsBox.appendChild(LC.el('button', {
@@ -201,9 +203,11 @@
           disabled: !!state.lock
         }));
       }
+      // 该袋流水：按袋码跳转（人可读），没有袋码时才退回袋编号
       var historyLink = LC.el('a', {
         class: 'lc-btn lc-btn-ghost',
-        href: LC.base + '/lab/history?bag_id=' + item.bag_id,
+        href: LC.base + '/lab/history?bag_code=' + encodeURIComponent(item.trace_code || '') +
+          (item.trace_code ? '' : '&bag_id=' + item.bag_id),
         text: '该袋流水'
       });
       actionsBox.appendChild(historyLink);
@@ -253,7 +257,7 @@
       if (!els.summary) return;
       LC.clear(els.summary);
       var pairs = [
-        ['领用明细 ID', String(item.issue_line_id), true],
+        ['领用记录号（诊断用）', String(item.issue_line_id), true],
         ['袋码', showText(item.trace_code), true],
         ['器件', itemText(item)],
         ['领用日期', LC.fmt.datetime(item.date)],
@@ -379,7 +383,7 @@
       if (els.unknownDetail) {
         LC.setText(els.unknownDetail,
           '重试会用完全相同的领用行与数量，并复用同一个 request_key；' +
-          '服务端若已处理会返回「已处理过（未重复入账）」。' +
+          '系统若已处理会返回「已处理过（未重复入账）」。' +
           '在此期间改数量或换领用行都不会发出请求。');
       }
     }
@@ -462,7 +466,7 @@
             message: verification === 'present'
               ? '已按「上次已入账」解除未决锁（未重发）。'
               : '已按「上次未入账」解除未决锁。',
-            detail: '列表已按服务端最新未还余额重新加载；请核对每一行的可归还量。'
+            detail: '列表已按系统最新未还余额重新加载；请核对每一行的可归还量。'
           });
         });
       }).catch(function (error) {
@@ -580,7 +584,7 @@
         message: message,
         detail: remaining <= 1e-9
           ? '该领用行已还清，不再出现在「只看未归还」里。'
-          : '可继续归还剩余数量；可归还量以服务端未还数量为准。'
+          : '可继续归还剩余数量；可归还量以系统未还数量为准。'
       });
 
       if (remaining <= 1e-9) {
@@ -700,7 +704,7 @@
     function init() {
       var notes = [];
       if (!state.canIssueForOthers) {
-        notes.push('当前账号不是库存管理员：列表只显示我自己的领用记录（由服务端过滤，不是前端筛选）。');
+        notes.push('当前账号不是库存管理员：列表只显示我自己的领用记录（由系统按权限过滤）。');
       }
       if (!state.canReturn) {
         notes.push('当前账号没有归还权限（can_return）：只能查看记录，不能提交归还。');

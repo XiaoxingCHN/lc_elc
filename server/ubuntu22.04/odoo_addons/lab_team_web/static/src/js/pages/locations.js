@@ -173,7 +173,7 @@
         LC.status.show({
           kind: 'success',
           message: '未决提交已确认生效' + (loc ? '：' + (loc.path || loc.name || '') : '') +
-            (res.replayed ? '（服务端判定为重放，未重复执行）' : '')
+            (res.replayed ? '（系统判定为重复提交，未重复执行）' : '')
         });
         load();
       }).catch(function (err) {
@@ -262,6 +262,27 @@
       ]);
     }
 
+    /* 窄屏卡片化：把表头文案复制到每个单元格的 data-label，
+     * CSS 在 ≤760px 用 ::before 显示（操作按钮不用横向滚动找）。 */
+    function labelCells() {
+      var table = root.querySelector('[data-lc-table="locations"]');
+      if (!table) return;
+      var heads = table.querySelectorAll('thead th');
+      var labels = [];
+      for (var i = 0; i < heads.length; i += 1) {
+        labels.push(String(heads[i].textContent || '').trim());
+      }
+      var rows = table.querySelectorAll('tbody tr');
+      for (var r = 0; r < rows.length; r += 1) {
+        var cells = rows[r].children;
+        for (var c = 0; c < cells.length; c += 1) {
+          if (labels[c] && !cells[c].getAttribute('data-label')) {
+            cells[c].setAttribute('data-label', labels[c]);
+          }
+        }
+      }
+    }
+
     function row(loc) {
       var cells = [
         LC.el('td', {}, [LC.el('span', { class: 'lc-mono', text: loc.code || '—' })]),
@@ -284,6 +305,7 @@
       var needle = nodes.filter ? String(nodes.filter.value || '').trim().toLowerCase() : '';
       var rows = all.filter(function (loc) { return matches(loc, needle); });
       LC.renderRows(nodes.rows, rows, row);
+      labelCells();
       LC.setText(nodes.count, String(rows.length));
       // 空状态要区分"本来就没有"与"筛选没命中"，否则用户以为库位丢了
       LC.setText(nodes.empty, needle
@@ -592,7 +614,7 @@
       if (!loc) return;
       var label = (loc.code ? '[' + loc.code + '] ' : '') + (loc.path || loc.name || '');
       var busy = '该库位（含子库位）当前有 ' + LC.fmt.quantity(loc.bag_count) + ' 袋 / 数量 ' +
-        LC.fmt.quantity(loc.quantity) + '；有库存时停用会被服务端拒绝。';
+        LC.fmt.quantity(loc.quantity) + '；有库存时停用会被系统拒绝。';
       if (!LC.confirmAction('停用库位 ' + label + '？\n' + busy + '\n停用后不再出现在列表里。')) return;
       LC.status.clear();
       submitDeactivate(loc, btn).then(function (res) {

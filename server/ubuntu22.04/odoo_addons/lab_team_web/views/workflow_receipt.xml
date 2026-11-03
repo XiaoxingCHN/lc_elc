@@ -34,15 +34,18 @@
         <t t-call="lab_team_web.workflow_page">
 
             <p class="lc-note lc-receipt-intro">
-                <strong>两阶段入库：</strong>建袋与打印标签<strong>不增加库存</strong>；
-                只有「扫码上架 → 选择库位 → 确认入库」才产生真实入库移动。
-                页面上的数量全部来自 Odoo 实时库存，本页不存任何本地台账。
+                建袋与打印标签<strong>不增加库存</strong>；只有「扫码上架 → 选库位 → 确认入库」才产生真实入库移动。
             </p>
 
+            <!-- 两步页签的 ARIA 契约：每个 tab 用 id + aria-controls 指向自己的
+                 tabpanel，panel 用 aria-labelledby 指回 tab；roving tabindex 由
+                 receipts.js 的 wireTabs 维护（选中 0，其余 -1）。 -->
             <div class="lc-tabs" role="tablist" aria-label="入库步骤">
-                <button class="lc-tab is-active" type="button" role="tab" aria-selected="true"
+                <button class="lc-tab is-active" type="button" role="tab" tabindex="0"
+                        id="lc-tab-prepare" aria-selected="true" aria-controls="lc-panel-prepare"
                         data-lc-action="tab" data-tab="prepare">① 建袋与打印</button>
-                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                <button class="lc-tab" type="button" role="tab" tabindex="-1"
+                        id="lc-tab-shelve" aria-selected="false" aria-controls="lc-panel-shelve"
                         data-lc-action="tab" data-tab="shelve">② 扫码上架</button>
             </div>
 
@@ -50,17 +53,18 @@
                  避免占用契约 §4.5 的属性名集合），值必须显式给出——XML 不接受裸属性。 -->
             <p class="lc-hint" data-readonly-note="1" hidden="hidden">
                 当前账号是只读库存角色：可以查看待入库袋，但建袋、打印、取消与确认入库
-                按钮不会显示（服务端也会拒绝这些写操作）。
+                按钮不会显示（系统也会拒绝这些写操作）。
             </p>
 
             <noscript>
                 <p class="lc-alert lc-alert-error" role="alert">
-                    本页需要启用 JavaScript：建袋、扫码解析与确认入库都通过页面脚本调用接口完成。
+                    本页需要启用 JavaScript：建袋、扫码解析与确认入库都由页面脚本完成。
                 </p>
             </noscript>
 
             <!-- 面板 A：建袋与打印（不增库存） -->
-            <section class="lc-panel" data-lc-panel="prepare">
+            <section class="lc-panel" data-lc-panel="prepare"
+                     id="lc-panel-prepare" role="tabpanel" aria-labelledby="lc-tab-prepare">
                 <div class="lc-panel-head">
                     <h2 class="lc-section-title">待入库袋</h2>
                     <span class="lc-toolbar-note" data-lc-count="pending">—</span>
@@ -78,7 +82,7 @@
                              data-lc-lock-scope="receipts/create"
                              data-lc-lock-endpoint="pendingCreate" hidden="hidden">
                             <p class="lc-alert lc-alert-error" role="alert">
-                                上一次「建待入库袋」的结果未知（服务端<strong>可能已经建好</strong>，袋码也已分配）。
+                                上一次「建待入库袋」的结果未知（系统<strong>可能已经建好</strong>，袋码也已分配）。
                                 核对前不能改料号/数量/袋数再次提交，也不要按原内容重复打印标签。
                             </p>
                             <p class="lc-hint" data-lc-lock-meta=""></p>
@@ -93,22 +97,33 @@
                         </div>
 
                         <h3 class="lc-section-title">选择统一料号（本地档案优先）</h3>
-                        <p class="lc-hint">
-                            扫码枪或粘贴统一料号后点「解析」：<span class="lc-mono">lcsc:C123</span>
-                            为立创编号、<span class="lc-mono">lab:42</span> 为本地档案。
-                            同一 C 编号有多个本地档案时<strong>不会替你选</strong>，必须在下拉里明确选择。
+                        <p class="lc-hint lc-hint-tight">
+                            输入名称 / 型号 / C 编号看候选；扫码枪整串回车直接解析。
                         </p>
+                        <details class="lc-help">
+                            <summary>编号规则与示例</summary>
+                            <p>
+                                粘贴或扫描 <span class="lc-mono">lcsc:C123</span>（立创编号）、
+                                <span class="lc-mono">lab:42</span>（本地档案编号）后回车即按原格式解析。
+                                同一 C 编号有多个本地档案时<strong>不会替你选</strong>，必须在「本地档案」里明确选择。
+                                页面上的数量全部以系统实时库存为准，本页不存任何本地台账。
+                            </p>
+                        </details>
 
                         <div class="lc-scanrow">
-                            <label class="lc-field lc-scanrow-field">
-                                <span class="lc-field-label">统一料号</span>
-                                <input class="lc-input lc-mono" type="text" name="item_key"
-                                       data-lc-field="item_key" autocomplete="off" inputmode="text"
-                                       placeholder="lcsc:C123 / lab:42 / 扫码"/>
-                            </label>
+                            <div class="lc-combobox lc-scanrow-field">
+                                <label class="lc-field">
+                                    <span class="lc-field-label">料号 / 关键词</span>
+                                    <input class="lc-input lc-mono" type="text" name="item_key"
+                                           data-lc-field="item_key" autocomplete="off" inputmode="text"
+                                           placeholder="名称、型号或 lcsc:C123 / lab:42"/>
+                                </label>
+                            </div>
                             <button class="lc-btn lc-btn-outline" type="button"
                                     data-lc-action="resolve-item">解析料号</button>
                         </div>
+
+                        <p class="lc-hint lc-hint-warn" data-lc-slot="search-denied" role="status" hidden="hidden"></p>
 
                         <div class="lc-material-picked" data-lc-selected="material" hidden="hidden">
                             <p class="lc-toolbar-note">已选物料</p>
@@ -118,9 +133,10 @@
                             </p>
                             <p class="lc-hint" data-slot="material-meta"></p>
                             <label class="lc-field">
-                                <span class="lc-field-label">本地档案（product_template_id）</span>
+                                <span class="lc-field-label">本地档案（要入库的物料档案）</span>
                                 <select class="lc-input" name="product_template_id"
                                         data-slot="material-select"></select>
+                                <span class="lc-hint">同一编号有多个档案时按名称 / 型号 / 封装 / SN 区分，必须选一个才能建袋。</span>
                             </label>
                             <button class="lc-btn lc-btn-ghost" type="button"
                                     data-lc-action="clear-item">重新选择</button>
@@ -271,7 +287,7 @@
                          data-lc-lock-scope="receipts/pending-update"
                          data-lc-lock-endpoint="pendingUpdate" hidden="hidden">
                         <p class="lc-alert lc-alert-error" role="alert">
-                            上一次「打印选择 / 取消」的结果未知（服务端可能已经改过状态）。
+                            上一次「打印选择 / 取消」的结果未知（系统可能已经改过状态）。
                             核对前不要继续改其它行，也不要用同一结果再点一次。
                         </p>
                         <p class="lc-hint" data-lc-lock-meta=""></p>
@@ -285,30 +301,32 @@
                         </div>
                     </div>
 
-                    <!-- 改草稿（改数量）说明：后端 pending/update 只支持 select / cancel，
-                         没有「编辑数量」的 action；前端**不得**用「新建 + 取消旧记录」绕过，
-                         否则已经打印出去的追溯码会指向一条已取消记录、标签作废。 -->
+                    <!-- 改草稿（改数量）用户帮助：追溯码在建袋时分配、标签印的就是它，
+                         所以不能用「新建一条袋」改数量。后端 pending/update 目前只有
+                         select / cancel，没有编辑数量的 action —— 页面不承诺该功能。
+                         若要补「原地改数量」，实现口径见交接
+                         local/web-ui-implementation/other-pages-handoff.md（不在界面里讲）。 -->
                     <div class="lc-receipt-rewrite">
                         <h3 class="lc-section-title">待入库袋改数量</h3>
                         <p class="lc-hint">
-                            追溯码在建袋时分配、标签印的就是它，因此<strong>不能靠新建一条袋来改数量</strong>
-                            （那样旧码会指向已取消记录，已打印的标签全部作废）。
-                            当前后端 <span class="lc-mono">pending/update</span> 只支持「打印选择」与「取消」，
-                            <strong>没有编辑数量/备注的接口</strong>；需要改数量时：
+                            追溯码在<strong>建袋时</strong>就分配好、标签上印的就是它，
+                            因此不能用「新建一条袋」来改数量。
                         </p>
-                        <ol class="lc-hint lc-receipt-steps">
-                            <li>如该袋标签还没打印：直接<strong>取消</strong>该袋，再按新数量重新建袋（新码随新标签一起打印）。</li>
-                            <li>如标签已打印：先与库存管理员确认是否补一条新袋并<strong>作废旧标签实物</strong>；
-                                系统不会替你换码，也不会自动新建。</li>
-                            <li>需要「原地改数量（保留原追溯码）」时，请由后端补
-                                <span class="lc-mono">pending/update action=edit</span>（窄路由已存在，缺 action）。</li>
-                        </ol>
+                        <details class="lc-help">
+                            <summary>要改数量怎么办</summary>
+                            <ol class="lc-receipt-steps">
+                                <li>标签<strong>还没打印</strong>：取消该袋，按新数量重新建袋（新码随新标签一起打印）。</li>
+                                <li>标签<strong>已经打印</strong>：先核对实物标签，再与库存管理员确认——
+                                    旧标签要作废，两类袋才不会被混着扫。</li>
+                            </ol>
+                        </details>
                     </div>
                 </div>
             </section>
 
             <!-- 面板 B：扫码上架（确认后才增加库存） -->
-            <section class="lc-panel" data-lc-panel="shelve" hidden="hidden">
+            <section class="lc-panel" data-lc-panel="shelve" hidden="hidden"
+                     id="lc-panel-shelve" role="tabpanel" aria-labelledby="lc-tab-shelve">
                 <div class="lc-panel-head">
                     <h2 class="lc-section-title">扫码上架（确认后才增加库存）</h2>
                 </div>
@@ -349,7 +367,7 @@
                             <h3 class="lc-section-title">库位推荐（只是顺序，不会自动选中）</h3>
                             <p class="lc-hint">
                                 推荐依据：相同器件 → 类别映射 → 同类器件；必须由你选定库位再确认。
-                                库位停用或不属于本公司会被服务端拒绝。
+                                库位停用或不属于本公司会被系统拒绝。
                             </p>
                             <div data-lc-recommend="shelve">
                                 <ul class="lc-recommend" data-lc-rows="recommend"></ul>
@@ -393,7 +411,7 @@
                              data-lc-lock-scope="receipts/confirm"
                              data-lc-lock-endpoint="pendingConfirm" hidden="hidden">
                             <p class="lc-alert lc-alert-error" role="alert">
-                                上一次「确认入库」的结果未知（服务端<strong>可能已经入库</strong>）。
+                                上一次「确认入库」的结果未知（系统<strong>可能已经入库</strong>）。
                                 核对前不能改库位/数量再提交，也不要重复确认。
                             </p>
                             <p class="lc-hint" data-lc-lock-meta=""></p>
@@ -658,7 +676,7 @@
                 </div>
                 <div class="lc-panel-body">
                     <p class="lc-hint" data-lc-filter-note="bags" hidden="hidden">
-                        「只看有未还」由服务端按未归还领用行过滤（最多覆盖前 2000 条未还袋）；
+                        「只看有未还」由系统按未归还领用行过滤（最多覆盖前 2000 条未还袋）；
                         需要精确清单请到「领用记录」页。
                     </p>
                     <div class="lc-table-wrap">
@@ -688,8 +706,8 @@
             </section>
 
             <p class="lc-hint">
-                在库 / 可用数量来自 Odoo 实时 stock.quant；袋上的缓存数量只用于列表筛选，
-                详情页以实时值为准。
+                在库 / 可用数量以当前实时数据为准；袋上的数量只用于列表筛选，
+                详情页同样以实时值为准。
             </p>
         </t>
     </template>
@@ -852,19 +870,28 @@
 
             <p class="lc-note lc-receipt-intro">
                 标签只做排版与打印，<strong>不改库存</strong>。每袋一个追溯二维码；
-                库位另用库码标签，两者不混印。生成的是真实 A4 PDF（服务端直出，浏览器自己打开）。
+                库位另用库码标签，两者不混印。生成的是真实 A4 PDF（由服务器直接生成，浏览器自己打开）。
             </p>
 
             <p class="lc-hint" data-readonly-note="1" hidden="hidden">
                 当前账号没有标签打印权限：可以查看页面说明，但选题、试算与下载按钮不会显示。
             </p>
 
+            <!-- 与入库两步页签同一套 ARIA 契约：tab 带 id + aria-controls 指向 tabpanel，
+                 panel 的 aria-labelledby 由 labels.js 的 switchKind 跟着切；roving
+                 tabindex + 方向键/Home/End 见 labels.js 的 onKindKey。 -->
             <div class="lc-tabs" role="tablist" aria-label="标签对象">
-                <button class="lc-tab is-active" type="button" role="tab" aria-selected="true"
+                <button class="lc-tab is-active" type="button" role="tab" tabindex="0"
+                        id="lc-tab-kind-pending" aria-selected="true"
+                        aria-controls="lc-panel-labels"
                         data-lc-action="kind" data-kind="pending">待入库标签</button>
-                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                <button class="lc-tab" type="button" role="tab" tabindex="-1"
+                        id="lc-tab-kind-bag" aria-selected="false"
+                        aria-controls="lc-panel-labels"
                         data-lc-action="kind" data-kind="bag">器件袋标签</button>
-                <button class="lc-tab" type="button" role="tab" aria-selected="false"
+                <button class="lc-tab" type="button" role="tab" tabindex="-1"
+                        id="lc-tab-kind-location" aria-selected="false"
+                        aria-controls="lc-panel-labels"
                         data-lc-action="kind" data-kind="location">库位标签</button>
             </div>
 
@@ -876,7 +903,11 @@
             <p class="lc-alert lc-alert-error" role="alert" data-lc-error="labels" hidden="hidden"></p>
             <div class="lc-loading" data-lc-loading="labels" hidden="hidden">加载可打印对象…</div>
 
-            <div class="lc-label-workbench" data-lc-workbench="labels" hidden="hidden">
+            <!-- 三种标签共用这一块工作台：切换 kind 只换内容，所以三个 tab 都指向同一个
+                 tabpanel，aria-labelledby 随选中项更新。 -->
+            <div class="lc-label-workbench" data-lc-workbench="labels"
+                 id="lc-panel-labels" role="tabpanel" aria-labelledby="lc-tab-kind-pending"
+                 hidden="hidden">
                 <section class="lc-panel">
                     <div class="lc-panel-head">
                         <h2 class="lc-section-title">选择打印对象</h2>

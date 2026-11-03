@@ -96,7 +96,7 @@
                     页面标识：<span class="lc-mono" t-esc="lc_page_id or '—'"/>
                 </p>
                 <p class="lc-hint">
-                    数据接口可用；此页不带任何业务表单，不会写入库存。
+                    页面入口可用；此页不带任何业务表单，不会写入库存。
                 </p>
                 <div class="lc-actions">
                     <a class="lc-btn lc-btn-primary" t-att-href="lc_entry_urls['lab']">返回仓库</a>

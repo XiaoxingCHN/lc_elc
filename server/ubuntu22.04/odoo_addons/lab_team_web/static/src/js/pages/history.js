@@ -59,7 +59,7 @@
       actor: root.querySelector('[name="actor_id"]'),
       borrower: root.querySelector('[name="borrower_id"]'),
       itemKey: root.querySelector('[name="item_key"]'),
-      bagId: root.querySelector('[name="bag_id"]'),
+      bagCode: root.querySelector('[name="bag_code"]'),
       tbody: root.querySelector('[data-lc-rows="history"]'),
       empty: root.querySelector('[data-lc-empty="history"]'),
       loading: root.querySelector('[data-lc-loading="history"]'),
@@ -116,7 +116,7 @@
         actor_id: els.actor ? els.actor.value : '',
         borrower_id: els.borrower ? els.borrower.value : '',
         item_key: els.itemKey ? els.itemKey.value.trim() : '',
-        bag_id: els.bagId ? els.bagId.value.trim() : ''
+        bag_code: els.bagCode ? els.bagCode.value.trim() : ''
       };
       return filters;
     }
@@ -131,12 +131,6 @@
       if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) {
         return { field: 'date_from', message: '开始日期不能晚于结束日期。' };
       }
-      if (filters.bag_id) {
-        var bagId = LC.parse.int(filters.bag_id, null);
-        if (!bagId || bagId < 1) {
-          return { field: 'bag_id', message: '袋 ID 必须是正整数。' };
-        }
-      }
       return null;
     }
 
@@ -147,11 +141,70 @@
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.actor_id) params.actor_id = LC.parse.int(filters.actor_id, null);
       if (filters.borrower_id) params.borrower_id = LC.parse.int(filters.borrower_id, null);
-      if (filters.item_key) params.item_key = filters.item_key;
-      if (filters.bag_id) params.bag_id = LC.parse.int(filters.bag_id, null);
       return params;
     }
 
+    /* ------------------------------------------------- 用户输入 → 真实查询值 */
+    var ITEM_PREFIX_RE = /^(lcsc|lab)\s*:\s*(.+)$/i;
+
+    /* 器件筛选只接受「编号或扫码内容」：立创 C 码、物料 SN、袋码。
+     * 明确前缀直接换算，裸 C 码补 lcsc:，纯数字当本地档案；
+     * 其余交给 resolve_code 解析（它只认 LABB:/LABL:/SN/立创 C 码/原厂袋码，
+     * 不支持名称或型号关键词搜索）；解析不到就明确报错，
+     * 不把「没解析出来」当成「没有数据」，也不把服务端原文抛给用户。
+     */
+    var ITEM_HELP = '只认编号或扫码：立创 C 码（C12345）、物料 SN、袋码（LABB:…）。'
+      + '本页不支持按名称/型号关键词搜索，按名称找请到「器件档案」。';
+    function resolveItemKey(raw) {
+      var value = String(raw || '').trim();
+      if (!value) return Promise.resolve('');
+      var match = ITEM_PREFIX_RE.exec(value);
+      if (match) {
+        var prefix = match[1].toLowerCase();
+        var body = match[2].trim();
+        return Promise.resolve(prefix === 'lcsc' ? 'lcsc:' + body.toUpperCase() : 'lab:' + body);
+      }
+      if (/^C\d+$/i.test(value)) return Promise.resolve('lcsc:' + value.toUpperCase());
+      if (/^\d+$/.test(value)) return Promise.resolve('lab:' + value);
+      return LC.rpc('resolve', { raw: value }).then(function (data) {
+        var key = (data && data.item_key) || '';
+        if (!key) throw notFoundItem(value);
+        return key;
+      }).catch(function (error) {
+        if (error && error.field) throw error;
+        throw notFoundItem(value);
+      });
+    }
+
+    function notFoundItem(value) {
+      return {
+        code: 'NOT_FOUND', field: 'item_key',
+        message: '没有识别到器件「' + value + '」。' + ITEM_HELP
+      };
+    }
+
+    function notFoundBag(value) {
+      return {
+        code: 'NOT_FOUND', field: 'bag_code',
+        message: '没有识别到袋「' + value + '」。请扫袋标签或填完整袋码（LABB:…）；'
+          + '只填数字（如 123）会按袋编号精确匹配，一般用不到。'
+      };
+    }
+
+    /* 袋筛选允许直接填袋码（可扫），换算成服务端要的袋编号。 */
+    function resolveBagId(raw) {
+      var value = String(raw || '').trim();
+      if (!value) return Promise.resolve(null);
+      if (/^\d+$/.test(value)) return Promise.resolve(parseInt(value, 10));
+      return LC.rpc('resolve', { raw: value }).then(function (data) {
+        var bag = data && data.bag;
+        if (!bag || !bag.id) throw notFoundBag(value);
+        return bag.id;
+      }).catch(function (error) {
+        if (error && error.field) throw error;
+        throw notFoundBag(value);
+      });
+    }
     /* -------------------------------------------------------------- 列表 */
     function load(reset) {
       if (state.loading) return;
@@ -167,13 +220,25 @@
         });
         return;
       }
-      var params = buildParams(filters);
-      if (!reset && state.cursor) params.cursor = state.cursor;
-
       state.loading = true;
       LC.show(els.loading, true);
       LC.show(els.more, false);
-      LC.rpc('history', params).then(function (data) {
+      Promise.all([
+        resolveItemKey(filters.item_key),
+        resolveBagId(filters.bag_code)
+      ]).then(function (resolved) {
+        var params = buildParams(filters);
+        if (resolved[0]) {
+          params.item_key = resolved[0];
+          // 把换算结果回填，用户能看到实际查询用的编号（不是黑箱）
+          if (els.itemKey && els.itemKey.value.trim() !== resolved[0]) {
+            els.itemKey.value = resolved[0];
+          }
+        }
+        if (resolved[1]) params.bag_id = resolved[1];
+        if (!reset && state.cursor) params.cursor = state.cursor;
+        return LC.rpc('history', params);
+      }).then(function (data) {
         state.loading = false;
         state.loaded = true;
         LC.show(els.loading, false);
@@ -203,6 +268,9 @@
         state.loading = false;
         LC.show(els.loading, false);
         LC.show(els.more, !!state.cursor);
+        if (error && error.field) {
+          LC.formError(els.form, error.field, error.message);
+        }
         // 读失败保留已有结果，不把表清空冒充"没有数据"
         LC.status.show({
           kind: 'error',
@@ -223,29 +291,42 @@
       }).join('；');
     }
 
+    /* 行内只用可读口径：lcsc:C123 → 立创 C123；lab:42 → 本地档案 #42。
+     * 原始 item_key 仍按用户输入回填在筛选框里，诊断需要时看得到。 */
+    function itemKeyText(value) {
+      if (!value) return '—';
+      var text = String(value);
+      var match = /^lcsc:(.+)$/i.exec(text);
+      if (match) return '立创 ' + match[1].toUpperCase();
+      match = /^lab:(\d+)$/i.exec(text);
+      if (match) return '本地档案 #' + match[1];
+      return text;
+    }
+
     function renderRow(row) {
       var tr = LC.el('tr', { 'data-move-id': row.move_id });
-      tr.appendChild(LC.el('td', { text: LC.fmt.datetime(row.date) }));
-      var typeCell = LC.el('td');
+      tr.appendChild(LC.el('td', { 'data-label': '时间', text: LC.fmt.datetime(row.date) }));
+      var typeCell = LC.el('td', { 'data-label': '类型' });
       typeCell.appendChild(LC.el('span', {
         class: 'lc-badge',
         'data-tone': row.operation_type === 'return' ? 'ok' : 'warn',
         text: TYPE_LABEL[row.operation_type] || showText(row.operation_type)
       }));
       tr.appendChild(typeCell);
-      tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(row.operation_name) }));
-      tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(row.trace_code) }));
-      var itemCell = LC.el('td');
-      itemCell.appendChild(LC.el('div', { text: showText(row.item_key) }));
+      tr.appendChild(LC.el('td', { 'data-label': '单号', class: 'lc-mono', text: showText(row.operation_name) }));
+      tr.appendChild(LC.el('td', { 'data-label': '袋码', class: 'lc-mono', text: showText(row.trace_code) }));
+      var itemCell = LC.el('td', { 'data-label': '器件' });
+      itemCell.appendChild(LC.el('div', { text: itemKeyText(row.item_key) }));
       tr.appendChild(itemCell);
-      tr.appendChild(LC.el('td', { class: 'lc-mono', text: showText(row.lot_name) }));
-      tr.appendChild(LC.el('td', { text: qtyText(row.quantity) }));
+      tr.appendChild(LC.el('td', { 'data-label': '批次', class: 'lc-mono', text: showText(row.lot_name) }));
+      tr.appendChild(LC.el('td', { 'data-label': '数量', text: qtyText(row.quantity) }));
       tr.appendChild(LC.el('td', {
+        'data-label': '来源 → 目标',
         text: showText(row.src_location) + ' → ' + showText(row.dest_location)
       }));
-      tr.appendChild(LC.el('td', { text: showText(row.actor_name) }));
-      tr.appendChild(LC.el('td', { text: showText(row.borrower_name) }));
-      tr.appendChild(LC.el('td', { text: showText(row.project) }));
+      tr.appendChild(LC.el('td', { 'data-label': '操作人', text: showText(row.actor_name) }));
+      tr.appendChild(LC.el('td', { 'data-label': '领用人', text: showText(row.borrower_name) }));
+      tr.appendChild(LC.el('td', { 'data-label': '项目', text: showText(row.project) }));
       return tr;
     }
 
@@ -266,7 +347,7 @@
           if (node) node.value = '';
         });
         if (els.itemKey) els.itemKey.value = '';
-        if (els.bagId) els.bagId.value = '';
+        if (els.bagCode) els.bagCode.value = '';
         LC.clearFormErrors(els.form);
         state.cursor = null;
         load(true);

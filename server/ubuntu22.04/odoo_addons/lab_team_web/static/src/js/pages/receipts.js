@@ -35,6 +35,9 @@
   var LOCK_TARGETS = {
     create: [
       '[data-lc-field="item_key"]',
+      // 本地档案下拉在建袋表单之外（workflow_receipt.xml），必须单独锁定：
+      // 否则未知结果期间用户改档案会误以为原请求已变。
+      '[data-slot="material-select"]',
       '[data-lc-action="resolve-item"]',
       '[data-lc-action="clear-item"]',
       '[data-lc-form="pending-create"] input',
@@ -62,7 +65,15 @@
     cursor: null,
     confirm: null,         // {record, recommendations}
     lastBagId: null,
-    locks: { create: null, material: null, confirm: null, update: null }
+    locks: { create: null, material: null, confirm: null, update: null },
+    // 解析请求序号：输入/选择一变就递增，晚到的响应据此丢弃（不覆盖当前输入与选择）
+    resolveSeq: 0,
+    // 多档案里出现"事实完全相同"的档案时为 true：不许自动选，也不许拿 id 冒充区分依据
+    ambiguousInsufficient: false,
+    searchBox: null,       // 候选组件句柄：锁定出现时立即收起面板
+    searchDenied: false,  // 目录检索无权限时不再重复请求候选（编号/SN 扫码路径仍可用）
+    pendingPick: null     // 刚从候选点选的器件事实：解析回来没有名称时用它兜底，别把已选器件说成"未命名档案"
+
   };
 
   /* ------------------------------------------------------------------ 小工具 */
@@ -160,6 +171,13 @@
       }
     }
     applyLockState(name, !!pending);
+    if (pending) {
+      // 锁定出现：作废在途的解析响应、收起候选面板，但保留原请求卡片与内容
+      state.resolveSeq += 1;
+      if (state.searchBox && typeof state.searchBox.close === 'function') {
+        state.searchBox.close();
+      }
+    }
     return pending;
   }
 
@@ -294,6 +312,7 @@
         return item.field + '：' + item.message;
       }).join('；');
     }
+    /* 业务前置条件的可执行说明由 LC.errorText 统一透出（见 workflow_core errorText）。 */
     LC.status.show({
       kind: err.code === 'FORBIDDEN' ? 'denied' : 'error',
       code: err.code,
@@ -400,7 +419,9 @@
     var tr = LC.el('tr', { 'data-id': String(record.id) });
     var writable = canReceipt() && record.state === 'pending';
 
-    var cellCheck = LC.el('td');
+    // 命中区是外层 label（44px，见 team.css .lc-check-cell）：表格里的裸 checkbox
+    // 只有 13px，碰不到触控目标；input 自带的 data-lc-action / checked / disabled 不变。
+    var cellCheck = LC.el('td', { class: 'lc-cell-check' });
     if (writable) {
       var box = LC.el('input', {
         type: 'checkbox',
@@ -410,7 +431,7 @@
       });
       box.checked = !!record.selected;
       box.disabled = !!state.locks.update;
-      cellCheck.appendChild(box);
+      cellCheck.appendChild(LC.el('label', { class: 'lc-check lc-check-cell' }, [box]));
     } else {
       cellCheck.appendChild(LC.el('span', { class: 'lc-hint', text: '—' }));
     }
@@ -486,20 +507,55 @@
   }
 
   /* ------------------------------------------------------------------ 料号解析 */
+  /* 档案可辨识事实：只用服务端真有的字段（SN/名称/型号/封装/在库/可用）。
+   * 绝不补数据库 id、也不编造字段——信息不足就明确要求补资料。 */
+  function candidateFacts(item) {
+    var parts = [];
+    if (item.sn) parts.push('SN ' + item.sn);
+    if (item.name) parts.push(String(item.name));
+    if (item.mpn) parts.push('型号 ' + item.mpn);
+    if (item.package) parts.push('封装 ' + item.package);
+    if (item.quantity !== undefined && item.quantity !== null) {
+      parts.push('在库 ' + Number(item.quantity));
+    }
+    if (item.available_quantity !== undefined && item.available_quantity !== null) {
+      parts.push('可用 ' + Number(item.available_quantity));
+    }
+    return parts;
+  }
+
   function renderMaterialSelect(candidates) {
     var select = slot('material-select');
     if (!select) return;
-    LC.clear(select);
-    select.appendChild(LC.el('option', { value: '', text: '请选择本地档案' }));
-    (candidates || []).forEach(function (item) {
-      var label = [item.sn, item.name, item.mpn].filter(Boolean).join(' · ');
-      select.appendChild(LC.el('option', {
-        value: String(item.product_template_id),
-        text: (label || ('档案 #' + item.product_template_id)) + '（#' + item.product_template_id + '）'
-      }));
+    var rows = candidates || [];
+    var counts = {};
+    rows.forEach(function (item) {
+      var key = candidateFacts(item).join('|') || '空档案';
+      counts[key] = (counts[key] || 0) + 1;
     });
+    var insufficient = false;
+    LC.clear(select);
+    select.appendChild(LC.el('option', {
+      value: '',
+      text: rows.length > 1 ? '请选择一个本地档案（共 ' + rows.length + ' 个）' : '请选择本地档案'
+    }));
+    rows.forEach(function (item) {
+      var facts = candidateFacts(item);
+      var key = facts.join('|') || '空档案';
+      var label = facts.join(' · ') || '无名称/型号/SN 的本地档案';
+      item.insufficient = false;
+      if (rows.length > 1 && counts[key] > 1) {
+        item.insufficient = true;
+        insufficient = true;
+        label += '（与其他档案信息相同，无法区分）';
+      }
+      select.appendChild(LC.el('option', { value: String(item.product_template_id), text: label }));
+    });
+    state.ambiguousInsufficient = insufficient;
   }
 
+  /* 卡片上的"已选/待选"必须以控件值为准（select.value 是提交值的唯一来源），
+   * 不能靠"记得选过一次"：用户改下拉、清空下拉、候选重渲染后都要跟着变。 */
   function renderMaterialCard() {
     var card = q('data-lc-selected', 'material');
     if (!card) return;
@@ -510,30 +566,67 @@
     }
     LC.show(card, true);
     setSlot('material-key', picked.item_key || '—');
-    setSlot('material-name', picked.name || '（未命名档案）');
-    setSlot('material-meta', [
-      picked.mpn ? '型号 ' + picked.mpn : '',
-      picked.package ? '封装 ' + picked.package : '',
-      picked.sn ? 'SN ' + picked.sn : '',
-      picked.ambiguous ? '注意：同一编号有多个本地档案，必须在下方选择' : ''
-    ].filter(Boolean).join(' · '));
-    renderMaterialSelect(picked.candidates || []);
+    // 名称缺失只说明"这个编号暂时读不到名称"，不能把整个器件说成未命名档案
+    setSlot('material-name', picked.name || '（名称待补）');
+
+    var rows = picked.candidates || [];
+    var multi = rows.length > 1;
+    // 重建下拉会清空选项，先记住用户当前值，重建后若仍合法就保留
+    var previous = '';
     var select = slot('material-select');
+    if (select) previous = String(select.value || '');
+    renderMaterialSelect(rows);
+    select = slot('material-select');
+    var chosen = null;
     if (select) {
-      if (picked.candidates && picked.candidates.length === 1) {
-        select.value = String(picked.candidates[0].product_template_id);
-        picked.product_template_id = picked.candidates[0].product_template_id;
-      } else {
-        select.value = '';
-        picked.product_template_id = null;
+      var value = '';
+      if (rows.length === 1) {
+        value = String(rows[0].product_template_id);
+      } else if (previous) {
+        value = rows.filter(function (c) {
+          return String(c.product_template_id) === previous;
+        }).length ? previous : '';
       }
+      select.value = value;
+      rows.forEach(function (c) {
+        if (value && String(c.product_template_id) === value) chosen = c;
+      });
     }
+    // 有候选时，控件空就等于没选到档案：这时不允许拿默认档案去提交
+    if (rows.length) {
+      picked.product_template_id = chosen ? chosen.product_template_id : null;
+      if (chosen) picked.sn = chosen.sn || null;
+    }
+
+    var meta = [];
+    if (chosen) {
+      var facts = candidateFacts(chosen);
+      meta.push('已选档案：' + (facts.join(' · ') || '该档案暂无 SN/型号资料'));
+      if (multi) meta.push('同一编号共 ' + rows.length + ' 个本地档案');
+    } else {
+      if (picked.mpn) meta.push('型号 ' + picked.mpn);
+      if (picked.package) meta.push('封装 ' + picked.package);
+      if (picked.sn) meta.push('SN ' + picked.sn);
+      if (multi) meta.push('待选档案：同一编号有 ' + rows.length + ' 个本地档案，请按 SN/在库数量明确选择');
+    }
+    if (state.ambiguousInsufficient) {
+      meta.push('其中存在名称/型号/SN/库存完全相同的档案，无法区分：请先在器件资料补齐 SN 或型号再入库');
+    }
+    setSlot('material-meta', meta.filter(Boolean).join(' · '));
+  }
+
+  /* 只清"已选"、不动输入框：输入一改旧选择必须立刻失效，避免拿旧选择提交新输入。 */
+  function resetSelection() {
+    state.resolveSeq += 1;        // 同时作废在途解析：晚到响应不得回填
+    state.selected = null;
+    state.pendingPick = null;     // 输入一变，上一候选的事实不许再兜底到新输入
+    areaLoading('resolve', false);
+    renderMaterialCard();
   }
 
   function clearSelection() {
-    state.selected = null;
+    resetSelection();
     areaError('resolve', '');
-    renderMaterialCard();
     var input = q('data-lc-field', 'item_key');
     if (input) input.value = '';
   }
@@ -583,7 +676,10 @@
    * assumeItemKey：仅当输入本身是 lcsc:Cxxx 且本地暂无档案时，用它作为待建档的 item_key
    * （pendingCreate 会在建袋时建最小档案；建袋结果仍以服务端返回为准）。 */
   function requestResolve(raw, typed, assumeItemKey) {
+    if (state.locks.create) { areaLoading('resolve', false); return; }
+    var mySeq = ++state.resolveSeq;
     LC.rpc('resolve', { raw: raw }).then(function (data) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;  // 已变/已锁：丢弃晚到响应
       areaLoading('resolve', false);
       var kind = (data && data.kind) || '';
       if (kind === 'bag' || kind === 'location') {
@@ -605,8 +701,19 @@
         ambiguous: !!(data && data.ambiguous_material) || candidates.length > 1,
         candidates: candidates
       };
+      // 点选候选后解析：扫码端点只回本地档案事实，名称常为空——先用刚才候选的事实兜底，
+      // 不能让用户看到"名称待补"以为自己选错了器件。
+      var hintPick = state.pendingPick;
+      if (hintPick && (!picked.item_key || !hintPick.key || picked.item_key === hintPick.key)) {
+        picked.name = picked.name || hintPick.name || '';
+        picked.mpn = picked.mpn || hintPick.mpn || '';
+        picked.package = picked.package || hintPick.package || '';
+        if (!picked.catalog_code) picked.catalog_code = hintPick.code || '';
+      }
       state.selected = picked;
       renderMaterialCard();
+      fillItemName(picked);
+      if (picked.candidates.length > 1) enrichCandidates(picked);
       if (!picked.item_key && assumeItemKey) {
         // 输入是 lcsc:Cxxx，但本地还没有档案：保留该编号本身，让建袋时由服务端建最小档案。
         // 这不是"空成功"——建袋仍是真实写操作，结果以服务端返回的 records 为准。
@@ -633,9 +740,58 @@
         });
       }
     }).catch(function (err) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;
       areaLoading('resolve', false);
       areaError('resolve', '料号解析失败：' + resolveErrorText(err));
       if (err && err.code !== 'VALIDATION_ERROR') showError(err, resolveItem);
+    });
+  }
+
+  /* 名称兜底：扫编号/SN 时服务端可能只回料号不回名称，用 catalogDetail 补一次真实名称。
+   * 只补服务端真有的字段；失败静默保持"名称待补"，不编造。 */
+  function fillItemName(picked) {
+    if (!picked || picked.name || !picked.item_key || !LC.rpc) return;
+    var mySeq = state.resolveSeq;
+    LC.rpc('catalogDetail', { item_key: picked.item_key }).then(function (data) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;
+      if (state.selected !== picked || picked.name) return;
+      var item = (data && data.item) || {};
+      if (!item.name) return;
+      picked.name = item.name;
+      if (!picked.mpn) picked.mpn = item.mpn || '';
+      if (!picked.package) picked.package = item.package || '';
+      renderMaterialCard();
+    }).catch(function () {
+      // 补名称失败不影响解析结果：保持"名称待补"并继续
+    });
+  }
+
+  /* 多档案时补真实"在库/可用/SN"事实：复用 catalogDetail（不新增接口）。
+   * 只合并服务端真返回的字段；拿不到就保持原样并提示信息不足，绝不编造。 */
+  function enrichCandidates(picked) {
+    var key = picked.item_key || '';
+    if (!key || !LC.rpc) return;
+    var mySeq = state.resolveSeq;
+    LC.rpc('catalogDetail', { item_key: key }).then(function (data) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;
+      if (!state.selected || state.selected !== picked) return;
+      var tpls = (data && data.lab_templates) || [];
+      if (!tpls.length) return;
+      var byId = {};
+      tpls.forEach(function (tpl) { byId[String(tpl && tpl.id)] = tpl; });
+      (picked.candidates || []).forEach(function (cand) {
+        var hit = byId[String(cand.product_template_id)];
+        if (!hit) return;
+        if (hit.sn && !cand.sn) cand.sn = hit.sn;
+        if (!cand.name && hit.name) cand.name = hit.name;
+        if (hit.quantity !== undefined && hit.quantity !== null) cand.quantity = hit.quantity;
+        if (hit.available_quantity !== undefined && hit.available_quantity !== null) {
+          cand.available_quantity = hit.available_quantity;
+        }
+      });
+      renderMaterialCard();
+    }).catch(function () {
+      // 补充事实失败不影响主流程：继续按已有事实展示（并保留"信息不足"提示）
     });
   }
 
@@ -643,7 +799,10 @@
    * 适配成页面既有的 picked 形状，candidates 用 lab_templates + lab_template_ids 合并，
    * 多个档案时仍全部列出、不自动首选（只有唯一档案才带 product_template_id）。 */
   function requestLocalDetail(itemKey, typed) {
+    if (state.locks.create) { areaLoading('resolve', false); return; }
+    var mySeq = ++state.resolveSeq;
     LC.rpc('catalogDetail', { item_key: itemKey }).then(function (data) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;
       areaLoading('resolve', false);
       var item = (data && data.item) || {};
       var templates = (data && data.lab_templates) || [];
@@ -658,7 +817,10 @@
           sn: (tpl && tpl.sn) || null,
           name: (tpl && tpl.name) || item.name || '',
           mpn: item.mpn || null,
-          package: item.package || null
+          package: item.package || null,
+          quantity: (tpl && tpl.quantity !== undefined) ? tpl.quantity : undefined,
+          available_quantity: (tpl && tpl.available_quantity !== undefined)
+            ? tpl.available_quantity : undefined
         });
       });
       (item.lab_template_ids || []).forEach(function (rawId) {
@@ -696,6 +858,7 @@
         areaError('resolve', '该料号在本地有多个档案：请在「本地档案」下拉里选一个，系统不会自动选择。');
       }
     }).catch(function (err) {
+      if (mySeq !== state.resolveSeq || state.locks.create) return;
       areaLoading('resolve', false);
       var hint = '';
       if (err && err.code === 'FORBIDDEN') {
@@ -713,9 +876,21 @@
     var form = LC.qs('[data-lc-form="pending-create"]', root);
     if (!form) return;
     LC.guard(form, function (values, done) {
+      if (state.locks.create) {
+        done();
+        areaError('resolve', '上一次建袋结果未知（已锁定）：请先按原内容重试确认结果，成功后才能改档案或数量。');
+        return;
+      }
       var input = q('data-lc-field', 'item_key');
       var typed = input ? String(input.value || '').trim() : '';
       var picked = state.selected;
+      if (!typed) {
+        // 空查询绝不能沿用旧选择提交（A2）
+        resetSelection();
+        done();
+        areaError('resolve', '料号输入为空：请重新输入名称/编号并用候选或「解析料号」选定料号，不能沿用上一次的选择。');
+        return;
+      }
       if (!picked || !picked.item_key) {
         done();
         notify('请先解析并选择统一料号。');
@@ -726,10 +901,30 @@
         areaError('resolve', '料号输入已改动，请重新点「解析料号」后再建袋。');
         return;
       }
-      var templateId = LC.parse.int(values.product_template_id, 0);
-      if (picked.ambiguous && !templateId) {
+      /* 本地档案下拉在 <form data-lc-form="pending-create"> 之外（同一个面板里），
+       * formValues() 只收集 form.elements，所以 values.product_template_id 恒为空：
+       * 卡片写着"已选 13"、下拉也显示 13，提交却按"没选档案"报错。提交值必须以
+       * 控件本身为准（下拉是唯一真实选中状态），formValues 只作为兜底。 */
+      var selectNode = slot('material-select');
+      var templateId = LC.parse.int(
+        (selectNode && selectNode.value) || values.product_template_id, 0);
+      var candidates = picked.candidates || [];
+      if (candidates.length > 1 && !templateId) {
         done();
-        areaError('resolve', '同一编号有多个本地档案：请先选定一个档案。');
+        areaError('resolve', '同一编号有多个本地档案：请先在「本地档案」里选定一个。');
+        return;
+      }
+      var chosen = templateId ? candidates.filter(function (c) {
+        return c.product_template_id === templateId;
+      })[0] : null;
+      if (templateId && candidates.length && !chosen) {
+        done();
+        areaError('resolve', '所选本地档案已失效（料号或档案变了），请重新选择料号后再建袋。');
+        return;
+      }
+      if (chosen && chosen.insufficient) {
+        done();
+        areaError('resolve', '所选本地档案与其他档案的名称/型号/SN/库存完全相同，无法确认是哪一个：请先在器件资料补齐 SN 或型号再入库。');
         return;
       }
       var quantity = LC.parse.float(values.quantity, 0);
@@ -1305,18 +1500,41 @@
   }
 
   /* ------------------------------------------------------------------ 标签页 ---------- */
+  /* 两步页签：激活只切面板与查询串，不碰已选料号、待入库勾选与未决锁。
+   * ARIA：每个 tab 的 aria-controls 指向自己的 tabpanel（XML 里静态给出），
+   * 这里维护 roving tabindex（选中项 0、其余 -1），方向键/Home/End 同步切换
+   * 激活项并把焦点移过去（自动激活，见 WAI-ARIA tabs 的 recommended 模式）。 */
   function wireTabs(root) {
     var tabs = LC.qsa('[data-lc-action="tab"]', root);
-    function activate(name) {
+    function activate(name, focusIt) {
       tabs.forEach(function (tab) {
         var active = tab.getAttribute('data-tab') === name;
         tab.classList.toggle('is-active', active);
         tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.setAttribute('tabindex', active ? '0' : '-1');
+        if (active && focusIt && tab.focus) tab.focus();
       });
       LC.show(q('data-lc-panel', 'prepare'), name === 'prepare');
       LC.show(q('data-lc-panel', 'shelve'), name === 'shelve');
       LC.setQuery({ tab: name });
     }
+    function onTabKey(ev, list) {
+      var key = ev.key;
+      if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
+      var all = LC.qsa('[role="tab"]', list);
+      if (!all.length) return;
+      var doc = list.ownerDocument || document;
+      var current = all.indexOf(doc.activeElement);
+      if (current < 0) current = 0;
+      var next = current;
+      if (key === 'ArrowRight') next = (current + 1) % all.length;
+      if (key === 'ArrowLeft') next = (current - 1 + all.length) % all.length;
+      if (key === 'Home') next = 0;
+      if (key === 'End') next = all.length - 1;
+      ev.preventDefault();
+      activate(all[next].getAttribute('data-tab'), true);
+    }
+    LC.on(root, '[role="tablist"]', 'keydown', onTabKey);
     return activate;
   }
 
@@ -1396,6 +1614,150 @@
     });
   }
 
+  /* --------------------------------------------------- 输入即候选（检索建议下拉）
+   * 只做"检索建议"：不建档、不写库存、不代替扫码解析。
+   * 选中候选后把输入收敛成统一 key（lcsc:C123 / lab:42），再走原有 resolveItem()
+   * 的完整解析与校验路径 —— 扫码枪、粘贴、候选三种入口语义完全一致。
+   */
+  // 检索权限提示常驻在表单里（不依赖候选面板是否打开）
+  function showSearchDenied(on) {
+    var hint = q('data-lc-slot', 'search-denied');
+    if (!hint) return;
+    hint.hidden = !on;
+    hint.textContent = on
+      ? '当前账号没有器件资料检索权限：关键词候选已停用，请改用编号 / SN 扫码；需要关键词搜索请联系管理员。'
+      : '';
+  }
+
+  function wireItemSearch(root) {
+    var input = q('data-lc-field', 'item_key');
+    if (!input || !LC.combobox) return null;
+    var container = root.querySelector('.lc-combobox');
+    if (!container) {
+      container = LC.el('div', { class: 'lc-combobox' });
+      if (input.parentNode) input.parentNode.insertBefore(container, input);
+      container.appendChild(input);
+    }
+    var box = LC.combobox({
+      input: input,
+      container: container,
+      minLength: 2,
+      limit: 8,
+      debounceMs: 250,
+      maxInflight: 2,          // 候选请求最多 2 个在途，其余只留最新待发
+      retryText: '重试检索',
+      disabled: function () {
+        return !canReceipt() || state.searchDenied || !!state.locks.create;
+      },
+      loadingText: '正在检索器件资料…',
+      emptyText: '没有匹配的器件。可以继续用编号 / SN 扫码，或直接填下方「新建器件档案」。',
+      errorText: function (err) {
+        if (err && (err.code === 'ACCESS_ERROR' || err.code === 'FORBIDDEN')) {
+          state.searchDenied = true;
+          // 权限原因要常驻：面板一关就消失会让用户以为是临时故障
+          showSearchDenied(true);
+          return '当前账号没有器件资料检索权限：请改用编号 / SN 扫码；需要关键词搜索请联系管理员分配目录读取权限。';
+        }
+        return '候选检索失败：' + resolveErrorText(err) + '。点「重试检索」用同一个关键词重发，或继续用编号扫码。';
+      },
+      // 候选请求是省钱查询：显式 8s 超时，不沿用 read 的 20s（方案 §3.1）
+      fetch: function (query) {
+        var text = String(query || '').trim();
+        // 袋码 / 库位码不是料号关键词，不查目录
+        if (!text || /^(LABB|LABL)\s*:/i.test(text)) return Promise.resolve([]);
+        var bare = text.replace(/^lcsc\s*:\s*/i, '');
+        return LC.rpc('catalogSearch', { query: bare, limit: 8 },
+          { timeoutMs: 8000 }).then(function (data) {
+          return (data && data.items) || [];
+        });
+      },
+      describe: function (item) {
+        // 后端 catalog_code 已含 C 前缀（lab_catalog_item._norm 返回 'C123'），
+        // 这里只做兜底，避免出现 "CC123"
+        var code = item.catalog_code || '';
+        if (code && !/^C/i.test(code)) code = 'C' + code;
+        var local = (item.lab_template_ids || []).length;
+        var stock = Number(item.lab_quantity || 0);
+        var facts = [
+          code || '',                     // 立创编号必须可见：候选里没有编号等于没法核对
+          item.mpn ? '型号 ' + item.mpn : '',
+          item.package ? '封装 ' + item.package : '',
+          item.brand || ''
+        ].filter(Boolean).join(' · ');
+        var tags = [
+          item.has_stock ? '本地库存 ' + stock : '本地无库存',
+          local ? '已有档案 ' + local + ' 个' : '暂无档案'
+        ];
+        if (item.catalog_stock !== null && item.catalog_stock !== undefined && item.catalog_stock !== '') {
+          tags.push('供货 ' + item.catalog_stock + '（非本地库存）');
+        }
+        return {
+          primary: item.name || code || item.item_key || '未命名器件',
+          meta: facts,
+          badge: tags.join(' · ')
+        };
+      },
+      onPick: function (item) {
+        if (state.locks.create) return;      // 锁定期间不换料号
+        var key = item.catalog_code ? 'lcsc:' + item.catalog_code : (item.item_key || '');
+        if (!key) return;
+        var code = item.catalog_code || '';
+        if (code && !/^C/i.test(code)) code = 'C' + code;
+        // 记住候选事实：解析回来的本地档案可能没有名称，用它兜底显示已选器件
+        state.pendingPick = {
+          key: key,
+          code: code,
+          name: item.name || '',
+          mpn: item.mpn || '',
+          package: item.package || ''
+        };
+        input.value = key;
+        resolveItem();
+      },
+      onQuery: function (text) {
+        // 锁定期间保留原请求卡片与内容（不清选择、不报错），避免误以为请求已变
+        if (state.locks.create) return;
+        // 输入一改，旧的"已选"必须立刻作废：不能让旧档案跟着新关键词提交
+        if (state.selected) resetSelection();
+        areaError('resolve', '');
+      }
+    });
+
+    state.searchBox = box;   // 锁定出现时用它收起候选面板
+
+    // 扫码枪 / 手工回车：组件没消费（面板未开且无高亮）时才整串解析，
+    // 保持原有完整解析路径不退化；defaultPrevented 表示候选已处理，不再重复提交。
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.defaultPrevented) return;
+      ev.preventDefault();
+      resolveItem();
+    });
+
+    // 本地档案下拉是提交值的唯一来源：控件改了 state 跟着改（不再"下拉变、state 不变"）
+    var select = slot('material-select');
+    if (select) {
+      select.addEventListener('change', function () {
+        if (state.locks.create) {
+          // 锁定期间改档案必须立即回滚：不能让用户以为原请求内容已经变了
+          select.value = (state.selected && state.selected.product_template_id)
+            ? String(state.selected.product_template_id) : '';
+          notify('上一次建袋结果未知：档案已锁定，请先重试查询结果。');
+          return;
+        }
+        if (!state.selected) return;
+        // 直接按控件值重渲染：卡片文案、state 里的 product_template_id/sn 一起更新，
+        // 不让"下拉已改、卡片还写待选"这种不一致存在。
+        renderMaterialCard();
+      });
+    }
+
+    // 挂载即聚焦料号输入（扫码枪免点一次）；已有深链内容时不抢焦点
+    if (canReceipt() && !input.value) {
+      try { input.focus(); } catch (e) { /* 焦点失败不影响功能 */ }
+    }
+    return box;
+  }
+
   /* ------------------------------------------------------------------ 初始化 */
   LC.register('receipts', function (ctx) {
     var root = ctx.root;
@@ -1406,6 +1768,7 @@
     wireConfirmForm(root);
     wireActions(root, activateTab);
     wireScanInput(root);
+    wireItemSearch(root);
 
     window.addEventListener('online', function () { LC.status.clear(); });
     window.addEventListener('offline', function () { offlineNote(); });

@@ -199,7 +199,10 @@
         'aria-label': '选择 ' + sourceLabel(row)
       });
       box.checked = !!state.selected[String(row.id)];
-      tr.appendChild(LC.el('td', {}, [box]));
+      // 与待入库袋表格一致：命中区外层 label 44px，图形 20px，input 属性不动
+      tr.appendChild(LC.el('td', { class: 'lc-cell-check' }, [
+        LC.el('label', { class: 'lc-check lc-check-cell' }, [box])
+      ]));
 
       var labelCell = LC.el('td', { class: 'lc-mono', text: sourceLabel(row) });
       tr.appendChild(labelCell);
@@ -401,10 +404,15 @@
     state.selected = {};
     state.cursor = null;
     state.rows = [];
+    /* ARIA tabs 契约（与入库两步页签一致）：roving tabindex（选中 0、其余 -1），
+     * tabpanel 的 aria-labelledby 指向当前 tab，读屏才知道面板属于哪个页签。 */
+    var panel = q('data-lc-workbench', 'labels');
     LC.qsa('[data-lc-action="kind"]', root).forEach(function (tab) {
       var active = tab.getAttribute('data-kind') === kind;
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      tab.setAttribute('tabindex', active ? '0' : '-1');
+      if (active && panel && tab.id) panel.setAttribute('aria-labelledby', tab.id);
     });
     var note = q('data-lc-kind-note', 'labels');
     if (note) {
@@ -467,6 +475,25 @@
       if (action === 'source-more') { ev.preventDefault(); loadSource(false); return; }
       if (action === 'plan') { ev.preventDefault(); runPlan(); return; }
       if (action === 'print') { ev.preventDefault(); submitPdf(); return; }
+    });
+
+    /* 方向键/Home/End 在三个页签间移动并激活（自动激活，WAI-ARIA tabs 推荐模式）。 */
+    LC.on(root, '[role="tablist"]', 'keydown', function (ev, list) {
+      var key = ev.key;
+      if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
+      var tabs = LC.qsa('[role="tab"]', list);
+      if (!tabs.length) return;
+      var doc = list.ownerDocument || document;
+      var current = tabs.indexOf(doc.activeElement);
+      if (current < 0) current = 0;
+      var next = current;
+      if (key === 'ArrowRight') next = (current + 1) % tabs.length;
+      if (key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+      if (key === 'Home') next = 0;
+      if (key === 'End') next = tabs.length - 1;
+      ev.preventDefault();
+      switchKind(tabs[next].getAttribute('data-kind') || 'pending', root);
+      if (tabs[next].focus) tabs[next].focus();
     });
 
     LC.on(root, '[data-lc-label-field]', 'change', function () { schedulePlan(); });

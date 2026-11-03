@@ -67,8 +67,16 @@ class AllowlistContractTest(unittest.TestCase):
         self.assertIn("/lab/client/updates/manifest", ALLOW)
 
     def test_denied_paths_absent(self):
+        """这些路径不得有**精确** location。
+
+        不能用子串断言：迁移后的旧菜单动作精确登记为
+        "location = /odoo/action-<xmlid>"（见
+        tests/test_legacy_action_gateway_contract.py），子串 "/odoo" 会误报。
+        通配/前缀形态由本文件与旧动作契约测试分别把关。
+        """
         for bad in ("/web/dataset", "/jsonrpc", "/web/database", "/odoo", "/website", "/web/login", "/longpolling"):
-            self.assertNotIn("location = %s" % bad, ALLOW)
+            self.assertNotRegex(ALLOW, r"location\s+=\s+%s\s*\{" % re.escape(bad),
+                                "不应精确登记：%s" % bad)
 
     def test_auth_location_clears_db_header(self):
         block = _auth_block()

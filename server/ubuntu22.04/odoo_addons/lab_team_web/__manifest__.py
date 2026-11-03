@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "战队管理站点（仓库 Web 入口）",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.0",
     "summary": "独立于 Odoo 原生 WebClient 的战队管理前端入口：欢迎、登录、仓库检索与器件详情",
     "description": """
 战队管理站点
@@ -36,6 +36,8 @@ history,materials,settings}；根级别别名可由参数 lab_team_web.root_alia
         "views/workflow_issue.xml",
         "views/workflow_inventory.xml",
         "views/workflow_account.xml",
+        # 旧入口菜单改指 + /odoo/action-<xmlid> 兼容路由的目标动作
+        "views/legacy_entry_menu.xml",
     ],
     "installable": True,
     "uninstall_hook": "uninstall_hook",

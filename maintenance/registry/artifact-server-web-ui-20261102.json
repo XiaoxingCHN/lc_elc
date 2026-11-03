@@ -1,0 +1,126 @@
+{
+  "file": "local/build/web-ui-20261102/candidates/server-web-ui-20261102-source.zip",
+  "bytes": 13251270,
+  "sha256": "cc1072482844ea2d3e0d2733be6ef799b530b6624b1b59b6a2538ca0a6970040",
+  "version": "lab_team_web19.0.1.2.0+server-ops2026.11.02.1",
+  "source_manifest": "maintenance/registry/source-server-web-ui-20261102.json",
+  "source_tree_sha256": "634d1893eb8c1e6ac26220003660cea6808348c0ba7c5b7856244f5298848126",
+  "validation": "Local candidate verified on an isolated WSL Odoo 19 instance (db p3_ui_20261102): -u lab_team_web with /lab_team_web tests gave ODOO_EXIT=0 and 52 tests / 0 failed / 0 error, and ir_module_module.latest_version for lab_team_web is 19.0.1.2.0 afterwards; node combobox 20/20, workflow core 19/19, bore legacy-action gateway contract 19 tests OK (7 skipped, env-dependent); repo_check PASS 52 checks / 0 errors / 1 known warning; git diff --check clean. Browser evidence is carried over from this round's earlier suites (55 items 54 pass/1 fail before the 44px button fix, then 34 items 30 pass/0 fail/4 blocked after it) and was NOT re-run for this artifact. Not deployed to production; deploy bundle built locally only.",
+  "source_manifest_sha256": "fe34ed95e47a7ccdc07ffabb86defdde3eb997ee8edfb69d251063276f29a71a",
+  "source_commit": "b3bcbf244e44939c6d481e3f97f11579cdf9ee99",
+  "source_worktree": "uncommitted candidate worktree (31 modified + 30 untracked entries preserved, no commit/push); the frozen source manifest is authoritative",
+  "kind": "source-only-local-candidate",
+  "production_deployed": false,
+  "build_environment": {
+    "os": "Windows 11",
+    "python": "3.15.0",
+    "packaging": "stdlib zipfile; sorted entries (MANIFEST.json first), fixed 1980-01-01 metadata, mode 0644, deflate 9; per-file raw and LF-normalized SHA256 verified, archive re-read after write",
+    "source_files": 258,
+    "archive_entries": 259
+  },
+  "signing": {
+    "status": "not_applicable",
+    "reason": "Source-only ZIP, not an executable application or a signed production release"
+  },
+  "build_report": "local/build/web-ui-20261102/candidates/build-summary-20261102.json",
+  "deploy_bundle": {
+    "file": "local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102.tar.gz",
+    "bytes": 91154,
+    "sha256": "b46d45997c4ec9469d7d45bf33a7ad1a1f8d878e9dd2ce1c8fba7163b23f55f0",
+    "entries": 27,
+    "params": "local/build/web-ui-20261102/candidates/params.env",
+    "params_contains_secrets": false,
+    "freeze_file": "FROZEN-20261102.sha256",
+    "freeze_entries": 18,
+    "bundle_meta_shipped_scripts": 15,
+    "bundle_meta_freeze_sha256": "93b07b020fb76d0ce48075495737a1e08b34df081370ab966eddacfb40b416b8",
+    "pack_command": "python local/web-ui-implementation/scripts/pack-bundle.py --out local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102.tar.gz --params local/build/web-ui-20261102/candidates/params.env",
+    "pack_rc": 0,
+    "contents": "lc_root.py + remote/ (14 scripts, params.env, params.env.example) + tools/ (5 scripts) + gateway_source/ (4 files) + FROZEN-20261102.sha256 + bundle-meta.json"
+  },
+  "validation_results": {
+    "module_suite_on_upgrade": {
+      "command": "bash local/web-ui-implementation/browser/upgrade-only-test.sh (-u lab_team_web --test-enable --test-tags=/lab_team_web --stop-after-init --http-port=18071)",
+      "odoo_exit": 0,
+      "script_exit": 0,
+      "tests": 52,
+      "failed": 0,
+      "errors": 0,
+      "log": "local/web-ui-implementation/evidence/upgrade-keepdb-20261102T111544Z.log",
+      "at_install_note": "odoo.tests.result recorded 0 failed, 0 error(s) of 42 tests during the at_install phase; post-install module stats recorded 52 tests"
+    },
+    "db_version_after_upgrade": {
+      "db": "p3_ui_20261102 (isolated WSL instance, PG 55432)",
+      "query": "select name, latest_version, state from ir_module_module where name in (...) order by name",
+      "lab_team_web": "19.0.1.2.0 installed",
+      "lab_workflow": "19.0.2.0.0 installed",
+      "lab_catalog": "19.0.2.0.5 installed",
+      "lab_inventory": "19.0.1.0.0 installed",
+      "lab_site": "uninstalled",
+      "lab_theme": "uninstalled",
+      "checked_at": "2026-11-02T19:16:27+08:00"
+    },
+    "combobox": {
+      "total": 20,
+      "pass": 20,
+      "fail": 0,
+      "exit": 0,
+      "command": "node server/ubuntu22.04/odoo_addons/lab_team_web/tests/test_combobox.mjs"
+    },
+    "workflow_core": {
+      "total": 19,
+      "pass": 19,
+      "fail": 0,
+      "exit": 0,
+      "command": "node server/ubuntu22.04/odoo_addons/lab_team_web/tests/test_workflow_core.mjs"
+    },
+    "legacy_action_gateway_contract": {
+      "ran": 19,
+      "skipped": 7,
+      "failed": 0,
+      "exit": 0,
+      "note": "unittest reported 'OK (skipped=7)'; the 7 skips are environment-dependent (no live gateway/nginx on this host)",
+      "command": "python server/ubuntu22.04/bore/tests/test_legacy_action_gateway_contract.py"
+    },
+    "repo_check": {
+      "result": "PASS",
+      "passed_checks": 52,
+      "errors": 0,
+      "warnings": 1,
+      "warning_ids": [
+        "production-py312-rebuild"
+      ],
+      "exit": 0,
+      "evidence": "local/web-ui-implementation/evidence/repo-check-20261102-final.json (re-run after the CHANGELOG/README/CURRENT_STATE/task/handoff doc updates)"
+    },
+    "git_diff_check": {
+      "exit": 0,
+      "note": "extra blank line at EOF of static/src/css/team.css removed in this round; only a CRLF-normalization notice remains on stderr (worktree uses core.autocrlf=true, same as the 10-28 manifest)"
+    },
+    "browser_suite_pre_fix": {
+      "total": 55,
+      "pass": 54,
+      "fail": 1,
+      "blocked": 0,
+      "report": "local/web-ui-implementation/out/run-real-2026-11-02T10-22-34-590Z/report.json",
+      "note": "the single fail was the two 36px inline buttons on the issues page; fixed to 44px in static/src/css/workflow_issue.css and workflow_inventory.css afterwards"
+    },
+    "pages_suite_after_fix": {
+      "total": 34,
+      "pass": 30,
+      "fail": 0,
+      "blocked": 4,
+      "report": "local/web-ui-implementation/out/run-real-2026-11-02T11-08-17-482Z/report.json",
+      "note": "3 blocked are sections deliberately skipped with --only; 1 blocked is the static bag detail case without an id, covered by the dynamic bag case"
+    },
+    "timing_caveat": "The browser suites were measured before the 19.0.1.2.0 version bump; only the module suite on -u and the node/contract tests were re-run for this artifact. They are not proof that the bumped build was re-verified in the browser."
+  },
+  "limitations": [
+    "Source-only candidate plus a local deploy bundle: nothing was deployed, no production host was contacted, no SSH or credentials were used",
+    "Browser/DOM evidence for the 19.0.1.2.0 build itself was not re-run (carried over from this round's earlier suites); only module suite + node/contract tests + repo_check were executed after the bump",
+    "The deploy bundle's params.env takes production paths/topology from the reviewed scripts/remote/params.env.example; they must be re-verified on the target before a real run",
+    "Isolated WSL Odoo 19/Python 3.10.12 instance is not production Python 3.12.15 equivalence; production-py312-rebuild payload remains open (repo_check warning)",
+    "Pre-existing registry drift kept untouched: components.json says lab_workflow 19.0.2.0.0 while the module manifest on disk says 19.0.2.0.5 (module not upgraded in this round)",
+    "Candidate identity was frozen before the docs/CHANGELOG/CURRENT_STATE updates; those files live outside server/ubuntu22.04 and are not part of the source manifest"
+  ]
+}

@@ -35,6 +35,9 @@ body.lc-body {
   --lc-radius-lg: 14px;
   --lc-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* 原生控件跟随深色：滚动条、select、input 的 UA 默认渲染不再按浅色走 */
+  color-scheme: dark;
+
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -330,7 +333,7 @@ body.lc-body .lc-btn-outline:hover {
 }
 
 body.lc-body .lc-btn-ghost {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-color: var(--line);
   background: transparent;
@@ -500,7 +503,7 @@ body.lc-body .lc-card-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 44px;
   color: var(--lime);
   font-size: 14px;
   font-weight: 600;
@@ -1985,7 +1988,7 @@ body.lc-body .lc-tabs {
 body.lc-body .lc-tab {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -2151,4 +2154,489 @@ body.lc-body .lc-btn-danger:hover {
   body.lc-body .lc-page-actions {
     display: none !important;
   }
+}
+/* ==========================================================================
+   共用搜索下拉（输入即候选）
+   --------------------------------------------------------------------------
+   由 workflow_core.js 的 LC.combobox 生成，页面只提供 input + .lc-combobox 容器：
+     .lc-combobox > input            输入框（role=combobox）
+     .lc-combobox-pop > ul[role=listbox] > li.lc-combobox-option
+     .lc-combobox-note[data-kind]    加载 / 无结果 / 失败 提示（role=status）
+   弹层绝对定位在输入框下方，不出视口；375px 时整宽显示，不横向溢出。
+   宽度跟输入框对齐，桌面不再被 540px 上限卡窄；窄屏仍受视口宽度约束。
+   ========================================================================== */
+
+body.lc-body .lc-combobox {
+  position: relative;
+  min-width: 0;
+}
+
+body.lc-body .lc-combobox-pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 240px;
+  max-width: min(780px, calc(100vw - 28px));
+  max-height: min(52vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--lc-radius);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.58);
+}
+
+/* 下方空间不足时由 LC.combobox 标 data-placement="up"，翻到输入框上方展开，
+   仍受 max-height 限制；窄屏/软键盘场景不再把候选裁到视口外。 */
+body.lc-body .lc-combobox-pop[data-placement="up"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.58);
+}
+
+/* 弹层要越过 .lc-panel 的圆角裁切：面板在下拉展开期间临时放开 overflow，
+   否则窄屏向上展开（data-placement="up"）时候选会被面板上沿裁掉，
+   elementFromPoint 会命中面板外的背景、点击落不到选项上（375px 实测）。 */
+body.lc-body .lc-panel:has(.lc-combobox-pop:not([hidden])) {
+  overflow: visible;
+}
+
+body.lc-body .lc-combobox-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+body.lc-body .lc-combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+body.lc-body .lc-combobox-option + .lc-combobox-option {
+  border-top: 1px solid var(--line);
+}
+
+body.lc-body .lc-combobox-option:hover,
+body.lc-body .lc-combobox-option.is-active {
+  background: var(--lime-soft);
+  box-shadow: inset 2px 0 0 var(--lime);
+}
+
+body.lc-body .lc-combobox-primary {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-badge {
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-combobox-note {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-combobox-note[data-kind="error"] {
+  color: var(--red);
+}
+
+body.lc-body .lc-combobox-note[data-kind="loading"] {
+  color: var(--lime);
+}
+
+/* 失败态里的"重试检索"：真按钮，键盘可达，不掉出暗色主题 */
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:hover,
+body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:focus-visible {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+/* 权限不足等常驻提示：不依赖候选面板是否打开 */
+body.lc-body .lc-hint-warn {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--red);
+  background: rgba(255, 75, 62, 0.08);
+  color: var(--red);
+  border-radius: 0 8px 8px 0;
+}
+
+@media (max-width: 760px) {
+  body.lc-body .lc-combobox-pop {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* ==========================================================================
+   整站骨架：桌面固定业务侧栏 + 顶部账号区（断点 1024px）
+   --------------------------------------------------------------------------
+   方案 §一：桌面不是"一行横向链接"，而是左侧固定业务侧栏 + 顶部账号区；
+   ≤1023px 侧栏收成抽屉（按钮在顶部条、品牌左侧），内容区单列。
+   侧栏用 .lc-rail 命名——.lc-sidebar 在本文件里已表示"目录筛选侧栏"，不复用。
+   ========================================================================== */
+
+body.lc-body .lc-rail {
+  min-width: 0;
+}
+
+body.lc-body .lc-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  body.lc-body .lc-header-inner {
+    flex-wrap: nowrap;
+    min-height: 68px;
+    padding: 10px 0;
+  }
+
+  body.lc-body .lc-shell {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    align-items: start;
+    gap: 32px;
+    width: min(var(--lc-wrap), calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  /* 无导航（匿名登录/欢迎页）时不保留那条 236px 空列 */
+  body.lc-body .lc-shell-plain {
+    display: block;
+  }
+
+  body.lc-body .lc-rail {
+    position: sticky;
+    top: 84px;
+    align-self: start;
+    max-height: calc(100vh - 108px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 0 28px;
+    border-right: 1px solid var(--line);
+    scrollbar-width: thin;
+  }
+
+  body.lc-body .lc-rail .lc-nav {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 2px;
+    padding-right: 18px;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link {
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 44px;
+    border-radius: 10px;
+  }
+
+  /* 当前页：左侧 2px 荧光条，与候选弹层的选中语言一致 */
+  body.lc-body .lc-rail .lc-nav-link.is-active {
+    box-shadow: inset 2px 0 0 var(--lime);
+  }
+
+  body.lc-body .lc-content {
+    min-width: 0;
+  }
+
+  /* 内容宽度交给 .lc-shell，避免 main 自己再居中造成双重留白 */
+  body.lc-body .lc-content .lc-main {
+    width: 100%;
+    margin: 0;
+    padding: 28px 0 64px;
+    scroll-margin-top: 84px;
+  }
+
+  body.lc-body .lc-content .lc-footer {
+    width: 100%;
+    margin: 0;
+    padding-bottom: 28px;
+  }
+}
+
+/* 桌面（≥1024px）隐藏抽屉按钮：固定侧栏已把导航摊开，这个按钮既不该可见也不该可点。
+   窄屏样式见下面 @media (max-width: 1023px)。 */
+body.lc-body .lc-nav-toggle {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  body.lc-body .lc-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    margin-left: 0;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  body.lc-body .lc-nav-toggle:hover {
+    border-color: var(--lime);
+    color: var(--lime);
+  }
+
+  body.lc-body .lc-nav-toggle-bars {
+    width: 14px;
+    height: 2px;
+    background: currentColor;
+    box-shadow: 0 -5px 0 currentColor, 0 5px 0 currentColor;
+  }
+
+  /* 覆盖 ≤760px 那版"横向滚动导航"：整个侧栏变抽屉 */
+  body.lc-body .lc-rail {
+    position: fixed;
+    z-index: 60;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(84vw, 320px);
+    max-width: 320px;
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--line-strong);
+    box-shadow: 0 0 42px rgba(0, 0, 0, 0.6);
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition: transform 0.22s var(--lc-ease), visibility 0.22s linear;
+  }
+
+  body.lc-body.lc-nav-open .lc-rail {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  body.lc-body .lc-rail .lc-nav {
+    order: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 2px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link {
+    flex: 0 0 auto;
+    padding: 12px 10px;
+    border-radius: var(--lc-radius);
+  }
+
+  body.lc-body .lc-shell {
+    width: min(var(--lc-wrap), calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  body.lc-body .lc-content .lc-main {
+    padding: 24px 0 56px;
+  }
+
+  body.lc-body.lc-nav-open .lc-nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(3, 4, 6, 0.62);
+  }
+
+  body.lc-body.lc-nav-open {
+    overflow: hidden;
+  }
+
+  body.lc-body .lc-rail .lc-nav-link:focus-visible,
+  body.lc-body .lc-nav-toggle:focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 560px) {
+  body.lc-body .lc-account .lc-user-name {
+    max-width: 84px;
+  }
+}
+
+/* ==========================================================================
+   折叠帮助（.lc-help）
+   --------------------------------------------------------------------------
+   入库台首屏要留给"输入料号"：编号规则、台账来源这类技术细节收进 details，
+   默认只占一行 12px 的"＋ 编号规则与示例"，展开后才显示正文。
+   ========================================================================== */
+
+body.lc-body .lc-help {
+  margin: 0 0 12px;
+}
+
+body.lc-body .lc-help > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+body.lc-body .lc-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.lc-body .lc-help > summary::before {
+  content: "＋";
+  color: var(--lime);
+  font-size: 11px;
+}
+
+body.lc-body .lc-help[open] > summary::before {
+  content: "－";
+}
+
+body.lc-body .lc-help > summary:hover {
+  color: var(--text);
+}
+
+body.lc-body .lc-help > summary:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+body.lc-body .lc-help > p {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--lc-radius);
+}
+
+body.lc-body .lc-hint-tight {
+  margin: 0 0 8px;
+}
+
+/* 窄屏首屏：标题与说明收紧，让"输入料号"尽早就位 */
+@media (max-width: 560px) {
+  body.lc-body .lc-receipt-intro {
+    margin: 0 0 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  body.lc-body .lc-tabs {
+    margin-bottom: 12px;
+  }
+
+  body.lc-body .lc-main > h1,
+  body.lc-body .lc-page-title {
+    margin: 0 0 8px;
+  }
+
+  /* 375 首屏优先给搜索：入库面板的标题/说明已经由输入框 label 和 placeholder 承担，
+     小屏上只保留一行「不增库存」提示，其余纵向留白收紧。 */
+  body.lc-body .lc-panel[data-lc-panel="prepare"] .lc-panel-head {
+    padding: 10px 12px;
+  }
+
+  body.lc-body .lc-panel[data-lc-panel="prepare"] .lc-panel-body {
+    padding: 12px;
+  }
+
+  body.lc-body .lc-receipt-write > .lc-section-title {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+
+  body.lc-body .lc-receipt-write > .lc-hint-tight {
+    display: none;
+  }
+
+  body.lc-body .lc-receipt-intro {
+    margin: 0 0 8px;
+    font-size: 11.5px;
+  }
+}
+
+/* ==========================================================================
+   表格内勾选（待入库袋"打印"、标签"选择"这类行内勾选）
+   --------------------------------------------------------------------------
+   表格里的裸 checkbox 只有 13px，与 44px 触控目标差三倍：命中区放到外层 label，
+   图形仍按 .lc-check 的 20px，input 上的 data-lc-action / checked / disabled 一律不动。
+   ========================================================================== */
+
+body.lc-body .lc-check.lc-check-cell {
+  min-width: 44px;
+  min-height: 44px;
+  gap: 0;
+  padding: 0;
+  justify-content: flex-start;
+}
+
+body.lc-body .lc-table td.lc-cell-check {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+
+body.lc-body .lc-table td.lc-cell-check .lc-check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+body.lc-body .lc-table td.lc-cell-check .lc-check input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }

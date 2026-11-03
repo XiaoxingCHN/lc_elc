@@ -903,6 +903,148 @@
     });
   }
 
+  // ------------------------------------------------------------------ 导航抽屉
+  /* 窄屏（≤1023px）把桌面左侧栏换成可开合抽屉（断点与 team.css 的 .lc-shell 一致）。
+   * 契约：默认关闭（visibility:hidden，链接不进 Tab 序列）；Escape / 遮罩 / 点链接
+   * / 视口变宽 都关闭；打开时焦点进第一个链接，关闭时还回菜单按钮。
+   * 宽屏不参与：按钮 display:none，nav 就是左侧栏里的纵向列表。 */
+  function initNavDrawer() {
+    var toggle = $('[data-lc-action="nav-toggle"]');
+    var nav = document.getElementById('lc-nav');
+    if (!toggle || !nav) return;
+    var scrim = $('.lc-nav-scrim');
+
+    /* 无障碍契约：窄屏关闭时侧栏加 inert + aria-hidden，链接不进 Tab 序列与无障碍树
+     * （只靠 translateX 移到屏外不够）；打开时把背景（顶栏与正文）设为 inert，
+     * 焦点只能在抽屉内，Esc/遮罩关闭后还回菜单按钮；视口变宽恢复为普通侧栏。 */
+    var narrowQuery = window.matchMedia ? window.matchMedia('(max-width: 1023px)') : null;
+    /* 背景 = 抽屉之外所有可交互区域：正文、"跳到主要内容"、页脚、账号区（退出/登录）
+     * 与品牌链接。顶栏本身不能整体 inert —— 菜单按钮就在里面，它就是关闭手柄；
+     * 所以按子元素逐个 inert，把焦点/读屏都锁在「抽屉 + 菜单按钮」这一圈里。 */
+    var backdrop = [
+      document.getElementById('lc-main'),
+      document.querySelector('.lc-skip'),
+      document.querySelector('.lc-footer'),
+      document.querySelector('.lc-account'),
+      document.querySelector('.lc-brand')
+    ].filter(Boolean);
+
+    function isNarrow() {
+      return narrowQuery ? narrowQuery.matches : false;
+    }
+
+    function setInert(node, on) {
+      if (!node) return;
+      if (on) node.setAttribute('inert', '');
+      else node.removeAttribute('inert');
+    }
+
+    function syncDrawer() {
+      var narrow = isNarrow();
+      var opened = isOpen();
+      var hiddenNav = narrow && !opened;
+      nav.setAttribute('aria-hidden', hiddenNav ? 'true' : 'false');
+      setInert(nav, hiddenNav);
+      backdrop.forEach(function (node) { setInert(node, narrow && opened); });
+      toggle.setAttribute('aria-expanded', opened ? 'true' : 'false');
+    }
+
+    function isOpen() {
+      return body.classList.contains('lc-nav-open');
+    }
+
+    function open() {
+      body.classList.add('lc-nav-open');
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-label', '关闭主导航');
+      if (scrim) setHidden(scrim, false);
+      syncDrawer();
+      focusFirstLink(0);
+    }
+
+    /* 抽屉刚加上 .lc-nav-open 时样式还没重算，此时 focus() 会被 visibility:hidden 拒绝，
+     * 所以在下一帧重试几次，直到焦点真的进了抽屉。 */
+    function focusFirstLink(attempt) {
+      var first = nav.querySelector('a, button');
+      if (!first || !first.focus) return;
+      first.focus();
+      var inside = document.activeElement && nav.contains(document.activeElement);
+      if (!inside && attempt < 4 && window.requestAnimationFrame) {
+        window.requestAnimationFrame(function () { focusFirstLink(attempt + 1); });
+      }
+    }
+
+    function close(returnFocus) {
+      if (!isOpen()) return;
+      body.classList.remove('lc-nav-open');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', '打开主导航');
+      if (scrim) setHidden(scrim, true);
+      syncDrawer();
+      if (returnFocus && toggle.focus) toggle.focus();
+    }
+
+    toggle.addEventListener('click', function () {
+      if (isOpen()) close(true);
+      else open();
+    });
+    if (scrim) {
+      scrim.addEventListener('click', function () { close(true); });
+    }
+    /* 焦点循环：抽屉打开时能 Tab 到的只有「菜单按钮（同时是关闭手柄）+ 侧栏链接」。
+     * 到最后一项回第一个，Shift+Tab 到第一项回最后一个；焦点若跑到别处也拉回来。
+     * 不新造可见 UI：关闭按钮就是现有的顶栏菜单按钮。 */
+    function trapTargets() {
+      var list = [toggle];
+      Array.prototype.forEach.call(
+        nav.querySelectorAll('a[href], button:not([disabled])'),
+        function (node) {
+          if (node.getClientRects().length) list.push(node);
+        });
+      return list;
+    }
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Tab' || !isOpen()) return;
+      var list = trapTargets();
+      if (!list.length) return;
+      var active = document.activeElement;
+      var index = list.indexOf(active);
+      if (event.shiftKey) {
+        if (index <= 0) {
+          event.preventDefault();
+          list[list.length - 1].focus();
+        }
+        return;
+      }
+      if (index < 0 || index === list.length - 1) {
+        event.preventDefault();
+        list[0].focus();
+      }
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape' || !isOpen()) return;
+      event.preventDefault();
+      close(true);
+    });
+    // 抽屉里点任何链接即关闭（同页锚点也关，避免遮住目标内容）
+    nav.addEventListener('click', function (event) {
+      var link = event.target && event.target.closest ? event.target.closest('a') : null;
+      if (link && isOpen()) close(false);
+    });
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(max-width: 1023px)');
+      var onChange = function (event) {
+        if (!event.matches) close(false);
+        syncDrawer();
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
+    }
+    syncDrawer();
+  }
+
   // ------------------------------------------------------------------ 启动
   function init() {
     var main = document.getElementById('lc-main');
@@ -911,6 +1053,7 @@
       main.setAttribute('tabindex', '-1');
     }
     initImageFallbacks();
+    initNavDrawer();
     initLogin();
     // 退出刻意不接管：表单是原生 POST + CSRF 隐藏域（模板 t-att-action 已带基址），
     // 浏览器自己完成 303 跳转。用 fetch 代提交会吞掉 303/网络错误并硬编码跳转目标，

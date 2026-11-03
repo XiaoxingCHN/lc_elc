@@ -220,8 +220,27 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
     state = state.copyWith(note: value);
   }
 
+  /// Commits the card the operator picked.
+  ///
+  /// Switching to a DIFFERENT card invalidates everything derived from the
+  /// previous one: a resolved scan payload, the archive list, the chosen
+  /// template and its SN. Keeping them would let a submission mix the new card
+  /// with an archive of the old one. The detail provider reloads the archives
+  /// for the new key, and [setMaterials] applies the one/many/none rule again.
+  /// Re-selecting the SAME card keeps the operator's archive choice.
   void setItem({required String itemKey, String itemName = ''}) {
-    state = state.copyWith(itemKey: itemKey, itemName: itemName, error: null);
+    final changed = itemKey != state.itemKey;
+    state = changed
+        ? state.copyWith(
+            itemKey: itemKey,
+            itemName: itemName,
+            resolved: null,
+            materials: const <LabMaterial>[],
+            templateId: null,
+            sn: '',
+            error: null,
+          )
+        : state.copyWith(itemKey: itemKey, itemName: itemName, error: null);
   }
 
   void setLocation(int? locationId, {String label = ''}) {

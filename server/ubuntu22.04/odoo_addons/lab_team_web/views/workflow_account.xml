@@ -51,8 +51,8 @@
                     <dd data-account-field="session">已登录</dd>
                 </dl>
                 <p class="lc-hint">
-                    本页只展示当前会话的身份与权限。页面不显示、也不保存密码、cookie
-                    或任何令牌；身份信息来自既有会话接口，不新建账号体系。
+                    本页只展示当前会话的身份与权限。页面不显示、也不保存密码、登录凭据
+                    或任何令牌；身份信息来自当前登录状态，不新建账号体系。
                 </p>
             </div>
         </section>
@@ -97,7 +97,7 @@
                     <li class="lc-account-perm">
                         <span class="lc-account-perm-name">代他人领料</span>
                         <span class="lc-badge" data-account-perm="can_issue_for_others" data-tone="warn">未获取</span>
-                        <span class="lc-account-perm-desc">为其他账号领用；服务端按库存组另行校验</span>
+                        <span class="lc-account-perm-desc">为其他账号领用；系统按库存组另行校验</span>
                     </li>
                     <li class="lc-account-perm">
                         <span class="lc-account-perm-name">库位管理</span>
@@ -121,8 +121,8 @@
                     </li>
                 </ul>
                 <p class="lc-hint">
-                    角色由库存管理员在「管理」页分配。页面只按权限位隐藏入口，每个接口仍由
-                    服务端独立校验；隐藏入口不等于授予或回收权限。
+                    角色由库存管理员在「管理」页分配。页面只按权限位隐藏入口，每项操作仍由
+                    系统独立校验；隐藏入口不等于授予或回收权限。
                 </p>
             </div>
         </section>
@@ -133,10 +133,10 @@
             </div>
             <div class="lc-panel-body">
                 <ul class="lc-account-list">
-                    <li>会话由 Odoo 会话 cookie 维持，退出后立即失效；本页不读取、不显示 cookie 或令牌。</li>
+                    <li>登录状态由系统会话维持，退出后立即失效；本页不读取、不显示任何登录凭据。</li>
                     <li>本页没有任何写操作，也不会把身份信息写入浏览器存储。</li>
-                    <li>密码变更本版本不提供入口：请由管理员复位，或走 Odoo 原生流程；不新建第二套认证。</li>
-                    <li>会话过期时接口返回 UNAUTHORIZED，状态区会给出「重新登录」入口。</li>
+                    <li>密码变更本版本不提供入口：请由管理员复位，或使用系统自带的密码修改流程；不新建第二套认证。</li>
+                    <li>会话过期时系统会提示登录已失效，状态区为你提供「重新登录」入口。</li>
                 </ul>
             </div>
         </section>

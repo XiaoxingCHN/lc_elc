@@ -126,6 +126,27 @@
       });
     }
 
+    /* 窄屏卡片化：把表头文案复制到每个单元格的 data-label，
+     * CSS 在 ≤760px 用 ::before 显示（操作按钮不用横向滚动找）。 */
+    function labelCells() {
+      var table = root.querySelector('[data-lc-table="materials"]');
+      if (!table) return;
+      var heads = table.querySelectorAll('thead th');
+      var labels = [];
+      for (var i = 0; i < heads.length; i += 1) {
+        labels.push(String(heads[i].textContent || '').trim());
+      }
+      var rows = table.querySelectorAll('tbody tr');
+      for (var r = 0; r < rows.length; r += 1) {
+        var cells = rows[r].children;
+        for (var c = 0; c < cells.length; c += 1) {
+          if (labels[c] && !cells[c].getAttribute('data-label')) {
+            cells[c].setAttribute('data-label', labels[c]);
+          }
+        }
+      }
+    }
+
     function row(item) {
       var isCatalog = String(item.item_key || '').indexOf('lcsc:') === 0;
       var actions = [actionButton('详情', 'materials-detail', item)];
@@ -147,6 +168,7 @@
 
     function render() {
       LC.renderRows(nodes.rows, items, row);
+      labelCells();
       LC.setText(nodes.count, String(items.length));
       LC.show(nodes.empty, items.length === 0);
       LC.show(nodes.more, !!cursor);
@@ -241,12 +263,31 @@
       }));
       ids.forEach(function (id, index) {
         var sn = ids.length === sns.length ? sns[index] : '';
+        // 选项文案给人看：有 SN 说 SN，没有才退回档案编号（id 不再是唯一辨识依据）
         select.appendChild(LC.el('option', {
           value: String(id),
-          text: '#' + id + (sn ? ' SN ' + sn : '')
+          text: sn ? ('SN ' + sn) : ('档案 #' + id)
         }));
       });
       select.value = ids.length === 1 ? String(ids[0]) : '';
+    }
+
+    /* 下拉是"真实选择值"的唯一来源：change 时给出可读确认，并把字段错误清掉。 */
+    function onTemplateChange() {
+      if (!bindForm || !bindForm.elements) return;
+      var select = bindForm.elements.product_template_id;
+      if (!select) return;
+      LC.formError(bindForm, 'product_template_id', '');
+      var option = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+      if (!option || !option.value) {
+        LC.status.show({ kind: 'empty', message: '未选择本地档案：保存前必须选一个具体档案。' });
+        return;
+      }
+      LC.status.show({
+        kind: 'info',
+        message: '已选本地档案：' + String(option.text || option.value) +
+          '（保存后该立创编号会绑定到这个档案）'
+      });
     }
 
     function selectItem(item) {
@@ -401,7 +442,7 @@
           kind: 'unknown',
           code: err.code,
           message: '结果未知：绑定可能已保存，也可能没有。',
-          detail: '绑定接口没有幂等键；服务端按（档案, 立创编号）唯一约束去重，'
+          detail: '绑定不支持重复提交保护；同一档案的同一立创编号只保留一条记录，'
             + '重试同一内容不会产生第二条绑定。也可以先重新检索核对。',
           retryLabel: '重试同一内容',
           retry: function () {
@@ -668,6 +709,10 @@
       });
     }
 
+    if (bindForm && bindForm.elements && bindForm.elements.product_template_id) {
+      bindForm.elements.product_template_id.addEventListener('change', onTemplateChange);
+    }
+
     if (bindForm) {
       LC.guard(bindForm, function (values, done) {
         var button = bindForm.querySelector('button[type="submit"]');
@@ -681,6 +726,15 @@
           done();
           LC.formError(bindForm, 'product_template_id',
             '请选择要绑定的本地档案；同一立创编号有多个档案时必须选具体 SN。');
+          return;
+        }
+        var templateSelect = bindForm.elements.product_template_id;
+        var chosen = templateSelect && templateSelect.selectedIndex >= 0
+          ? templateSelect.options[templateSelect.selectedIndex] : null;
+        if (!chosen || String(chosen.value) !== String(values.product_template_id)) {
+          done();
+          LC.formError(bindForm, 'product_template_id',
+            '所选档案已不在当前下拉里（可能刚重新检索过），请重新选择后再保存。');
           return;
         }
         if (!String(values.catalog_code || '').trim()) {

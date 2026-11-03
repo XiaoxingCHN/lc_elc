@@ -24,9 +24,22 @@ body.lc-body .lc-workflow .lc-inv-actions {
 }
 
 body.lc-body .lc-workflow .lc-inv-btn-sm {
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
   font-size: 13px;
+}
+
+/* 触控设备（触屏 / 二合一）：行内小按钮抬到 44px 触控下限（方案 §三 组件清单） */
+@media (any-pointer: coarse) {
+  body.lc-body .lc-workflow .lc-inv-btn-sm {
+    min-height: 44px;
+    padding: 0 14px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 body.lc-body .lc-workflow .lc-inv-self {
@@ -41,16 +54,34 @@ body.lc-body .lc-workflow .lc-inv-role-cell {
   white-space: nowrap;
 }
 
-body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"] {
+/* 角色勾选框：图形保持 18px，真实可点击区域（label）≥44×44 */
+body.lc-body .lc-workflow .lc-inv-role-hit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+body.lc-body .lc-workflow .lc-inv-role-hit input[type="checkbox"] {
   width: 18px;
   height: 18px;
   accent-color: var(--lime);
   cursor: pointer;
+  margin: 0;
 }
 
-body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"][aria-busy="true"] {
+body.lc-body .lc-workflow .lc-inv-role-hit input[type="checkbox"][aria-busy="true"] {
   cursor: progress;
   opacity: 0.6;
+}
+
+body.lc-body .lc-workflow .lc-inv-role-hit:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* --------------------------------------------------------------------------
@@ -275,9 +306,10 @@ body.lc-body .lc-workflow .lc-inv-plain {
   }
 
   body.lc-body .lc-workflow .lc-inv-btn-sm {
-    min-height: 32px;
-    padding: 0 10px;
-    font-size: 12px;
+    /* 触控目标不小于 44px（方案 §三 组件清单） */
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 13px;
   }
 
   body.lc-body .lc-workflow .lc-inv-actions {
@@ -307,5 +339,117 @@ body.lc-body .lc-workflow .lc-inv-plain {
   body.lc-body .lc-workflow .lc-toolbar,
   body.lc-body .lc-workflow .lc-inv-actions {
     display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   窄屏（≤760px）列表改"摘要卡"：字段标签来自每行表头（JS 写入 data-label），
+   操作按钮留在卡内，无需横向滚动。
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  body.lc-body .lc-workflow .lc-table-wrap {
+    overflow-x: visible;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"],
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] {
+    /* table 自己也要变 block：否则表格布局仍按列宽撑开，卡片会比视口宽 */
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody {
+    display: block;
+    width: 100%;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] thead,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody tr,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel-2);
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody td,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: auto;
+    max-width: 100%;
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="mappings"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="members"] tbody td::before,
+  body.lc-body .lc-workflow .lc-table[data-lc-table="materials"] tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-num {
+    text-align: left;
+  }
+
+  /* 角色勾选：标签在左，勾选在右，整行 ≥44px 可点 */
+  body.lc-body .lc-workflow .lc-inv-role-cell {
+    align-items: center;
+    text-align: left;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-role-cell input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  body.lc-body .lc-workflow .lc-inv-btn-sm {
+    min-height: 44px;
+    padding: 0 14px;
   }
 }

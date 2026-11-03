@@ -179,7 +179,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('选择元器件'));
+      await tester.tap(find.text('从器件库选择'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('自定义 / 新建器件'));
       await tester.pumpAndSettle();

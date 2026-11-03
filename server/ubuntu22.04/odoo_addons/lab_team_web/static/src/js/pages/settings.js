@@ -162,7 +162,7 @@
         LC.status.show({
           kind: 'success',
           message: '未决角色变更已确认生效（' + spec.label + '）' +
-            (res && res.replayed ? '；服务端判定为重放，未重复执行' : '')
+            (res && res.replayed ? '；系统判定为重复提交，未重复执行' : '')
         });
       }).catch(function (err) {
         var payload = pending.payload || {};
@@ -229,7 +229,33 @@
         checked: !!(member.roles && member.roles[role])
       });
       if (locked) box.disabled = true;
-      return LC.el('td', { class: 'lc-inv-role-cell' }, [box]);
+      /* 图形仍 18/22px，但真实可点击区域由 label 撑到 ≥44×44（触屏/鼠标都好点） */
+      var hit = LC.el('label', {
+        class: 'lc-inv-role-hit',
+        title: box.title || ''
+      }, [box]);
+      return LC.el('td', { class: 'lc-inv-role-cell' }, [hit]);
+    }
+
+    /* 窄屏卡片化：把表头文案复制到每个单元格的 data-label，
+     * CSS 在 ≤760px 用 ::before 显示（操作按钮不用横向滚动找）。 */
+    function labelCells() {
+      var table = root.querySelector('[data-lc-table="members"]');
+      if (!table) return;
+      var heads = table.querySelectorAll('thead th');
+      var labels = [];
+      for (var i = 0; i < heads.length; i += 1) {
+        labels.push(String(heads[i].textContent || '').trim());
+      }
+      var rows = table.querySelectorAll('tbody tr');
+      for (var r = 0; r < rows.length; r += 1) {
+        var cells = rows[r].children;
+        for (var c = 0; c < cells.length; c += 1) {
+          if (labels[c] && !cells[c].getAttribute('data-label')) {
+            cells[c].setAttribute('data-label', labels[c]);
+          }
+        }
+      }
     }
 
     function row(member) {
@@ -253,6 +279,7 @@
 
     function render() {
       LC.renderRows(nodes.rows, members, row);
+      labelCells();
       LC.setText(nodes.count, String(members.length));
       LC.show(nodes.empty, members.length === 0);
       LC.show(nodes.more, !!cursor);
@@ -396,7 +423,7 @@
       }
       var enabled = !!box.checked;
       if (member.is_self && role === 'lab_manager' && !enabled) {
-        if (!LC.confirmAction('撤销自己的库存管理员角色？若本公司没有其他管理员，服务端会拒绝。')) {
+        if (!LC.confirmAction('撤销自己的库存管理员角色？若本公司没有其他管理员，系统会拒绝。')) {
           render();
           return;
         }

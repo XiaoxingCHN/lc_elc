@@ -30,7 +30,7 @@
         "lab_workflow": "19.0.2.0.0",
         "lab_theme": "19.0.1.0.2",
         "lab_site": "19.0.1.0.0",
-        "lab_team_web": "19.0.1.1.0"
+        "lab_team_web": "19.0.1.2.0"
       },
       "source_root": "server/ubuntu22.04/odoo_addons",
       "required_files": [
@@ -45,7 +45,7 @@
     },
     {
       "id": "server-ops",
-      "version": "2026.10.28.1",
+      "version": "2026.11.02.1",
       "source_root": "server/ubuntu22.04",
       "required_files": [
         "server/ubuntu22.04/install_offline.sh",

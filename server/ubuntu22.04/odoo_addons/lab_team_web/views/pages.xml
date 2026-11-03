@@ -8,6 +8,9 @@
                 <meta charset="utf-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 <meta name="robots" content="noindex, nofollow"/>
+                <!-- 品牌图标：不写这条浏览器会去请求 /favicon.ico（该路径本服务 404，控制台报错）。
+                     图标是本模块自己的静态资源，同源、无需 CDN，也不放宽 CSP。 -->
+                <link rel="icon" type="image/png" href="/lab_team_web/static/src/img/favicon.png"/>
                 <title t-esc="(lc_page_title + ' · ' if lc_page_title else '') + lc_site_title"/>
                 <link rel="stylesheet" t-attf-href="/lab_team_web/static/src/css/team.css?v=#{lc_css_v}"/>
                 <!-- 业务页面专属样式：只有子任务文件存在（内容哈希 != '0'）时才输出，
@@ -32,41 +35,61 @@
                   data-api-search="/lab/api/catalog/search">
                 <a class="lc-skip" href="#lc-main">跳到主要内容</a>
 
+                <!-- 顶部条：品牌 + 账号区。桌面端导航不在这里，而在左侧固定侧栏
+                     （见下方 .lc-shell / .lc-rail）；窄屏时侧栏变成抽屉，按钮在账号区左侧。 -->
                 <header class="lc-header">
                     <div class="lc-header-inner">
+                        <button class="lc-nav-toggle" type="button" data-lc-action="nav-toggle"
+                                aria-expanded="false" aria-controls="lc-nav" aria-label="打开主导航">
+                            <span class="lc-nav-toggle-bars" aria-hidden="true"></span>
+                            <span>菜单</span>
+                        </button>
                         <a class="lc-brand" t-att-href="lc_welcome_url">
                             <span class="lc-brand-text">
                                 <strong>力创实验室</strong>
                                 <span class="lc-brand-sub">TEAM WAREHOUSE</span>
                             </span>
                         </a>
-                        <nav class="lc-nav" aria-label="主导航">
-                            <t t-foreach="lc_nav" t-as="nav">
-                                <a t-attf-class="lc-nav-link #{'is-active' if nav.get('active') else ''}"
-                                   t-att-href="nav.get('href')"
-                                   t-att-aria-current="'page' if nav.get('active') else None"
-                                   t-esc="nav.get('title')"/>
-                            </t>
+                        <div class="lc-account">
                             <t t-if="not lc_anonymous">
-                                <span class="lc-nav-user">
-                                    <span class="lc-user-name" t-esc="lc_user_name"/>
-                                    <form class="lc-logout-form" t-att-action="lc_logout_url" method="post">
-                                        <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
-                                        <button class="lc-btn lc-btn-ghost" type="submit">退出</button>
-                                    </form>
-                                </span>
+                                <span class="lc-user-name" t-esc="lc_user_name"/>
+                                <form class="lc-logout-form" t-att-action="lc_logout_url" method="post">
+                                    <input type="hidden" name="csrf_token" t-att-value="lc_csrf_token"/>
+                                    <button class="lc-btn lc-btn-ghost" type="submit">退出</button>
+                                </form>
                             </t>
-                        </nav>
+                            <t t-else="">
+                                <a class="lc-btn lc-btn-ghost" t-att-href="lc_login_url">登录</a>
+                            </t>
+                        </div>
                     </div>
                 </header>
 
-                <main id="lc-main" class="lc-main">
-                    <t t-out="0"/>
-                </main>
+                <div class="lc-nav-scrim" data-lc-action="nav-close" aria-hidden="true"></div>
 
-                <footer class="lc-footer">
-                    <span t-esc="lc_site_title"/>
-                </footer>
+                <div t-attf-class="lc-shell #{'' if lc_nav else 'lc-shell-plain'}">
+                    <t t-if="lc_nav">
+                        <aside class="lc-rail" id="lc-nav">
+                            <nav class="lc-nav" aria-label="主导航">
+                                <t t-foreach="lc_nav" t-as="nav">
+                                    <a t-attf-class="lc-nav-link #{'is-active' if nav.get('active') else ''}"
+                                       t-att-href="nav.get('href')"
+                                       t-att-aria-current="'page' if nav.get('active') else None"
+                                       t-esc="nav.get('title')"/>
+                                </t>
+                            </nav>
+                        </aside>
+                    </t>
+                    <div class="lc-content">
+                        <main id="lc-main" class="lc-main" tabindex="-1">
+                            <t t-out="0"/>
+                        </main>
+
+                        <footer class="lc-footer">
+                            <span t-esc="lc_site_title"/>
+                        </footer>
+                    </div>
+                </div>
             </body>
         </html>
     </template>

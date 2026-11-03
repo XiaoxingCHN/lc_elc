@@ -26,6 +26,24 @@
 #   /lab/api/catalog/{bind,create_material}（materials 页使用；角色仍由后端 catalog 权限校验）
 # 旧 /lab/scan 兼容：只做站内相对 303 迁移，**没有** proxy_pass，旧 inline 控制台永不可达
 #   GET/HEAD /lab/scan[?raw=...]  ->  303 /team/scan$is_args$args
+# 旧菜单动作 GET 兼容（lab_team_web/controllers/legacy_entries.py，13 条**固定 xmlid** 精确路径）：
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_scan_console      -> 303 /team/scan
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_bag               -> 303 /team/lab/bags[?bag_id=]
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_issue_line        -> 303 /team/lab/issues
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_return_wizard     -> 303 /team/lab/issues
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_label_open        -> 303 /team/lab/labels
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_location          -> 303 /team/lab/locations
+#   GET/HEAD /odoo/action-lab_workflow.action_lab_operation         -> 303 /team/lab/history
+#   GET/HEAD /odoo/action-lab_catalog.action_lab_unified_catalog_client -> 303 /team/lab
+#   GET/HEAD /odoo/action-lab_catalog.view_lab_catalog_item_action  -> 303 /team/lab/materials
+#   GET/HEAD /odoo/action-lab_catalog.view_lab_catalog_binding_action -> 303 /team/lab/materials
+#   GET/HEAD /odoo/action-lab_inventory.action_lab_product          -> 303 /team/lab/materials
+#   GET/HEAD /odoo/action-lab_inventory.action_lab_location         -> 303 /team/lab/locations
+#   GET/HEAD /odoo/action-lab_inventory.action_lab_mapping          -> 303 /team/lab/location-mappings
+# 只放行这 13 条**字面量**：没有 /odoo/action-* 通配、没有 /odoo 前缀 location。
+# 未知/未迁移的 xmlid（action_lab_request_log、action_lab_move、catalog category/import_run 等）
+# 一律落到 location / { return 404; }，不回退旧网页、不转发 Odoo 通用 /odoo 入口。
+# 代理层**不判断角色**：Odoo 侧先鉴权（匿名 303 /team/login，无角色 403），再由应用层 303。
 # 明确不开放（有端点但无 P3 UI / 写历史库存高风险 / 通用入口）：
 #   /lab/api/inventory/adopt_stock、/lab/api/inventory/legacy_stock、
 #   旧表单端点（/lab/scan/resolve、/lab/scan/submit、/lab/labels/plan、/lab/labels/download）
@@ -125,6 +143,37 @@ server {
         absolute_redirect off;
         return 303 /team/scan$is_args$args;
     }
+
+    # ---------- 旧菜单动作 GET 兼容（13 条固定 xmlid，精确字面量） ----------
+    # 依据 lab_team_web/controllers/legacy_entries.py 的 LEGACY_ACTIONS：应用层先鉴权，
+    # 再 303 到自有页；目标路由未注册时应用层 503（不 404、不静默回退旧台）。
+    # 只登记迁移类入口：request_log / action_lab_move / catalog category / import_run 刻意不登记。
+    # 扫码操作台
+    location = /odoo/action-lab_workflow.action_lab_scan_console { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 库存袋与追溯码
+    location = /odoo/action-lab_workflow.action_lab_bag { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 领用记录
+    location = /odoo/action-lab_workflow.action_lab_issue_line { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 归还
+    location = /odoo/action-lab_workflow.action_lab_return_wizard { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 批量标签（A4）
+    location = /odoo/action-lab_workflow.action_lab_label_open { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 库位与库码
+    location = /odoo/action-lab_workflow.action_lab_location { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 库存作业流水
+    location = /odoo/action-lab_workflow.action_lab_operation { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 统一器件库（OWL）
+    location = /odoo/action-lab_catalog.action_lab_unified_catalog_client { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 资料库索引
+    location = /odoo/action-lab_catalog.view_lab_catalog_item_action { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # C 编号绑定
+    location = /odoo/action-lab_catalog.view_lab_catalog_binding_action { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 元器件档案
+    location = /odoo/action-lab_inventory.action_lab_product { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 库位管理
+    location = /odoo/action-lab_inventory.action_lab_location { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    # 类别→库位映射
+    location = /odoo/action-lab_inventory.action_lab_mapping { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
 
     # ---------- 认证/会话 ----------
     # 本 location 必须独立写头（唯一差异：清空 X-Odoo-Database 以保留 Odoo 冷会话），

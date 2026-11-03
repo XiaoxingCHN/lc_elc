@@ -1,5 +1,186 @@
 # 当前状态与已知限制
 
+## 2026-11-03 P3 Web 生产部署完成（r3 → 生产 LcHardwareHouse；公网回归通过）
+
+- **结论**：r3 冻结候选已于 **2026-11-03 00:16–00:36Z** 部署到生产 `192.168.31.105`（DB `LcHardwareHouse`），
+  `DEPLOY_STATE=completed`（`DEPLOY_COMPLETED_UTC=20261103T003543Z`、`DEPLOY_FACTS_PROVEN=43`），odoo.service active、
+  HTTP `/web/login` 200；公网 `team.l-creation.club` 回归全项通过。**此前各节的「未部署 / 生产主机不可达」均为部署前时点结论。**
+- **版本生效**：`lab_team_web 19.0.1.1.0 → 19.0.1.2.0`（`-u lab_team_web`，`UPGRADE_EXIT=0`、错误行 0）；
+  `lab_workflow 19.0.2.0.0`、`lab_catalog 19.0.2.0.5`、`lab_inventory 19.0.1.0.0` 未变；`lab_site` 仅权限归一（内容 = 冻结）、
+  `lab_theme` 仅由 `deploy-theme.sh` 换成冻结版。生产运行面：Odoo19、`/opt/odoo/venv/bin/python3`（Python 3.12.15）、
+  `/etc/odoo.conf`、`/opt/odoo/custom-addons`、data_dir `/opt/odoo/.local/share/Odoo`、base 19.0.1.3、已装 55 模块、nginx 1.18.0。
+- **一致备份（停服态）** `/opt/odoo/backups/20261103T001648Z-p3-web-20261103T000658Z/`：`db.dump` 110,944,415 B /
+  `40c76d0679d2a7915ba5857d5009c291c18f17fdf239803a484246228993ba19`；`filestore.tar.gz` 12,819,190 B /
+  `305b841f50f0b3417b120a3ff0b52e61800d533f3a2337418f3114a2d85abfda`（611 条目）；`MANIFEST.json`、`odoo.log.tail`；
+  `store_fname` distinct 139 / tar 成员 140 / 缺失 0；`service_was_active=false`。
+  源码回滚快照 `/opt/odoo/backups/module-source-before-20261103T000658Z/{lab_site,lab_team_web,lab_theme}`。
+- **菜单**：before 234 行（其中 lab_* 21 行，sha `3eb392d0…`）→ after `removed=0 / added=1 / changed=12 / match=1`；
+  新增 `lab_team_web.menu_legacy_label_wizard`（id 382，parent `lab_workflow.menu_lab_config`，action `lab_workflow.action_lab_label_open`）；
+  12 条仅 action 变（旧入口改指）；菜单树稳定 sha `bafa905fc5f5fdb65fe3ea72af42647e78300b685d5323b9764db26e9ec64b8c`。
+- **网关**：release `/var/lib/lc-elc-bore/releases/p3-web-20261103T002651Z`；`/etc/nginx/conf.d/lc-bore-netlify.conf` 现 include 该 release 的
+  `gateway.conf`，include sha `34289f2612c9adb460c787c6765f72525bd1db5359eff515164cbb1ab42508ef`（切换前 `bb3164e5…`，
+  回滚点同目录 `rollback/project-include.before`）；allowlist pages 24 / apis 5 / legacy 13；未动 `lc-bore-public.conf`、DNS、Docker、其他服务。
+- **50-verify**：**PASS，129 项检查 / 0 失败**（`/var/tmp/lc-deploy/verify-20261103T003528Z.json` + `verify-facts-…env`）；
+  三模块逐文件与冻结清单逐字节相等（`lab_site 19` / `lab_team_web 58` / `lab_theme 6` 文件）；13 条 legacy action GET/HEAD 全过、POST 全拒；
+  `/web/login`、`/database`、`/jsonrpc`、ORM 404；`workflow_core.js` sha `6942f733fddaf4b3183a0251ad5d2ac99913d4c339921ca48dc59b7346cc0936`。
+- **90-close**：`DEPLOY_STATE=completed`、`DEPLOY_COMPLETED_UTC=20261103T003543Z`、`DEPLOY_FACTS_PROVEN=43`；run env
+  `/var/tmp/lc-deploy/run-20261103T001600Z.env`（sha `20f5b3fe34c2ed6c1c3f35a6141368a729a4e3baf4532ccdafe5dfb7905ec008`）、
+  close log `/var/tmp/lc-deploy/close-20261103T003543Z.log`。
+- **公网回归**（`team.l-creation.club` 经 Netlify→bore→网关）：`/ 200`、`/login 200`、`/team/login 200`、`/team/lab/receipts 303`、
+  `/team/scan 303`、`/lab/bags 303`、`/odoo/action-lab_workflow.action_lab_scan_console 303`、`/odoo/action-lab_inventory.action_lab_mapping 303`、
+  `/web/login 404`、`GET /lab/api/inventory/bags 403`、`POST /team/lab/receipts 403`、`POST /lab/api/catalog/search 415`、
+  `workflow_core.js` sha 一致、`pages/receipts.js 200`、`workflow_receipt.css 200`。
+- **最终部署包** `deploy-bundle-web-ui-20261102-r3.tar.gz`：**93,486 B** / `34a485101b3a1725e45375a1b97cf94079a80414166dc2ff24c4cc726824f67a` / 27 条目 /
+  FROZEN 18 条 / shipped 15 / `bundle-meta` freeze `f0dce4080e6170587bbda6e3836ab4f88c62ded4e7ef0dc5c76bbeff5e21401b`；
+  部署前中间包 91,307 B/`8215a795…`、91,586 B/`e453db43…`、92,857 B/`085945a2…` **均非最终**。
+- **部署期修复的脚本缺陷（已修）**：`05-bootstrap.sh`（tar 选项顺序 / mawk 转义斜杠正则 / members.txt 误判顶层，
+  sha `f2d46931a5ddf15d430f63c469f78476345a22aa20be367526301e70b6755fde`）、`00-preflight.sh`（网关 include 闸门改声明式，
+  `c48bbfddb5070f35e7724761b7a865ed3e0ab7a32d2abb1385b88577bd8ef99a`）、`lib.sh`（`http_login_code` 多路径 + `X-Odoo-Database`，
+  `d5da44ed05aa46fab3e90bf53fe2215bbc490c1bbff315b63445db261817ba98`）、`40-gateway.py`（reload 优雅切换竞态加有界 settle，
+  `487283ee6ee844a0ca81af66f57cda70fcc1a74579bb506be2096125cb231e7b`）、`50-verify.py`（`ir_ui_menu.action` Char vs res_id int、
+  origin 探针补 DB 头、公网 5xx 有界重试，`14d4c1e084691486c5b231028848a553b948f269aae802c5238ee55a64997f0d`）；
+  `FROZEN-20261102.sha256` 已同步，`check-scripts` `SYNTAX_ERRORS=0`、`USED_BUT_MISSING none`。
+- **证据**：`local/web-ui-implementation/evidence/production/p3-deploy-evidence-20261103.tar.gz`（21,344 B /
+  `53433008c3bb6ae48da899105e64d2fd6e814b24a47d5b2617a3fe9cdc8069b5` / 20 条目，Git 排除）。
+- **凭据**：`local/private/web-ui-20261102.dpapi` 部署后已删除（`BLOB_DELETED`），本机不再存生产口令。
+- **仍未做**：未 commit/push（分支 `codex/receipt-search-feedback` 仍在工作区）；未建/发布客户端包（客户端 `1.1.3+6` 不变）；
+  未做真实业务写入；未动 DNS/Docker/其他服务；未执行回滚（回滚点已备）；未读 CI。
+
+## 2026-11-02 自有 Web 统一 UI（历史时点：本机实施轮，早于冻结；当前冻结口径见下一节 r3）与生产状态只读核对
+
+- **本轮性质（历史）**：本机实施 + 隔离实例验证，分支 `codex/receipt-search-feedback`（基线 `b3bcbf244e44939c6d481e3f97f11579cdf9ee99`）。
+  **未提交、未推送、当时未冻结、未连生产**（同日随后重新冻结为 r2、继而 r3，见下一节）；下文 10-28 节的「未部署生产」只描述那一轮，不能当作 2026-11-02 的生产结论。
+- **已落地（有隔离实测证据）**：整站骨架 1024px 断点（≥1024 固定侧栏 / ≤1023 抽屉）、`LC.combobox`
+  （250ms 去抖、IME 组字不检索、请求序号 + 在途 ≤2 + 8s 显式超时 + 「重试检索」、方向键/Enter/Esc/Tab 与 aria 语义）、
+  来料页关键词候选与多档案明确选择、建袋结果未知期锁定 `material-select`、旧入口 13 条 `/odoo/action-<xmlid>`
+  兼容路由（非 GET/HEAD 返回 405，不重放写操作）、菜单可逆改指（卸载还原、保留用户自定义）。
+  证据：模块用例 52/52、真实 Chrome 15/15、14 个路由 × 桌面/375 共 28 张截图、
+  `node .../tests/test_combobox.mjs` 20/20、`tests/test_workflow_core.mjs` 17/17、bore 契约 19 项 OK。
+- **生产状态（截至 2026-11-01 只读预检，见 `local/web-ui-implementation/deploy-preflight.md`，Git 排除）**：
+  磁盘 addons 的 20/20 静态资源 hash 与冻结登记 `maintenance/registry/source-server-p3-web-20261028.json` 一致；
+  **DB 内模块版本 / 表 / 库存未核实**（psql 报 `FATAL: role "hbut" does not exist`、Peer authentication failed，缺提权）；
+  公网 `/web/login`、`/team/lab/receipts`、`/team/scan`、`/lab/api/catalog/search`、`/web/static/*` 为 nginx 404（146B 体），
+  而内网同样路径分别 200/303/303/405/200。→ 因此**不以“已部署/未部署”定性**，DB 与公网入口仍待核实。
+- **回滚风险（旧备份不合格）**：2026-10-27 P2 的 `filestore.tar.gz` 只有 59B 空包，真实 139 个附件在事后单独补包且未进
+  `MANIFEST.artifacts`；`odoo_restore.py` 只解 `filestore.tar.gz` 且不做 `store_fname` 交叉校验 → 旧备份不是一致回滚点，
+  正式部署前必须重新做停机一致备份（DB dump + filestore 同刻、校验清单与还原清单）。
+- **仍未验证**：13 个业务页的逐页交互验收、异常权限下的 403/登录表现、Flutter 端适配、生产 DB 与公网入口、
+  CSP 在真实网关链路上的行为（直连隔离服务没有项目网关 CSP，不能据此声称生产合规）。
+## 2026-11-02 收尾：r3 版本冻结 / 源候选 / 部署包（r2、r1 已被 r3 取代；本节为部署前时点，**2026-11-03 已部署，见上一节**）
+
+- **版本已定版**并同步 `maintenance/registry/components.json`：`lab_team_web 19.0.1.1.0 → 19.0.1.2.0`、
+  `server-ops 2026.10.28.1 → 2026.11.02.1`；`lab_workflow`/`lab_catalog`/`lab_inventory`/`lab_theme`/`lab_site` 源码版本未动。
+  `lab_workflow` 为 `19.0.2.0.0`（`server/ubuntu22.04/odoo_addons/lab_workflow/__manifest__.py:4`，与
+  `maintenance/registry/components.json` 及生产 DB 记录一致；早先「磁盘 19.0.2.0.5 / 三处不一致」是误记，已更正）。
+- **r2 相对 r1 的唯一源码变化（历史；r2 已被 r3 取代）**：`server/ubuntu22.04/odoo_addons/lab_team_web/static/src/css/team.css:2198` 新增
+  `body.lc-body .lc-panel:has(.lc-combobox-pop:not([hidden])) { overflow: visible; }`，修掉 375px 窄屏下下拉向上展开被
+  `.lc-panel { overflow: hidden }` 裁切、点击落不到选项的真实缺陷。r1 冻结于该修复之前，**已被 r2 取代，不得部署**
+  （r1 数字仅作历史：manifest `634d1893…`/`fe34ed95…`、ZIP 13,251,270 B、bundle 91,154 B）。
+- **r3 相对 r2 的源码变化（共 2 处，只改 `team.css`；r3 为当前候选）**：① 在 `body.lc-body` 令牌块内
+  （`server/ubuntu22.04/odoo_addons/lab_team_web/static/src/css/team.css:38-41`，`--lc-ease` 之后、`display:flex` 之前）
+  新增 `color-scheme: dark`，使原生滚动条 / select / input 按深色 UA 渲染；② `team.css:2181` 的 `.lc-combobox-pop`
+  由 `max-width: min(540px, calc(100vw - 28px))` 改为 `min(780px, calc(100vw - 28px))`，桌面 1440 时候选弹层与
+  770px 输入框同左同宽，窄屏仍受视口约束（注释补句在 `team.css:2166`）。其余 CSS 属性、JS、XML、Python 均未改；
+  manifest 差异仅这一个文件，258 个源文件数量不变（无增删）。
+- **已知遗留 B / C 已修复（实测值）**：B（深色主题缺 `color-scheme`，原生控件按浅色 UA 渲染）：5 个下拉用例
+  `colorScheme` 实测均为 `dark`（修复前 `normal`），原生滚动条 / select / input 跟随深色；C（1440 下拉偏窄）：
+  1440 视口实测 `input=770px`、`pop=770px`（gap 0，修复前 540px），375 视口 `input=pop=277px` 且
+  `document.scrollWidth=375` 无横向溢出（窄屏仍受视口约束）。
+- **升级验证（r3 源码上重跑，隔离实例，真实退出码）**：`local/web-ui-implementation/browser/upgrade-only-test.sh`
+  → RUN=`upgrade-keepdb-20261102T134429Z`，`ODOO_EXIT=0`，`/lab_team_web` 用例 **52 tests，FAIL: / ERROR: 计数 0**，日志
+  `local/web-ui-implementation/evidence/upgrade-keepdb-20261102T134429Z.log`（r2 轮的 RUN=`upgrade-keepdb-20261102T125331Z` 仅作历史）；DB 实测
+  `lab_team_web=19.0.1.2.0`（state=installed），`lab_workflow` 记录仍为 `19.0.2.0.0`、`lab_catalog 19.0.2.0.5` 不变。
+- **同轮重跑（更正上一节数字；r3 轮沿用，未重跑，与 r3 的 CSS 改动无关）**：`tests/test_combobox.mjs` 20/20；`tests/test_workflow_core.mjs` **19/19**
+  （上一节写 17/17 是同日更早一轮）；bore 契约 `Ran 19 tests ... OK (skipped=7)`（7 skip 为环境相关）。
+- **冻结与产物（r3，本机，未部署）**：源清单
+  [source-server-web-ui-20261102-r3.json](../../maintenance/registry/source-server-web-ui-20261102-r3.json)
+  **258 文件**，treeSHA `95baea916fbe4c8504e9a3bc2ce1c18235cf53689373d323b32d914d1e1fe8de`，
+  manifestSHA `2192a3545ebbe2ea3293072d1cc971a8deab1e524a4e39c20503d760888a7224`，已 `--activate`
+  （`active-sources.server` 指向 r3；`source-server-p3-web-20261028.json`、r1 `source-server-web-ui-20261102.json`
+  与 r2 `source-server-web-ui-20261102-r2.json` 未改写）；
+  候选包 `local/build/web-ui-20261102/candidates/server-web-ui-20261102-r3-source.zip`
+  （**13,251,571 B**，SHA256 `3800e2a210a1c0fdad562112b4682ed02d83ae466f678443bfafb1923a02d4f7`，
+  259 条目 = 258 源文件 + `MANIFEST.json`，构建报告 `local/build/web-ui-20261102/candidates/build-summary-20261102-r3.json`）；部署包
+  `local/build/web-ui-20261102/candidates/deploy-bundle-web-ui-20261102-r3.tar.gz`（部署前中间包 **91,307 B**，
+  SHA256 `8215a7958fe227452f19f3458a149509169cfd3cf26fadfbd6ecad82b6e8f02d`，27 条目；
+  **2026-11-03 更新**：部署期修复 5 个脚本缺陷后重打，最终实际部署包为 **93,486 B** /
+  `34a485101b3a1725e45375a1b97cf94079a80414166dc2ff24c4cc726824f67a` / 27 条目 / `FROZEN-20261102.sha256` 18 条 /
+  `bundle-meta.json` 的 `freeze_sha256` = `f0dce4080e6170587bbda6e3836ab4f88c62ded4e7ef0dc5c76bbeff5e21401b`、`shipped_script_count=15`；
+  91,586 B / `e453db43…`、92,857 B / `085945a2…` 同为部署前中间包，均非最终；`params.env` 已指向 r3 的 zip/manifest 与两个 sha）；登记
+  [artifact-server-web-ui-20261102-r3.json](../../maintenance/registry/artifact-server-web-ui-20261102-r3.json)
+  （新文件，`kind=source-only-local-candidate`；**`production_deployed` 已于 2026-11-03 部署后改为 true**，并新增 `production_deployment` 块与 `validation_results.production_post_verify` / `public_regression`；`supersedes` 指向 r2 登记）。
+  r2 的数字仅作历史（ZIP 13,251,445 B / `cb868d76…`、bundle 91,273 B / `84808261…`、FROZEN 19 条 = 15 + 3 + 1 空行）；
+  r2 的清单、两个包与 artifact 登记均保持未改写。
+- **真实浏览器证据（均在 r3 源码上重跑）**：下拉截图 `node local/web-ui-implementation/browser/capture-receipt-dropdown.mjs`
+  = **53 断言 all pass / 0 fail**（`evidence.json` 记 total 53 / pass 53 / fail 0 / failedIds `[]`，证据
+  `local/web-ui-implementation/out/receipt-dropdown-20261102/evidence.json`；补充截图
+  `.../receipt-dropdown-20261102/width-fix-1440.png`（118,206 B，1440×900）、`width-fix-375.png`（67,712 B，375×812）
+  与度量原始数据 `width-fix-measure.json`，headless Chrome 156.0.8078.74）；全站真实套件
+  `node local/web-ui-implementation/run-real-ui.mjs` = **55 项 55 pass / 0 fail / 0 blocked**（`exitCode 0`，
+  `writeGate` 全 true），report `local/web-ui-implementation/out/run-real-2026-11-02T13-38-39-691Z/report.json`；
+  r2 时 3 项 blocked 已消失：静态袋详情按 1440/375 真跑出 2 条（`/team/lab/bags/41`，lab.bag id=41，
+  trace `TRC00000045`，company=1；httpStatus 200、errCount 0、horizontalOverflow false、smallTargetCount 0），
+  `real-receipt-multi-create-lock`（archiveId=13，product.template 13，C990000001，tracking=none，无批次库存 12.00；
+  createPosts=1、payloadTemplate=13、payloadMatch true、trace `TRC00000046`）与 `real-receipt-legacy-precondition`
+  （code=`PRECONDITION_FAILED`、fieldsItemKey=`legacy_untracked_stock`、库存 12→12 未变、hasBag false、界面提示可见）
+  一并通过。（r2 轮为 48 断言、54 项 51P/0F/3B，仅作历史。）
+- **套件证据缺陷（工具问题，非产品缺陷；已补证据，未改工具源码）**：真实浏览器套件在给了 `WEBUI_BAG_ID` 后，
+  静态袋页与交互节动态袋详情共用测试 id 前缀 `real-bag-detail-<1440|375>`，同一 id 出现两次且截图按 id 命名
+  互相覆盖，`13-38-39Z` 目录里 `real-bag-detail-1440.png` 实际是动态袋 42；已用 `--only=pages` 复跑
+  （`local/web-ui-implementation/out/run-real-2026-11-02T13-40-31-993Z/report.json` = 35 项 32 pass / 0 fail / 3 blocked，
+  3 个 blocked 全为 `--only` 主动跳过 interactions/drawer/manager 的标记，`exitCode 3`）留下静态袋 41 截图
+  `shots/real-bag-detail-1440.png`（172,807 B，1440×2258）。建议后续把静态页 id 改成 `real-page-bag-detail-<vw>`。
+  另注：同库并发跑套件会互相污染合成数据，只能串行执行。
+- **仓库检查（r3）**：`python tools/repo_check.py` = PASS / 52 项 / **errors 0** / 1 条既有 warning
+  （`production-py312-rebuild`），证据 `local/web-ui-implementation/evidence/repo-check-20261102-r3.json`；`git diff --check` = 0（r1 时期修掉 `team.css` 文件尾多空行，随后 r2 又新增 CSS 规则并重新冻结）。
+  本文档上一版曾记「更新时点（2026-11-02 21 时前后）重跑 repo_check = FAIL / 51 项 / 1 error `frozen-source:client`
+  （`clients/app/lib/features/unified/` 下 `inventory_providers.dart`、`pending_receipt_screen.dart`、`receipt_screen.dart`
+  与冻结源不一致）」——那次 FAIL 的真实原因是**客户端改动（收据/待打印入库页内联搜索建议）当时尚未冻结**，不是仓库回归；
+  冻结客户端源码后重跑 `python tools/repo_check.py --output local/web-ui-implementation/evidence/repo-check-20261102-r2-flutter.json`
+  = **PASS / 52 项 / 0 errors / 1 既有 warning（`production-py312-rebuild`）**，故当前可宣称 PASS。
+- **Flutter 客户端：收据/待打印入库页内联搜索建议已完成并冻结（并行的客户端轮，验收通过）**：
+  - 新增 `clients/app/lib/features/unified/widgets/catalog_suggest_search.dart`（818 行，格式化后）：OverlayPortal +
+    CompositedTransformFollower 的内联建议浮层；防抖 `Duration(milliseconds: 250)`；每键 `_seq` 递增使旧请求作废；
+    IME 组合期（`_controller.value.composing.isValid`）不查询；状态 loading/empty/error+retry；Up/Down/Enter/Escape/Tab 键操作；
+    48dp 行高；TapRegion 外点关闭；不裁切。
+  - 新增测试 `clients/app/test/features/unified/catalog_suggest_search_test.dart`（739 行，20 个用例）。
+  - 改 `clients/app/lib/features/unified/screens/receipt_screen.dart`（+66/-4）：扫码行下加内联建议字段；档案加载中显示
+    「正在读取本地档案…」并禁用提交（`archivesLoading = itemKey 非空且 materials 空且 detail.isLoading`）；选中走
+    `ReceiptController.setItem`；再次键入时 `_releaseSuggestion` 撤销上一次由建议提交的卡（仅当当前 `itemKey` 仍等于该卡时才清）。
+  - 改 `clients/app/lib/features/unified/screens/pending_receipt_screen.dart`（+129/-16）：用建议字段替换原「选择元器件」ListTile，
+    保留「从器件库选择」「资料库没有？新建器件」两个入口；已选卡用带「清除选择」按钮的 ListTile 展示；同一 C 多档案时显示
+    「此编号对应多个本地档案，请先选择本次制袋的档案。」并禁用「生成袋码并加入待打印」；`_selectionSeq` 令牌防止在途档案查询
+    复活已撤销的选择。
+  - 改 `clients/app/lib/features/unified/providers/inventory_providers.dart`（+20/-1）：`ReceiptController.setItem` 在切换到不同卡时
+    清 `resolved`/`materials`/`templateId`/`sn`（`copyWith` 用 `_unset` 哨兵，传 `null` 真能清空），同一张卡重选保留已选档案。
+  - 改 `clients/app/test/features/unified/item_picker_test.dart`（1 行）：点击目标文案「选择元器件」→「从器件库选择」。
+  - 实现决策：复用既有 `LabApiClient.search(CatalogQuery)`/`detail()`，无新接口；同 C 分组在客户端按规范化的 C 码合并，本地变体排主位，
+    只有供应商独有组才显示供应商库存，绝不把供应商库存当本地库存；`lab:`/`lcsc:`/`LABB:`/`LABL:` 等内部前缀由 `catalogSuggestTerm` 剥掉，
+    `LABB`/`LABL` 不作为文本上送；扫码与手工建档路径未改。
+  - 验证（工作目录 `F:/lc_elc/clients/app`，`PUB_CACHE=F:/lc_elc/dependencies/pub-cache-windows`、`FLUTTER_SUPPRESS_ANALYTICS=true`、
+    `F:/lc_elc/dependencies/sdk/windows/flutter/bin/flutter.bat`，均 `--no-pub`、无 `pub get`）：`flutter test --no-pub --reporter compact`
+    = exit 0，`+295 ~5`（295 passed / 5 skipped；5 个 skip 是既有需要真实 Odoo 账号的 live 集成用例，本轮同样跳过），Lead 已自行复跑
+    确认同一结果；单跑新测试文件 = exit 0，20/20；`flutter analyze --no-pub` = **exit 1，但 0 error / 0 warning / 119 info**（全部为改动前
+    既有 info：deprecated `DropdownButtonFormField.value`、curly braces、1 个多余 import；新文件 0 新增），输出存
+    `local/web-ui-implementation/evidence/flutter-analyze-20261102.txt`；`dart format --output=none --set-exit-if-changed` 两个新文件 = exit 0、
+    无改动；三个既有文件故意没跑新 SDK 格式化（会把 ~435 行无关行重排，仓库本就不是该格式化基线）。
+  - 客户端源码冻结（Lead 执行，EXIT=0）：`python tools/release.py snapshot --component client --output maintenance/registry/source-client-receipt-search-feedback-20261102.json --activate`
+    → `file_count=169`、`tree_sha256=ee5adebdaa0c3e81dfa616b8dc55243d6419790422b93b010f9126f3aaa70072`、清单 sha256
+    `d703e507cd04bbe6bad648a3bf263b79d6626bf34ae77bba45cae88d6d37952f`；`active-sources.client` 已指向它，旧
+    `source-client-android-install-fix-final-20261019.json` 未改写。
+  - 版本与边界：客户端 `pubspec` 仍 `1.1.3+6`（本轮未升版、未构建签名 APK、未发布；Android stable 仍 `1.1.3+6`）；
+    **没有 emulator/真机运行**，UI 证据只有 widget 测试与静态分析；receipt 页没有专门的提交锁 widget 测试（pending 页有），不声称已测。
+  - 遗留：`git stash@{0}`（format-churn-revert，仅含三个文件被新格式化器重排的副本）因安全策略不允许删除，保留未动。
+- **文档**：`local/web-ui-implementation/deploy-plan.md` 增 `§1.1`（本轮候选实测参数）与**第 8.5 步**
+  （50-verify 之后执行 `remote/90-close.sh` 写 `DEPLOY_STATE`）；`CHANGELOG.md` 增 2026-11-02 条目；
+  交接见 [2026-11-02 实施交接](../../maintenance/handoffs/2026-11-02-web-ui-unification-implementation.md)。
+- **有效性边界（2026-11-03 更新）**：**已部署**——r3 于 2026-11-03 00:16–00:36Z 部署到生产 `192.168.31.105`（DB `LcHardwareHouse`），
+  `lab_team_web 19.0.1.2.0` 生效、网关切到 r3 allowlist、50-verify 129 项 0 失败、90-close `completed`（`20261103T003543Z`）、公网回归全项通过；
+  备份与回滚点见上一节。此前记录的「未部署 / 生产主机不可达」是 2026-11-02 时点结论，已失效。
+  仍未做：commit/push（分支仍在工作区）、客户端包（`1.1.3+6` 不变）、真实业务写、DNS/Docker 变更、回滚演练、CI。
+  仍未复核：13 个业务页逐页真实点击交互、异常权限下的 403/登录呈现、Flutter 端对其余业务页的适配（收据/待打印两页见本节上一条）、真实网关链路上的 CSP。
+  浏览器证据是**隔离实例**结果（全站套件 55 项 55 pass / 0 fail / 0 blocked；`--only=pages` 复跑为 35 项 32 pass / 0 fail / 3 条主动跳过标记），**不得写成生产已验收**。
+
 ## 2026-10-28 P3 自有 Web 日常业务：候选已冻结 / 构建 / 登记（**未部署生产**）
 
 - **版本（已定版）**：`lab_workflow 19.0.2.0.0`、`lab_team_web 19.0.1.1.0`、`server-ops 2026.10.28.1`

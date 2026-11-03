@@ -723,6 +723,65 @@ test('错误状态可恢复：连续 show/clear 不残留旧内容', async () =>
   assert.ok(secondText.indexOf('没有数据') !== -1);
 });
 
+test('字段级错误只展示人话：机器码（item_key：legacy_untracked_stock）不得进状态区', async () => {
+  const { LC } = loadCore();
+  const machine = LC.fieldMessages({
+    code: 'PRECONDITION_FAILED',
+    fields: { item_key: 'legacy_untracked_stock', submit: 'pending_unknown', error_id: 'E-7' }
+  });
+  assert.equal(machine.length, 0, '纯机器码字段不得作为用户文案输出：' + JSON.stringify(machine));
+  const human = LC.fieldMessages({
+    code: 'VALIDATION_ERROR',
+    fields: {
+      item_key: 'legacy_untracked_stock',
+      sn: '请先使用「历史库存分袋适配」把现有库存按袋登记。',
+      note: ''
+    }
+  });
+  assert.equal(human.length, 1, '中文说明必须保留，机器码和空值丢掉：' + JSON.stringify(human));
+  assert.equal(human[0].field, 'sn');
+  assert.ok(human[0].message.indexOf('历史库存分袋适配') !== -1);
+});
+
+test('已知业务错误展示服务端可执行说明，INTERNAL/纯技术文本仍走通用句', async () => {
+  const { LC } = loadCore();
+
+  // 1. 业务前置条件：服务端 message 是唯一可执行指引，不能被通用句盖掉
+  const precondition = LC.errorText({
+    code: 'PRECONDITION_FAILED',
+    message: '物料「合成电阻 10k 0603」在内部库位还有 15.0 个无批次库存，' +
+      '直接开启批次跟踪会让这些库存无法追溯。请先使用「历史库存分袋适配」把现有库存按袋登记，再入库新袋。',
+    fields: { item_key: 'legacy_untracked_stock' }
+  });
+  assert.ok(precondition.indexOf('历史库存分袋适配') !== -1,
+    '业务前置条件必须显示可执行指引：' + precondition);
+  assert.equal(precondition.indexOf('legacy_untracked_stock'), -1,
+    '机器码不得出现在用户文案里：' + precondition);
+
+  // 2. 参数校验：服务端中文说明优先于「请检查填写的参数」
+  const validation = LC.errorText({
+    code: 'VALIDATION_ERROR',
+    message: '袋码「LABB:X」不存在或已作废，请重新扫描袋标签。'
+  });
+  assert.ok(validation.indexOf('请重新扫描袋标签') !== -1, '参数校验说明要透出：' + validation);
+
+  // 3. 纯技术文本（英文异常/字段名）不放行，退回通用句，避免把实现词暴露给用户
+  const technical = LC.errorText({
+    code: 'PRECONDITION_FAILED',
+    message: 'KeyError: product_template_id'
+  });
+  assert.equal(technical, '当前条件不满足，无法完成该操作。');
+
+  // 4. 服务器内部错误：仍是通用句 + 错误编号，不把原始异常抛给用户
+  const internal = LC.errorText({ code: 'INTERNAL_ERROR', errorId: 'E-42', message: 'Traceback ...' });
+  assert.ok(internal.indexOf('错误编号 E-42') !== -1, '内部错误要带编号便于排查：' + internal);
+  assert.equal(internal.indexOf('Traceback'), -1);
+
+  // 5. 结果未知仍优先提示可重试，不被任何 message 覆盖
+  const unknown = LC.errorText({ code: 'INTERNAL_ERROR', unknown: true, message: '历史库存分袋适配' });
+  assert.ok(unknown.indexOf('结果未知') !== -1, unknown);
+});
+
 /* ------------------------------------------------------------------ 运行器 */
 async function main() {
   let failed = 0;

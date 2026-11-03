@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+          旧入口迁移（docs/requirements/WEB_UI_UNIFICATION_PLAN_20261102.md §2.6 方式 A）
+
+          * 只新增 ir.actions.act_url 指向已注册的自有业务路由，再用**同一 xmlid**
+            覆盖菜单的 action；groups / sequence / 父子关系一律不动。
+          * 原 ir.actions.act_window / act_url / client 记录全部保留：
+            2.3 的旧 GET 兼容层、管理员维护与回退都还要引用它们。
+          * 本文件必须加入 __manifest__.py 的 data 列表才会生效（主实施集成项），
+            未加入前本文件不参与安装，属于「未部署」而不是「已迁移」。
+        -->
+
+        <!-- 目标动作（act_url 只指 http 路由，不新建假模型） -->
+        <record id="action_legacy_catalog" model="ir.actions.act_url">
+            <field name="name">器件库（自有页面）</field>
+            <field name="url">/team/lab</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_scan" model="ir.actions.act_url">
+            <field name="name">扫码（自有页面）</field>
+            <field name="url">/team/scan</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_issues" model="ir.actions.act_url">
+            <field name="name">领用与归还（自有页面）</field>
+            <field name="url">/team/lab/issues</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_bags" model="ir.actions.act_url">
+            <field name="name">库存袋与追溯（自有页面）</field>
+            <field name="url">/team/lab/bags</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_history" model="ir.actions.act_url">
+            <field name="name">库存作业流水（自有页面）</field>
+            <field name="url">/team/lab/history</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_labels" model="ir.actions.act_url">
+            <field name="name">标签中心（自有页面）</field>
+            <field name="url">/team/lab/labels</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_locations" model="ir.actions.act_url">
+            <field name="name">库位与库码（自有页面）</field>
+            <field name="url">/team/lab/locations</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_mappings" model="ir.actions.act_url">
+            <field name="name">类别到库位映射（自有页面）</field>
+            <field name="url">/team/lab/location-mappings</field>
+            <field name="target">self</field>
+        </record>
+        <record id="action_legacy_materials" model="ir.actions.act_url">
+            <field name="name">器件档案（自有页面）</field>
+            <field name="url">/team/lab/materials</field>
+            <field name="target">self</field>
+        </record>
+
+        <!-- 根菜单：点击「实验室库存」进入自有器件库，而不是 OWL 统一器件库 -->
+        <record id="lab_inventory.menu_lab_root" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_catalog"/>
+        </record>
+
+        <!-- 作业与追溯：扫码操作台 / 领用记录 / 库存袋 / 作业流水 -->
+        <record id="lab_workflow.menu_lab_scan" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_scan"/>
+        </record>
+        <record id="lab_workflow.menu_lab_issue_line" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_issues"/>
+        </record>
+        <record id="lab_workflow.menu_lab_bag" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_bags"/>
+        </record>
+        <record id="lab_workflow.menu_lab_operation_list" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_history"/>
+        </record>
+
+        <!-- 配置组：库位与库码、批量标签（向导仍留给管理员，见文件末尾回退菜单） -->
+        <record id="lab_workflow.menu_lab_location" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_locations"/>
+        </record>
+        <record id="lab_workflow.menu_lab_labels" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_labels"/>
+        </record>
+
+        <!-- 实验室库存：元器件档案 / 库位管理 / 类别映射 -->
+        <record id="lab_inventory.menu_lab_product" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_materials"/>
+        </record>
+        <record id="lab_inventory.menu_lab_location" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_locations"/>
+        </record>
+        <record id="lab_inventory.menu_lab_mapping" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_mappings"/>
+        </record>
+
+        <!-- 资料库管理：C 编号绑定（绑定表单已在 /team/lab/materials 页内） -->
+        <record id="lab_catalog.menu_lab_unified_catalog" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_catalog"/>
+        </record>
+        <record id="lab_catalog.menu_lab_catalog_binding" model="ir.ui.menu">
+            <field name="action" ref="action_legacy_materials"/>
+        </record>
+
+        <!--
+          方式 B：旧标签向导留给管理员（日常角色走自有标签中心）。
+          新页面覆盖不了「粘贴任意 ID 列表批量出标签」这一旧能力，故保留原生向导入口；
+          若主实施决定不加菜单，删除这一条即可，向导仍可由 /web#action=<id> 直达。
+        -->
+        <menuitem id="menu_legacy_label_wizard"
+                  name="标签向导（原生回退）"
+                  parent="lab_workflow.menu_lab_config"
+                  action="lab_workflow.action_lab_label_open"
+                  sequence="25"
+                  groups="lab_workflow.group_lab_manager"/>
+
+        <!--
+          刻意不改指（方案 §2.6 方式 C，均保留原生）：
+            lab_workflow.menu_lab_request_log    低频幂等诊断面
+            lab_catalog.menu_lab_catalog_index   资料库索引（批量运维仍在原生列表）
+            lab_catalog.menu_lab_catalog_category 商城分类树（无自有页）
+            lab_catalog.menu_lab_catalog_import_run 导入批次审计（无自有页）
+            lab_inventory.menu_lab_move          库存流水：新 history 只覆盖
+                                                 lab.operation，stock.move 的上架/
+                                                 内部调拨未覆盖，能力未对齐前不隐藏
+        -->
+
+    </data>
+</odoo>

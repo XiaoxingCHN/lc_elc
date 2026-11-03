@@ -424,6 +424,19 @@
   ApiError.prototype = Object.create(Error.prototype);
   ApiError.prototype.constructor = ApiError;
 
+  //: 业务校验/前置条件是"人话在服务端、通用句只是兜底"的一类：
+  //: 例如 legacy_untracked_stock 的可执行指引（「请先使用「历史库存分袋适配」…」）
+  //: 只存在于服务端 message，用通用句盖掉它等于让用户无从下手。
+  var SERVER_TEXT_CODES = {
+    VALIDATION_ERROR: true,
+    PRECONDITION_FAILED: true,
+    CONFLICT: true,
+    DUPLICATE_REQUEST: true,
+    AMBIGUOUS_MATERIAL: true
+  };
+  //: 只放行真正写给人的中文说明；纯英文/代码片段（field 名、异常类名）退回通用句。
+  var HAS_HUMAN_TEXT = /[\u4e00-\u9fa5]/;
+
   function errorText(error) {
     if (!error) return ERROR_TEXT.INTERNAL_ERROR;
     if (error.unknown) return '结果未知（网络中断或超时），可以用同一请求安全重试。';
@@ -431,8 +444,18 @@
     if (error.code === 'INTERNAL_ERROR' && error.errorId) {
       return base + '（错误编号 ' + error.errorId + '）';
     }
-    return base || error.message || '操作失败。';
+    var detail = typeof error.message === 'string' ? error.message.trim() : '';
+    if (SERVER_TEXT_CODES[error.code] === true && detail && detail !== base && HAS_HUMAN_TEXT.test(detail)) {
+      return detail;
+    }
+    return base || detail || '操作失败。';
   }
+
+  /* 服务端 fields 里混着两种值：给用户看的说明（中文），和机器码（legacy_untracked_stock、
+     not_owner、last_manager 之类）。页面把 field 名和值拼成「item_key：legacy_untracked_stock」
+     展示给用户时就是实现词泄漏，对用户没有任何指导意义（真正的解释在服务端 message 里），
+     所以这里只保留人类可读的说明，机器码直接丢掉。 */
+  var MACHINE_VALUE = /^[A-Za-z0-9_.:-]+$/;
 
   function fieldMessages(error) {
     var out = [];
@@ -440,7 +463,11 @@
     Object.keys(fields).forEach(function (key) {
       var value = fields[key];
       if (key === 'error_id') return;
-      out.push({ field: key, message: typeof value === 'string' ? value : String(value) });
+      var message = typeof value === 'string' ? value : String(value);
+      var trimmed = message.trim();
+      if (!trimmed) return;
+      if (MACHINE_VALUE.test(trimmed)) return;
+      out.push({ field: key, message: message });
     });
     return out;
   }
@@ -1009,6 +1036,388 @@
     runInits();
   }, { once: true });
 
+  /* ------------------------------------------------------------ 搜索下拉（combobox）
+   * 共用组件：输入即时候选 + 键盘/触控选择 + 明确的加载/空/失败反馈。
+   * 由页面注入检索函数（组件自己不拼 URL、不写业务规则）。
+   *
+   * 行为契约：
+   *   * 每次输入/清空/失焦/选择都递增内部 seq：晚到的响应一律丢弃，
+   *     既不覆盖当前输入，也不会把已经关掉的面板重新打开；
+   *   * IME 组字期间不检索，compositionend 后按最终文本检索一次；
+   *   * Enter 只在面板打开且有高亮项时消费（选择候选），否则不拦截；
+   *   * 候选文本一律 textContent（无 innerHTML），不新增网络依赖；
+   *   * 开启时立即给出"搜索中"反馈，不等 250ms 防抖结束才反馈。
+   */
+  var comboboxSeq = 0;
+
+  function createCombobox(options) {
+    var opts = options || {};
+    var input = opts.input;
+    if (!input) return null;
+    var container = opts.container || input.parentNode;
+    if (!container) return null;
+
+    var minLength = Math.max(1, opts.minLength || 2);
+    var limit = Math.max(1, opts.limit || 8);
+    var debounceMs = opts.debounceMs === undefined ? 250 : opts.debounceMs;
+    var uid = 'lc-cb-' + (++comboboxSeq);
+
+    var pop = el('div', { class: 'lc-combobox-pop', id: uid + '-pop' });
+    var list = el('ul', { class: 'lc-combobox-list', role: 'listbox', id: uid + '-list' });
+    var note = el('p', { class: 'lc-combobox-note', role: 'status', 'aria-live': 'polite' });
+    pop.appendChild(list);
+    pop.appendChild(note);
+    setHidden(pop, true);
+    container.appendChild(pop);
+
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-controls', uid + '-list');
+    if (!input.getAttribute('autocomplete')) input.setAttribute('autocomplete', 'off');
+
+    var items = [];
+    var active = -1;
+    var seq = 0;
+    var timer = null;
+    var composing = false;
+    var isOpen = false;
+    // 请求预算（方案 §3.1）：在途候选请求最多 maxInflight 个，
+    // 超出的查询只保留"最新一条待发"，其余直接丢弃；关闭/清空/锁定/销毁也丢待发。
+    var maxInflight = Math.max(1, opts.maxInflight || 2);
+    var inflight = 0;
+    var pending = null;         // {text, seq}：唯一待发查询
+    var lastFailed = null;      // 上次失败的关键词，供"重试检索"校验输入未变
+
+    function bump() {
+      seq += 1;
+      return seq;
+    }
+
+    function query() {
+      return String(input.value || '').trim();
+    }
+
+    function disabled() {
+      return (typeof opts.disabled === 'function' && opts.disabled()) || !!input.disabled;
+    }
+
+    function dropPending() {
+      pending = null;
+    }
+
+    function close() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      dropPending();          // 面板关闭后不再补发排队中的查询
+      active = -1;
+      isOpen = false;
+      setHidden(pop, true);
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      Array.prototype.forEach.call(list.children || [], function (node) {
+        node.classList.remove('is-active');
+      });
+    }
+
+    function setNote(text, kind) {
+      note.textContent = text || '';
+      note.setAttribute('data-kind', kind || '');
+      if (!text) setHidden(note, true);
+      else {
+        setHidden(note, false);
+        open();
+      }
+    }
+
+    // 视口内定位：默认向下展开；下方空间不足且上方更宽裕时翻到上方，
+    // 并把弹层最大高度压到可用空间，避免窄屏（375）或软键盘场景把候选裁掉。
+    function place() {
+      if (typeof pop.getBoundingClientRect !== 'function' ||
+          typeof container.getBoundingClientRect !== 'function') return;
+      var viewportH = (typeof window !== 'undefined' && typeof window.innerHeight === 'number')
+        ? window.innerHeight : 0;
+      if (!viewportH) return;
+      var box = container.getBoundingClientRect();
+      var below = Math.max(0, viewportH - box.bottom - 12);
+      var above = Math.max(0, box.top - 12);
+      var up = below < 220 && above > below;
+      pop.setAttribute('data-placement', up ? 'up' : 'down');
+      if (pop.style) pop.style.maxHeight = Math.max(120, Math.floor(up ? above : below)) + 'px';
+    }
+
+    function open() {
+      isOpen = true;
+      setHidden(pop, false);
+      input.setAttribute('aria-expanded', 'true');
+      place();
+    }
+
+    function render(rows) {
+      clear(list);
+      items = rows;
+      active = -1;
+      input.removeAttribute('aria-activedescendant');
+      rows.forEach(function (item, index) {
+        var view = typeof opts.describe === 'function'
+          ? (opts.describe(item) || {})
+          : { primary: String(item) };
+        var option = el('li', {
+          class: 'lc-combobox-option',
+          role: 'option',
+          id: uid + '-opt-' + index,
+          'aria-selected': 'false'
+        }, [
+          el('span', { class: 'lc-combobox-primary', text: view.primary || '—' }),
+          view.meta ? el('span', { class: 'lc-combobox-meta', text: view.meta }) : null,
+          view.badge ? el('span', { class: 'lc-combobox-badge', text: view.badge }) : null
+        ]);
+        option.setAttribute('data-lc-index', String(index));
+        list.appendChild(option);
+      });
+      open();
+      place();
+    }
+
+    function setActive(index) {
+      var nodes = list.children || [];
+      if (!nodes.length) return;
+      var next = index;
+      if (next < 0) next = nodes.length - 1;
+      if (next >= nodes.length) next = 0;
+      active = next;
+      Array.prototype.forEach.call(nodes, function (node, i) {
+        var on = i === next;
+        node.classList.toggle('is-active', on);
+        node.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      input.setAttribute('aria-activedescendant', uid + '-opt-' + next);
+      var current = nodes[next];
+      if (current && typeof current.scrollIntoView === 'function') {
+        try { current.scrollIntoView({ block: 'nearest' }); } catch (error) { /* 忽略 */ }
+      }
+    }
+
+    function pick(index) {
+      var item = items[index];
+      if (!item) return;
+      if (typeof opts.onPick === 'function') opts.onPick(item, { query: query() });
+      bump();
+      close();
+    }
+
+    function busy() {
+      return inflight >= maxInflight;
+    }
+
+    function release() {
+      inflight = Math.max(0, inflight - 1);
+      if (!pending) return;
+      var next = pending;
+      pending = null;
+      if (next.seq !== seq || disabled()) return;      // 期间有更新输入/锁定 -> 旧待发作废
+      if (query() !== next.text) return;
+      setNote(opts.loadingText || '正在检索器件…', 'loading');
+      run(next.text, next.seq);
+    }
+
+    function handleRows(rows, text, mySeq) {
+      if (mySeq !== seq || disabled()) return;
+      if (query() !== text) return;
+      lastFailed = null;
+      var list2 = (rows || []).slice(0, limit);
+      if (!list2.length) {
+        items = [];
+        clear(list);
+        setNote(opts.emptyText || '没有匹配的器件。', 'empty');
+        return;
+      }
+      setNote('');
+      setHidden(note, true);
+      render(list2);
+    }
+
+    function handleError(error, text, mySeq) {
+      if (mySeq !== seq || disabled()) return;
+      if (query() !== text) return;
+      items = [];
+      clear(list);
+      lastFailed = text;
+      var text2 = typeof opts.errorText === 'function'
+        ? opts.errorText(error)
+        : '候选加载失败，请稍后重试。';
+      setErrorNote(text2);
+    }
+
+    // 失败文案 + 可点的"重试检索"：同一关键词重发 catalogSearch，
+    // 保持输入不变、不改选中、不写库存；输入已变时按新输入重新检索。
+    function setErrorNote(text) {
+      note.textContent = '';
+      note.setAttribute('data-kind', 'error');
+      note.appendChild(el('span', { class: 'lc-combobox-error-text', text: text }));
+      var retry = el('button', {
+        type: 'button',
+        class: 'lc-combobox-retry',
+        text: opts.retryText || '重试检索'
+      });
+      retry.addEventListener('click', function (event) {
+        if (event && event.preventDefault) event.preventDefault();
+        if (event && event.stopPropagation) event.stopPropagation();
+        retryNow();
+      });
+      note.appendChild(retry);
+      setHidden(note, false);
+      open();
+    }
+
+    function retryNow() {
+      if (disabled()) return;
+      var text = query();
+      if (text.length < minLength) return;
+      if (lastFailed && lastFailed !== text && query() !== lastFailed) {
+        // 输入已改：走正常检索，不硬用旧关键词
+        schedule();
+        return;
+      }
+      if (timer) { clearTimeout(timer); timer = null; }
+      var mySeq = bump();
+      setNote(opts.loadingText || '正在检索器件…', 'loading');
+      run(text, mySeq);
+    }
+
+    function run(text, mySeq) {
+      timer = null;
+      if (busy()) {
+        pending = { text: text, seq: mySeq };   // 只保留最新待发，旧待发被覆盖
+        return;
+      }
+      inflight += 1;
+      var promise;
+      try {
+        promise = opts.fetch(text, { seq: mySeq });
+      } catch (error) {
+        promise = Promise.reject(error);
+      }
+      Promise.resolve(promise).then(function (rows) {
+        try { handleRows(rows, text, mySeq); } finally { release(); }
+      }, function (error) {
+        try { handleError(error, text, mySeq); } finally { release(); }
+      });
+    }
+
+    function schedule() {
+      if (composing) return;
+      if (typeof opts.onQuery === 'function') opts.onQuery(query());
+      if (disabled()) {
+        bump();
+        close();
+        return;
+      }
+      var text = query();
+      var mySeq = bump();
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (text.length < minLength) {
+        items = [];
+        clear(list);
+        setHidden(note, true);
+        close();
+        return;
+      }
+      // 立即反馈（"搜索中"），防抖只延迟请求本身
+      setNote(opts.loadingText || '正在检索器件…', 'loading');
+      timer = setTimeout(function () { run(text, mySeq); }, debounceMs);
+    }
+
+    input.addEventListener('input', function () { schedule(); });
+    input.addEventListener('compositionstart', function () { composing = true; });
+    input.addEventListener('compositionend', function () {
+      composing = false;
+      schedule();
+    });
+    input.addEventListener('keydown', function (event) {
+      var key = event.key || '';
+      if (key === 'ArrowDown') {
+        if (!isOpen && (items.length || note.textContent)) {
+          open();
+          event.preventDefault();
+          return;
+        }
+        if (!items.length) return;
+        event.preventDefault();
+        setActive(active + 1);
+        return;
+      }
+      if (key === 'ArrowUp') {
+        if (!isOpen || !items.length) return;
+        event.preventDefault();
+        setActive(active - 1);
+        return;
+      }
+      if (key === 'Enter') {
+        // 只有"面板打开 + 有高亮项"才消费 Enter；否则交给页面/表单默认行为
+        if (isOpen && active >= 0) {
+          event.preventDefault();
+          pick(active);
+        }
+        return;
+      }
+      if (key === 'Escape') {
+        if (!isOpen) return;
+        event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        bump();
+        close();
+        return;
+      }
+      if (key === 'Tab') {
+        bump();
+        close();
+      }
+    });
+    input.addEventListener('focusout', function (event) {
+      var next = event && event.relatedTarget;
+      if (next && container.contains && container.contains(next)) return;
+      bump();
+      close();
+    });
+    container.addEventListener('mousedown', function (event) {
+      var option = event.target && event.target.closest
+        ? event.target.closest('.lc-combobox-option') : null;
+      if (!option) return;
+      event.preventDefault();   // 保持输入焦点，避免 blur 先关面板
+    });
+    container.addEventListener('click', function (event) {
+      var option = event.target && event.target.closest
+        ? event.target.closest('.lc-combobox-option') : null;
+      if (!option) return;
+      var index = parseInt(option.getAttribute('data-lc-index'), 10);
+      if (!isFinite(index) || index < 0) return;
+      event.preventDefault();
+      pick(index);
+    });
+    document.addEventListener('mousedown', function (event) {
+      if (!isOpen) return;
+      var target = event && event.target;
+      if (target && container.contains && container.contains(target)) return;
+      bump();
+      close();
+    });
+
+    return {
+      input: input,
+      container: container,
+      isOpen: function () { return isOpen; },
+      query: query,
+      close: function () { bump(); close(); },
+      refresh: schedule,
+      retry: retryNow,
+      // 便于单测断言"在途请求上界"与"待发只有一条"
+      stats: function () {
+        return { inflight: inflight, pending: pending ? pending.text : null, maxInflight: maxInflight };
+      },
+      destroy: function () { bump(); close(); }
+    };
+  }
+
   /* ------------------------------------------------------------------ 导出 */
   var LC = {
     version: 1,
@@ -1052,6 +1461,8 @@
 
     el: el,
     clear: clear,
+    // 搜索下拉（输入即候选）：页面注入 fetch/describe/onPick，组件只管状态机与可访问性
+    combobox: createCombobox,
     qs: qs,
     qsa: qsa,
     show: function (node, visible) { setHidden(node, !visible); },
