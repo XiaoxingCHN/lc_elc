@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/unified_item.dart';
 import '../providers/inventory_providers.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
 
 /// 归还 (return): choose the ORIGINAL issue record, then one of its lines, and
@@ -54,7 +55,10 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
     final state = ref.read(returnControllerProvider);
     final line = state.selectedLine;
     final quantity = state.quantity;
-    if (line == null || quantity == null || quantity <= 0 || quantity > line.outstanding) {
+    if (line == null ||
+        quantity == null ||
+        quantity <= 0 ||
+        quantity > line.outstanding) {
       await ref.read(returnControllerProvider.notifier).submit();
       return;
     }
@@ -91,7 +95,8 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: LabAppBar(fallbackLocation: '/catalog',
+      appBar: LabAppBar(
+        fallbackLocation: '/catalog',
         title: const Text('归还'),
         actions: <Widget>[
           IconButton(
@@ -118,15 +123,18 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                   Row(
                     children: <Widget>[
                       Expanded(
-                        child: Text('选择原领料记录', style: theme.textTheme.titleSmall),
+                        child: Text(
+                          '选择原领料记录',
+                          style: theme.textTheme.titleSmall,
+                        ),
                       ),
                       Switch(
                         value: state.outstandingOnly,
                         onChanged: state.isBusy
                             ? null
                             : (value) => ref
-                                .read(returnControllerProvider.notifier)
-                                .loadIssues(outstandingOnly: value),
+                                  .read(returnControllerProvider.notifier)
+                                  .loadIssues(outstandingOnly: value),
                       ),
                       Text('只看未归还', style: theme.textTheme.labelSmall),
                     ],
@@ -141,8 +149,9 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                     ErrorView(
                       message: state.issuesError!,
                       compact: true,
-                      onRetry: () =>
-                          ref.read(returnControllerProvider.notifier).loadIssues(),
+                      onRetry: () => ref
+                          .read(returnControllerProvider.notifier)
+                          .loadIssues(),
                     ),
                   if (!state.loadingIssues &&
                       state.issuesError == null &&
@@ -170,8 +179,10 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                         title: Text(issue.displayTitle),
                         subtitle: Text(
                           <String>[
-                            if (issue.borrowerName.isNotEmpty) '领用人 ${issue.borrowerName}',
-                            if (issue.actorName.isNotEmpty) '操作人 ${issue.actorName}',
+                            if (issue.borrowerName.isNotEmpty)
+                              '领用人 ${issue.borrowerName}',
+                            if (issue.actorName.isNotEmpty)
+                              '操作人 ${issue.actorName}',
                             '未归还 ${UnifiedItem.formatQuantity(issue.outstanding)}',
                           ].join(' · '),
                         ),
@@ -190,7 +201,8 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                               subtitle: Text(
                                 <String>[
                                   if (line.itemName.isNotEmpty) line.itemName,
-                                  if (line.locationCode.isNotEmpty) '库位 ${line.locationCode}',
+                                  if (line.locationCode.isNotEmpty)
+                                    '库位 ${line.locationCode}',
                                   '已领 ${UnifiedItem.formatQuantity(line.quantity ?? 0)}',
                                   if (line.returnedQuantity != null)
                                     '已还 ${UnifiedItem.formatQuantity(line.returnedQuantity!)}',
@@ -207,7 +219,9 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                               onTap: line.hasId
                                   ? () {
                                       ref
-                                          .read(returnControllerProvider.notifier)
+                                          .read(
+                                            returnControllerProvider.notifier,
+                                          )
                                           .selectLine(line);
                                       _quantity.text = line.outstanding
                                           .toString()
@@ -234,19 +248,22 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                     state.selectedLine == null
                         ? '请选择要归还的领料明细行'
                         : '未归还数量：${UnifiedItem.formatQuantity(state.outstanding)}'
-                            '（默认回到原库位/原袋）',
+                              '（默认回到原库位/原袋）',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _quantity,
                     enabled: !state.isBusy && state.selectedLine != null,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: <TextInputFormatter>[
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
-                    onChanged: (value) =>
-                        ref.read(returnControllerProvider.notifier).setQuantity(value),
+                    onChanged: (value) => ref
+                        .read(returnControllerProvider.notifier)
+                        .setQuantity(value),
                     decoration: const InputDecoration(
                       labelText: '归还数量',
                       border: OutlineInputBorder(),
@@ -256,8 +273,9 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                   TextField(
                     controller: _note,
                     enabled: !state.isBusy,
-                    onChanged: (value) =>
-                        ref.read(returnControllerProvider.notifier).setNote(value),
+                    onChanged: (value) => ref
+                        .read(returnControllerProvider.notifier)
+                        .setNote(value),
                     decoration: const InputDecoration(
                       labelText: '备注（可选）',
                       border: OutlineInputBorder(),
@@ -270,8 +288,9 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
                     Text(
                       '归还数量不能超过尚未归还数量 '
                       '${UnifiedItem.formatQuantity(state.outstanding)}。',
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.colorScheme.error),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
                     ),
                   ],
                 ],
@@ -281,13 +300,17 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
           const SizedBox(height: 8),
 
           if (state.error != null) _Banner(message: state.error!, error: true),
-          if (state.notice != null && !state.succeeded) _Banner(message: state.notice!),
+          if (state.notice != null && !state.succeeded)
+            _Banner(message: state.notice!),
 
           FilledButton.icon(
             onPressed: state.isBusy ? null : _confirmAndSubmit,
             icon: state.submitting
                 ? const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.assignment_return_outlined),
             label: const Text('确认归还'),
           ),
@@ -297,8 +320,9 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
     );
   }
 
-  static String _format(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2);
+  static String _format(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(2);
 }
 
 class _ReturnResultCard extends ConsumerWidget {
@@ -342,14 +366,8 @@ class _Banner extends StatelessWidget {
   final bool error;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: error ? theme.colorScheme.errorContainer : theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(message, style: theme.textTheme.bodySmall),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusBanner(
+    message: message,
+    tone: error ? StatusTone.error : StatusTone.notice,
+  );
 }

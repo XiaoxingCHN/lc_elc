@@ -1,27 +1,25 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// A bounded frosted surface: blur is restricted to the toolbar, never the list.
+import '../ui/glass/glass_chrome.dart';
+import '../ui/glass/glass_theme.dart';
+
+// The glass design system lives in lib/ui/glass/. Re-exported here so screens
+// keep a single import for chrome, surfaces, controls and tokens.
+export '../ui/glass/glass_chrome.dart';
+export '../ui/glass/glass_controls.dart';
+export '../ui/glass/glass_surface.dart';
+export '../ui/glass/glass_theme.dart';
+export '../ui/glass/glass_tokens.dart';
+
+/// The app bar's glass. Kept as its own widget (and its own type) because the
+/// navigation tests assert on it; the blur itself lives in [GlassSurface].
 class LabGlassSurface extends StatelessWidget {
   const LabGlassSurface({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    final contrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: contrast ? 0 : 18, sigmaY: contrast ? 0 : 18),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: contrast ? 1 : .76),
-            border: const Border(bottom: BorderSide(color: Color(0x99FFFFFF))),
-          ),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const GlassAppBarSurface();
 }
 
 class LabBackButton extends StatelessWidget {
@@ -37,6 +35,7 @@ class LabBackButton extends StatelessWidget {
       router.go(fallbackLocation);
     }
   }
+
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: '返回',
@@ -45,24 +44,47 @@ class LabBackButton extends StatelessWidget {
   );
 }
 
+/// Per-screen app bar on glass.
+///
+/// There is deliberately no global navigation shell in this app: fifteen
+/// screens build their own bar, and restyling this one widget is what changes
+/// all of them. `flexibleSpace` must stay a [LabGlassSurface] instance.
 class LabAppBar extends AppBar {
-  LabAppBar({super.key, super.title, super.actions, Widget? leading,
-    super.automaticallyImplyLeading, super.centerTitle, super.bottom,
-    super.toolbarHeight, super.leadingWidth, String? fallbackLocation})
-    : super(
-        leading: leading ?? (fallbackLocation == null ? null : LabBackButton(fallbackLocation: fallbackLocation)),
-        flexibleSpace: const LabGlassSurface(),
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-      );
+  LabAppBar({
+    super.key,
+    super.title,
+    super.actions,
+    Widget? leading,
+    super.automaticallyImplyLeading,
+    super.centerTitle,
+    super.bottom,
+    super.toolbarHeight,
+    super.leadingWidth,
+    String? fallbackLocation,
+  }) : super(
+         leading:
+             leading ??
+             (fallbackLocation == null
+                 ? null
+                 : LabBackButton(fallbackLocation: fallbackLocation)),
+         flexibleSpace: const LabGlassSurface(),
+         backgroundColor: Colors.transparent,
+         surfaceTintColor: Colors.transparent,
+         elevation: 0,
+         scrolledUnderElevation: 0,
+       );
 }
 
 /// A directly opened business page must also respond to Android system Back.
 class LabPageFrame extends StatelessWidget {
-  const LabPageFrame({super.key, required this.child, this.fallbackLocation = '/catalog'});
+  const LabPageFrame({
+    super.key,
+    required this.child,
+    this.fallbackLocation = '/catalog',
+  });
   final Widget child;
   final String fallbackLocation;
+
   @override
   Widget build(BuildContext context) {
     final router = GoRouter.maybeOf(context);
@@ -76,40 +98,23 @@ class LabPageFrame extends StatelessWidget {
   }
 }
 
+/// Theme entry points kept for the existing screens and tests.
+///
+/// [dark] is what the app ships; [light] stays complete so a screen pumped
+/// under a light theme still renders with readable tokens.
 class LabTheme {
+  /// Compatibility constant for callers that paint their own page background
+  /// (the router tests do). It mirrors `GlassPalette.dark`; the live background
+  /// is [GlassBackdrop], which also carries the light sources.
   static const background = BoxDecoration(
-    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-      colors: [Color(0xFFEAF2FF), Color(0xFFF6F5FB), Color(0xFFE7F3F1)]),
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF070809), Color(0xFF0B0D10), Color(0xFF0A1410)],
+    ),
   );
-  static ThemeData get light {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF007AFF),
-      surface: const Color(0xFFF8FAFE), brightness: Brightness.light);
-    final radius = BorderRadius.circular(16);
-    return ThemeData(
-      useMaterial3: true, colorScheme: scheme,
-      scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(foregroundColor: Color(0xFF18263B),
-        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF18263B)),
-        centerTitle: false),
-      cardTheme: CardThemeData(color: const Color(0xEFFFFFFF), elevation: 0,
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: Color(0xCCFFFFFF)))),
-      inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: const Color(0xDCFFFFFF),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: Color(0xFFD8E2EF))),
-        enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: Color(0xFFD8E2EF)))),
-      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: radius), minimumSize: const Size(44,44))),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: radius), elevation: 0, minimumSize: const Size(44,44))),
-      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: radius), minimumSize: const Size(44,44))),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: scheme.primary, foregroundColor: Colors.white, elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22))),
-      dividerTheme: const DividerThemeData(color: Color(0xFFE1E7EF)),
-      drawerTheme: const DrawerThemeData(backgroundColor: Color(0xF5F8FAFF)),
-    );
-  }
+
+  static ThemeData get light => buildGlassTheme(Brightness.light);
+
+  static ThemeData get dark => buildGlassTheme(Brightness.dark);
 }

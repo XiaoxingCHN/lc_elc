@@ -39,3 +39,17 @@
 ## 本机 TOMC 记忆
 
 本机可选项目笔记位于 `.tomc/memory.sqlite3`，整个 `.tomc/` 已排除 Git。使用已安装 TOMC 的原生 notebook 存储；运行 `python .tomc/memory.py list`，按实际任务用 `recall <name> <task>` 读取。使用和来源说明见 `.tomc/README.md`；若该目录不存在，直接按上述权威文档接手，无需阻塞维护。记忆是有日期的文档快照，不替代最新源码/登记表，不扩大生产授权。只显式保存已授权项目资料，不自动收集当前对话或任何凭据。
+
+## Agent skills
+
+### Issue tracker
+
+任务单以 `maintenance/tasks/` 下的 Markdown 文件为准，模板为 `maintenance/templates/TASK.md`。See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+使用默认的五个 triage 状态角色，记录在任务文件顶部的 `- Status:` 行。See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context：根目录 `GLOSSARY.md` + `docs/adr/`。See `docs/agents/domain.md`.

@@ -28,7 +28,9 @@ class LabPendingReceiptController(http.Controller):
     @http.route(API + '/inventory/pending/list', type='jsonrpc', auth='user', methods=POST, csrf=False)
     @envelope
     def pending_list(self, **kwargs):
-        return request.env['lab.workflow.common'].lab_pending_list(params().get('cursor'))
+        data = params()
+        return request.env['lab.workflow.common'].lab_pending_list(
+            data.get('cursor'), data.get('query'), data.get('state'))
 
     @http.route(API + '/inventory/pending/create', type='jsonrpc', auth='user', methods=POST, csrf=False)
     @envelope

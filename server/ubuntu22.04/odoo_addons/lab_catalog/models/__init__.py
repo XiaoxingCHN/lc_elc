@@ -4,4 +4,5 @@ from . import lab_catalog_item
 from . import lab_catalog_param
 from . import lab_catalog_binding
 from . import lab_catalog_import_run
+from . import lab_catalog_fetch
 from . import product_template

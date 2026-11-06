@@ -47,6 +47,24 @@ except ImportError:  # pragma: no cover
 MARKET_CN = 'cn'
 BATCH = 500
 
+
+def _load_param_search():
+    """Load the shared Odoo-free helper without importing the Odoo addon."""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.abspath(os.path.join(
+        here, '..', '..', 'lab_inventory', 'tools', 'param_search.py'))
+    spec = importlib.util.spec_from_file_location('lc_param_search', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError('cannot load param_search.py: %s' % path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_param_search = _load_param_search()
+build_search_params = _param_search.build_search_params
+
 # ---------------------------------------------------------------- identity
 _CATALOG_RE = re.compile(r'^C([0-9]+)$')
 
@@ -338,7 +356,7 @@ ITEM_COLUMNS = [
     'brand_code', 'package', 'category_id', 'category_name', 'category_path',
     'catalog_stock', 'price', 'currency', 'price_basis', 'image_url', 'has_image',
     'datasheet_url', 'has_datasheet', 'doc_files_json', 'param_count', 'search_text',
-    'fetched_at', 'source_fingerprint', 'import_run_id',
+    'search_params', 'fetched_at', 'source_fingerprint', 'import_run_id',
     # 注意：hs_rank / lab_quantity / lab_available_quantity / bound_template_count / has_stock
     # 已从模型删除（库存改为请求时实时聚合）。导入列必须与模型一致，否则
     # INSERT 会报 UndefinedColumn 并且整批失败。
@@ -361,7 +379,7 @@ def create_temp_tables(cur):
             category_id int, category_name text, category_path text,
             catalog_stock int, price numeric, currency text, price_basis text,
             image_url text, has_image boolean, datasheet_url text, has_datasheet boolean,
-            doc_files_json text, param_count int, search_text text,
+            doc_files_json text, param_count int, search_text text, search_params text,
             fetched_at timestamptz, source_fingerprint text, import_run_id int,
             create_uid int, create_date timestamptz, write_uid int, write_date timestamptz
         ) ON COMMIT PRESERVE ROWS
@@ -396,8 +414,9 @@ def upsert_batch(cur, items, params_map):
     cur.copy_expert('COPY tmp_item (catalog_code, market, product_id_ext, source_url, name, mpn, brand,'
                     ' brand_code, package, category_id, category_name, category_path, catalog_stock,'
                     ' price, currency, price_basis, image_url, has_image, datasheet_url, has_datasheet,'
-                    ' doc_files_json, param_count, search_text, fetched_at, source_fingerprint,'
-                    ' import_run_id, create_uid, create_date, write_uid, write_date)'
+                    ' doc_files_json, param_count, search_text, search_params, fetched_at,'
+                    ' source_fingerprint, import_run_id, create_uid, create_date, write_uid,'
+                    ' write_date)'
                     ' FROM STDIN', io.StringIO(buf))
 
     cur.execute("""
@@ -405,13 +424,13 @@ def upsert_batch(cur, items, params_map):
           (catalog_code, market, product_id_ext, source_url, name, mpn, brand, brand_code,
            package, category_id, category_name, category_path, catalog_stock, price, currency,
            price_basis, image_url, has_image, datasheet_url, has_datasheet, doc_files_json,
-           param_count, search_text, fetched_at, source_fingerprint, import_run_id,
+           param_count, search_text, search_params, fetched_at, source_fingerprint, import_run_id,
            create_uid, create_date, write_uid, write_date)
         SELECT catalog_code, market, product_id_ext, source_url, name, mpn, brand, brand_code,
                package, category_id, category_name, category_path, catalog_stock, price, currency,
                price_basis, image_url, has_image, datasheet_url, has_datasheet, doc_files_json,
-               param_count, search_text, fetched_at, source_fingerprint, import_run_id,
-               create_uid, create_date, write_uid, write_date
+               param_count, search_text, search_params, fetched_at, source_fingerprint,
+               import_run_id, create_uid, create_date, write_uid, write_date
         FROM tmp_item
         ON CONFLICT (catalog_code, market) DO UPDATE SET
           product_id_ext=EXCLUDED.product_id_ext, source_url=EXCLUDED.source_url,
@@ -425,7 +444,8 @@ def upsert_batch(cur, items, params_map):
           datasheet_url=COALESCE(EXCLUDED.datasheet_url, lab_catalog_item.datasheet_url),
           has_datasheet=EXCLUDED.has_datasheet,
           doc_files_json=EXCLUDED.doc_files_json, param_count=EXCLUDED.param_count,
-          search_text=EXCLUDED.search_text, fetched_at=EXCLUDED.fetched_at,
+          search_text=EXCLUDED.search_text, search_params=EXCLUDED.search_params,
+          fetched_at=EXCLUDED.fetched_at,
           source_fingerprint=EXCLUDED.source_fingerprint, write_uid=EXCLUDED.write_uid,
           write_date=EXCLUDED.write_date
     """)
@@ -664,6 +684,7 @@ def main():
                 len(params),
                 search_text_of(norm, obj.get('name'), obj.get('mpn'), obj.get('brand'),
                                obj.get('category'), obj.get('package')),
+                build_search_params(params),
                 fetched_at, fp, run_id, 1, datetime.now(timezone.utc),
                 1, datetime.now(timezone.utc),
             ])
@@ -697,6 +718,25 @@ def main():
                  'state=%s seen=%s written=%s skipped=%s failed=%s' %
                  (state, seen, written, skipped, failed), run_id))
     pg.commit()
+
+    # A full successful run has written every search_params field.  Mark the
+    # derived index ready so the API/UI no longer shows the fallback warning.
+    cur.execute("SELECT count(*) FROM lab_catalog_item "
+                "WHERE market = %s AND search_params IS NULL", (MARKET_CN,))
+    missing_params = cur.fetchone()[0]
+    if state == 'done' and not args.limit and missing_params == 0:
+        cur.execute("""
+            INSERT INTO ir_config_parameter
+              (key, value, create_uid, create_date, write_uid, write_date)
+            VALUES ('lab_catalog.param_index_state', 'ready', 1, now(), 1, now())
+            ON CONFLICT (key) DO UPDATE
+               SET value = EXCLUDED.value, write_uid = EXCLUDED.write_uid,
+                   write_date = EXCLUDED.write_date
+        """)
+        pg.commit()
+    elif missing_params:
+        print('   参数检索未就绪：%d 行缺少 search_params；请运行 '
+              'backfill_search_params.py' % missing_params)
 
     print('== 完成（state=%s） ==' % state)
     print('   扫描 %d  写入 %d  跳过 %d  失败 %d  用时 %.1fs'

@@ -62,6 +62,9 @@
     locations: [],
     selected: null,        // {raw, item_key, product_template_id, name, mpn, package, sn, candidates}
     pending: [],
+    pendingTotal: 0,
+    pendingQuery: '',
+    pendingState: 'pending',
     cursor: null,
     confirm: null,         // {record, recommendations}
     lastBagId: null,
@@ -384,23 +387,43 @@
   }
 
   /* ------------------------------------------------------------------ 待入库袋列表 */
+  var pendingSeq = 0;
+
   function loadPending(reset) {
+    var mySeq = ++pendingSeq;
     areaLoading('pending', true);
     areaError('pending', '');
-    var params = {};
+    var params = { query: state.pendingQuery, state: state.pendingState };
     if (!reset && state.cursor) params.cursor = state.cursor;
     LC.rpc('pendingList', params).then(function (data) {
+      if (mySeq !== pendingSeq) return;
       areaLoading('pending', false);
       var records = (data && data.records) || [];
       if (reset || !state.cursor) state.pending = records;
       else state.pending = state.pending.concat(records);
       state.cursor = (data && data.cursor) || null;
+      state.pendingTotal = data && typeof data.total === 'number'
+        ? data.total : state.pending.length;
       renderPending();
     }).catch(function (err) {
+      if (mySeq !== pendingSeq) return;
       areaLoading('pending', false);
       areaError('pending', '待入库袋加载失败：' + LC.errorText(err));
       showError(err, function () { loadPending(reset); });
     });
+  }
+
+  function wirePendingFilters() {
+    var input = q('data-lc-field', 'pending_query');
+    var select = q('data-lc-field', 'pending_state');
+    var apply = LC.debounce(function () {
+      state.pendingQuery = input ? String(input.value || '').trim() : '';
+      state.pendingState = select ? String(select.value || 'pending') : 'pending';
+      state.cursor = null;
+      loadPending(true);
+    }, 250);
+    if (input) input.addEventListener('input', apply);
+    if (select) select.addEventListener('change', apply);
   }
 
   function stateBadge(record) {
@@ -499,10 +522,7 @@
     LC.show(q('data-lc-action', 'pending-more'), !!state.cursor);
     var count = q('data-lc-count', 'pending');
     if (count) {
-      var pendingCount = state.pending.filter(function (record) {
-        return record.state === 'pending';
-      }).length;
-      count.textContent = '共 ' + state.pending.length + ' 条（待入库 ' + pendingCount + ' 条）';
+      count.textContent = '共 ' + state.pendingTotal + ' 条';
     }
   }
 
@@ -1629,6 +1649,15 @@
       : '';
   }
 
+  function showParamIndexHint(on) {
+    var hint = q('data-lc-slot', 'param-index');
+    if (!hint) return;
+    hint.hidden = !on;
+    hint.textContent = on
+      ? '参数索引尚未就绪：当前只能按名称/型号等身份字段搜索，参数值可能暂时搜不到；请联系管理员运行回填。'
+      : '';
+  }
+
   function wireItemSearch(root) {
     var input = q('data-lc-field', 'item_key');
     if (!input || !LC.combobox) return null;
@@ -1646,6 +1675,11 @@
       debounceMs: 250,
       maxInflight: 2,          // 候选请求最多 2 个在途，其余只留最新待发
       retryText: '重试检索',
+      viewAllLabel: '查看全部结果',
+      viewAllHref: function (text) {
+        var bare = String(text || '').trim().replace(/^lcsc\s*:\s*/i, '');
+        return (LC.urls.lab || '/team/lab') + '?q=' + encodeURIComponent(bare);
+      },
       disabled: function () {
         return !canReceipt() || state.searchDenied || !!state.locks.create;
       },
@@ -1668,6 +1702,7 @@
         var bare = text.replace(/^lcsc\s*:\s*/i, '');
         return LC.rpc('catalogSearch', { query: bare, limit: 8 },
           { timeoutMs: 8000 }).then(function (data) {
+          showParamIndexHint(!!(data && data.param_index_ready === false));
           return (data && data.items) || [];
         });
       },
@@ -1767,6 +1802,7 @@
     wireMaterialCreateForm(root);
     wireConfirmForm(root);
     wireActions(root, activateTab);
+    wirePendingFilters();
     wireScanInput(root);
     wireItemSearch(root);
 

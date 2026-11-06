@@ -68,6 +68,17 @@ class OdooConfig {
     return value.startsWith('http://') || value.startsWith('https://');
   }
 
+  /// True when the build baked in a server address, so the login form can hide
+  /// the address field and the operator only types account + password.
+  ///
+  /// The value still comes from `--dart-define=LAB_ODOO_URL=...`; nothing is
+  /// hard-coded in source, so one build can target the LAN and another a
+  /// public address without touching code.
+  static bool get hasFixedServer => defaultBaseUrl.trim().isNotEmpty;
+
+  /// Same for the database name (`--dart-define=LAB_ODOO_DB=...`).
+  static bool get hasFixedDatabase => defaultDatabase.trim().isNotEmpty;
+
   // ---------------------------------------------------------------------------
   // "Remember login" policy
   // ---------------------------------------------------------------------------

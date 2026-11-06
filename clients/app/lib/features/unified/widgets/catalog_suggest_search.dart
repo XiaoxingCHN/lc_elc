@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../../widgets/lab_ui.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,7 +236,7 @@ class CatalogSuggestField extends ConsumerStatefulWidget {
     this.onQueryChanged,
     this.enabled = true,
     this.label = '搜索并选择器件',
-    this.hintText = 'C 编号 / 型号 / 名称',
+    this.hintText = 'C 编号 / 型号 / 名称 / 参数（如 10R）',
     this.helperText,
     this.autofocus = false,
     this.minQueryLength = 2,
@@ -590,7 +592,6 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
               helperMaxLines: 2,
               prefixIcon: const Icon(Icons.search),
               filled: true,
-              fillColor: scheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: scheme.outlineVariant),
@@ -622,13 +623,11 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
       return const SizedBox.shrink();
     }
     final theme = Theme.of(overlayContext);
-    final scheme = theme.colorScheme;
     final radius = BorderRadius.circular(12);
-    final panel = Material(
-      elevation: 8,
+    final panel = GlassSurface(
+      blur: GlassTokens.ofContext(overlayContext).blurOverlay,
       borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      color: scheme.surfaceContainerHigh,
+      padding: EdgeInsets.zero,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minWidth: _anchorWidth,
@@ -690,7 +689,11 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
             children: <Widget>[
               Text('没有匹配的器件', style: theme.textTheme.titleSmall),
               const SizedBox(height: 4),
-              Text('可以继续用编号 / SN 扫码，或新建器件。', style: theme.textTheme.bodySmall),
+              Text(
+                '可以换关键词，或按参数搜：10R = 10Ω、4R7 = 4.7Ω、100nF = 0.1uF；'
+                '也可以继续扫码或新建器件。',
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           ),
         );

@@ -16,6 +16,12 @@
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
+from ..tools.param_search import build_search_specs
+
+import logging
+
+_logger = logging.getLogger(__name__)
+
 # SN 序列标识（ir.sequence）
 SN_SEQUENCE_CODE = 'lab.component.sn'
 
@@ -60,8 +66,31 @@ class ProductTemplate(models.Model):
     lab_specifications = fields.Text(
         string='规格参数 (JSON)',
         help='键值对 JSON 字符串，例如 {"阻值": "270Ω", "精度": "±1%"}')
+    lab_search_specs = fields.Text(
+        string='参数检索文本', compute='_compute_lab_search_specs', store=True,
+        help='由规格参数归一化得到的只读检索文本；不可手工编辑。')
     lab_datasheet_url = fields.Char(string='数据手册链接')
     lab_source_url = fields.Char(string='来源链接')
+
+    @api.depends('lab_specifications')
+    def _compute_lab_search_specs(self):
+        for rec in self:
+            rec.lab_search_specs = build_search_specs(rec.lab_specifications or '')
+
+    def init(self):
+        """Create the optional trigram index without breaking an installation."""
+        cr = self.env.cr
+        cr.execute('SAVEPOINT lc_inv_trgm')
+        try:
+            cr.execute('CREATE EXTENSION IF NOT EXISTS pg_trgm')
+            cr.execute(
+                'CREATE INDEX IF NOT EXISTS product_template_lab_search_specs_trgm_idx '
+                'ON product_template USING gin (lab_search_specs gin_trgm_ops)')
+            cr.execute('RELEASE SAVEPOINT lc_inv_trgm')
+            _logger.info('lab_inventory: product_template trigram index ready')
+        except Exception as exc:
+            cr.execute('ROLLBACK TO SAVEPOINT lc_inv_trgm')
+            _logger.warning('lab_inventory: trigram index skipped: %s', exc)
 
     @api.constrains('lab_sn')
     def _check_lab_sn_unique(self):

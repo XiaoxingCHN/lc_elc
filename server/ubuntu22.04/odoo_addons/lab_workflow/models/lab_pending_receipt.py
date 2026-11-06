@@ -4,6 +4,7 @@ import json
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
+from odoo.addons.lab_inventory.tools.param_search import search_tokens
 from psycopg2 import errors as pg_errors
 
 from ..tools import inventory_codec
@@ -145,14 +146,37 @@ class LabPendingReceiptService(models.AbstractModel):
 
     @api.model
     @internal_only
-    def lab_pending_list(self, cursor=None):
-        domain = [('owner_id', '=', self.env.uid), ('company_id', '=', self.env.company.id)]
+    def lab_pending_list(self, cursor=None, query=None, state=None):
+        """List the caller's pending bags with optional keyword/state filters.
+
+        ``state`` is optional for backward compatibility: old clients that do
+        not send it keep seeing every state (the previous behavior).  The Web
+        page explicitly sends ``pending`` unless the user changes the filter.
+        """
+        domain = [('owner_id', '=', self.env.uid),
+                  ('company_id', '=', self.env.company.id)]
+        for token in search_tokens(query):
+            leaves = [
+                ('trace_code', 'ilike', token),
+                ('product_tmpl_id.name', 'ilike', token),
+                ('product_tmpl_id.lab_mpn', 'ilike', token),
+                ('product_tmpl_id.lab_package', 'ilike', token),
+                ('product_tmpl_id.lab_sn', 'ilike', token),
+            ]
+            domain += ['|'] * (len(leaves) - 1) + leaves
+        state = str(state or '').strip().lower()
+        if state and state != 'all':
+            if state not in ('pending', 'done', 'cancelled'):
+                raise LabApiError.validation('不支持的待入库状态。')
+            domain.append(('state', '=', state))
+        total = self.env['lab.pending.receipt'].search_count(domain)
         if cursor:
             domain.append(('id', '<', int(cursor)))
         records = self.env['lab.pending.receipt'].search(domain, limit=101)
         page = records[:100]
         return {'records': [r._lab_pending_dict() for r in page],
-                'cursor': page[-1].id if len(records) > 100 else None}
+                'cursor': page[-1].id if len(records) > 100 else None,
+                'total': total}
 
     @api.model
     @internal_only

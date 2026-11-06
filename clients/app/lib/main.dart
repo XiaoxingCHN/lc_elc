@@ -1,5 +1,3 @@
-import 'widgets/lab_ui.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,8 +6,9 @@ import 'features/unified/providers/unified_providers.dart';
 import 'providers/auth_provider.dart';
 import 'routes/app_router.dart';
 import 'services/odoo_client.dart';
-import 'updates/update_ui.dart';
 import 'updates/desktop_update.dart';
+import 'updates/update_ui.dart';
+import 'widgets/lab_ui.dart';
 
 void main() {
   // Bindings first: the secure-storage plugin (remembered login) is used from
@@ -42,7 +41,7 @@ void main() {
 }
 
 class MyApp extends ConsumerWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,9 +49,12 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: '实验室库存系统',
+      // Dark is the shipped look; the complete light theme also supports the
+      // widget-test fallback. UpdateHost must remain inside the glass backdrop.
       theme: LabTheme.light,
-      builder: (context, child) => DecoratedBox(
-        decoration: LabTheme.background,
+      darkTheme: LabTheme.dark,
+      themeMode: ThemeMode.dark,
+      builder: (context, child) => GlassBackdrop(
         child: UpdateHost(child: child ?? const SizedBox.shrink()),
       ),
       routerConfig: router,

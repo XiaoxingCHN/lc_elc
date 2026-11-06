@@ -119,6 +119,12 @@ class LabCatalogBinding(models.Model):
                 records |= payload
             else:
                 records |= super(LabCatalogBinding, self).create(payload)
+        # 绑定即带入资料库事实：品牌/型号/封装/参数/占位名称。
+        # 幂等分支也走一遍 —— 档案之前可能就绑定过但字段仍是空的。
+        for binding in records:
+            template = binding.product_template_id
+            if template:
+                template._lab_apply_catalog_facts(binding.catalog_code)
         # 绑定成功后刷新库存版本，供界面失效缓存。
         # 走**私有**方法：绑定是普通操作员的合法动作，不能要求 manager。
         self.env['lab.catalog.item']._touch_inventory_revision()

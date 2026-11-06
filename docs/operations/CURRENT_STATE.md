@@ -1,5 +1,36 @@
 # 当前状态与已知限制
 
+## 2026-11-06 器件库按需抓取源码候选（未部署/未冻结）
+
+- **版本与边界**：`lab_catalog 19.0.2.0.9 → 19.0.2.0.10`（`components.json` 已同步）；客户端源码变更但版本仍为 `1.2.0+7`。未升级模块、未注册 `ir.cron`、未建表、未部署、未冻结 source manifest、未提交/推送。
+- **服务端**：`lab_catalog/tools/lcsc_remote.py` 用固定域名（`wmsc.lcsc.com`、`item.szlcsc.com`）完成 C 码/精确 MPN 取数，中文字段全部来自中文详情页；`lab.catalog.fetch.request` 状态机 + 部分唯一索引去重 + advisory lock 串行的每分钟 cron（2 条）；`/lab/api/catalog/search` 空结果返回 `fetch_suggestion`，新增 `/lab/api/catalog/fetch`、`/fetch_status`；只写 `lab.catalog.item/param` 与供应商库存，不写产品/quant/move。
+- **客户端**：空结果页“立即从立创商城抓取”，1 秒轮询最多 60 次，成功自动刷新；多候选必须人工选择；失败显示中文原因可重试；换查询取消轮询。
+- **实际验证**：`flutter test --no-pub` exit 0，**326 passed / 5 skipped / 0 failed**（基线 319/5）；`flutter analyze --no-pub lib test` exit 1，**0 error / 0 warning / 120 info**；`test_lcsc_remote.py` 15/15。`python tools/repo_check.py` exit 1，50 项通过，错误为本轮未冻结的 `frozen-source:client`（4 文件）与 `frozen-source:server`（13 文件），16 条 payload 警告为既有缺口；`generate_routes.py` 重新生成 `routes.json`（94 条）后 `--check` exit 0，`git diff --check` exit 0。
+- **未验证**：Odoo/PostgreSQL 测试库 ORM 用例、真实网络端到端（三个目标料号）、Flutter widget 测试、真实生产环境。
+- **交接**：[按需抓取实施记录](../../maintenance/handoffs/2026-11-06-catalog-on-demand-fetch.md)。
+
+## 2026-11-06 Flutter Liquid Glass 源码候选（未发布/未部署）
+
+- **版本与边界**：客户端 `1.1.3+6 → 1.2.0+7`，`pubspec.yaml` 与 `components.json` 已同步；默认深色玻璃 + 荧光绿。保留路由、文案、登录记忆、参数搜索、待入库服务端筛选与库存语义；零新增 pub 依赖。未构建、签名或发布安装包，未生产部署、未推送。
+- **设计系统**：`lib/ui/glass/` 提供 tokens/surface/chrome/controls/theme；`lab_ui.dart` 保持兼容。只有 `GlassSurface` 创建 `BackdropFilter`，真实模糊限于 chrome/抽屉/建议/浮层，内容卡片与 `GlassPanel` 默认无模糊。修复 prominent 的 accent/onAccent 配对、默认面板过度模糊、更新宿主接入回归。Material 主操作通过统一主题呈现，不机械替换全部按钮。
+- **业务屏**：登录、器件库、详情、收/领/还、标签、离线与两阶段入库接入视觉层；`StatusBanner` 统一图标+文字状态。待入库服务端 query/state、去抖与慢响应序号保护不变；A4 预览白底黑字。Flutter 材质是近似实现，不声称具备原生真实折射。
+- **实际验证**：Flutter 3.47.7 / Dart 3.13.5，`flutter analyze --no-pub lib test` exit 1，**0 error / 0 warning / 118 info**；`flutter test --no-pub --reporter compact` exit 0，**319 passed / 5 skipped / 0 failed**。6 张深色离屏 PNG（登录、1280 器件库、详情、入库准备/扫码、A4）已逐张检查，无溢出；320/1280 × 深/浅 × 200% 文本与 prominent/高对比度/减少动效由 widget 测试覆盖。
+- **冻结**：`maintenance/registry/source-client-liquid-glass-20261106.json`（177 文件，tree `a19e0ddf2f7cdba420ae7605763c40926c3745d3ab5de60387c8aab7da1d0e4e`，清单 SHA256 `930b53e17d189a0b5ab1fb1a507aa74ce7d2be7c57d1cad91892f07486c6b11c`），已 `--activate`，旧清单未改写。
+- **仓库检查**：`generate_routes.py --check` exit 0（92 条既有路由），`git diff --check` exit 0。`python tools/repo_check.py` exit 1，51 项通过，**唯一错误 `frozen-source:server`**：9 个已登记服务端文件（catalog `19.0.2.0.9`、workflow `19.0.2.0.2` 相关工作区源码）晚于 active r2；客户端冻结通过。16 条离线载荷警告为既有缺口，`--verify-payloads` 未执行。该服务端差异不属于本轮 UI，不能记作已冻结/已部署。
+- **未验证**：三端真机、profile 滚动性能、真实触控、读屏、摄像头/扫码枪、OS 安全存储、实体打印；PNG 为离屏证据，不代表这些项目通过。
+- **交接**：[Flutter Liquid Glass](../../maintenance/handoffs/2026-11-06-client-liquid-glass.md)。
+
+## 2026-11-04 入库参数关键词搜索（已部署；真实浏览器验收待做）
+
+- **性质**：分支 `feat/receipt-param-search`（从 `main` `c808065` 切出）上的源码候选；**未提交、未推送**。生产已于 **2026-11-04T12:59–13:09Z** 从 r3 升级到本候选。
+- **版本（生产已 installed）**：`lab_inventory 19.0.1.1.0`、`lab_catalog 19.0.2.0.6`、`lab_workflow 19.0.2.0.1`、`lab_team_web 19.0.1.2.1`；`components.json` 已同步，client/eda/theme/site 不变。
+- **已实现**：共享参数选取/归一化（含 `10Ω = 10R`、`4.7Ω = 4R7`、`0.1Ω = R1`、`4k7`、`1k5`、`100nF = 0.1uF`）；`product.template.lab_search_specs` 与迁移回填；`lab.catalog.item.search_params`、参数行增量重算、导入器写入与独立回填脚本；检索空白分词 AND（身份字段 + 参数文本），保留本地有货优先排序；`/lab/api/catalog/search` 响应新增 `param_index_ready`；待入库队列 query/state/total；Web 队列筛选、"共 N 条"、combobox "查看全部结果"、索引未就绪提示。
+- **生产部署**：四模块 `-u lab_inventory,lab_catalog,lab_workflow,lab_team_web` 退出码 0、0 条 ERROR/CRITICAL/Traceback；`odoo.service active`；`/web/login` 返回 303 → `/web/database/selector`（带 cookie 跟随后最终 200 登录页，不是故障）；`lab_team_web` 静态 JS 200（75,312 B）且含 `pendingTotal`/`viewAllLabel`。参数回填 **695,217/695,217**，`lab_catalog.param_index_state=ready`；回填日志 0 条 Traceback/ERROR/CRITICAL。
+- **备份/回滚**：`/opt/odoo/backups/20261104T125944Z-before-upgrade/`（`db.dump` 110,948,317 B / `2c8bd939…810794`；`filestore.tar.gz` 12,819,190 B / `c180ca54…c929f`）；旧四模块源码在同目录 `module-source-before-upgrade/`，回滚工具在 `deploy-tools/`。升级/回填日志 `param-search-upgrade-20261104T125944Z.log`、`param-search-backfill-20261104T130525Z.log`。
+- **测试（真实执行）**：纯归一化 8/8、combobox 21/21、workflow_core 19/19、`py_compile` OK、`git diff --check` 0；生产升级与回填日志如上。**未执行**：Odoo ORM/HttpCase（本工作区无可用 Odoo/PostgreSQL 测试实例）、真实浏览器 `10R`/`4R7`/`R1`/`100nF`/`0.1uF` 搜索、待入库队列筛选、Flutter。新增 ORM 与队列用例已写入但未运行，不能记作通过。
+- **冻结与检查**：新建并激活 `maintenance/registry/source-server-param-search-20261104-r2.json`（264 文件，tree_sha256 `503e278221851fa129351bae12e95b6da5a8eeb5192d4e8ab2e5907c270ab378`，清单 sha256 `485c93c2ca3d1543bf8bb8838acb538f24c0a6f23ae4b68418cd4c8f3410b86a`）；r1 与旧 r3 清单未改写。`repo_check` = 51 项通过 / exit 1，唯一错误为既有 `frozen-source:client`（`clients/app/t.obj` 缺失），16 条 payload 警告为既有离线载荷缺口；`generate_routes.py --check` = 0。
+- **未做/风险**：目录导入、真实业务写、Flutter 回归未做；短 token（如 `1%`）误命中未在真实库评估；本地档案仅 2 条占位记录，`lab_specifications` 搜索不能宣称生产覆盖。标准 `server/ubuntu22.04/upgrade_modules.sh` 仍只升级三模块，且把 `/web/login` 的 303 判为失败；本次用四模块副本 + `finish_remote.sh` 完成，后续应修脚本以免重复手工收尾。
+
 ## 2026-11-03 P3 Web 生产部署完成（r3 → 生产 LcHardwareHouse；公网回归通过）
 
 - **结论**：r3 冻结候选已于 **2026-11-03 00:16–00:36Z** 部署到生产 `192.168.31.105`（DB `LcHardwareHouse`），

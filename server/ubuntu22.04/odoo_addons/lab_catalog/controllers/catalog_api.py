@@ -7,12 +7,20 @@
 """
 import json
 import logging
+from datetime import timedelta
 
 from odoo import fields, http
 from odoo.http import request
 
-from .envelope import (AMBIGUOUS_MATERIAL, CONFLICT, NOT_FOUND, VALIDATION_ERROR,
-                       LabApiError, api_route, as_int, require)
+from odoo.addons.lab_catalog.tools import lcsc_remote
+
+from .envelope import (AMBIGUOUS_MATERIAL, CONFLICT, FORBIDDEN, NOT_FOUND,
+                       RATE_LIMITED, VALIDATION_ERROR, LabApiError, api_route,
+                       as_int, require)
+
+FETCH_ACTIVE_STATES = ('queued', 'resolving', 'fetching')
+FETCH_ACTIVE_LIMIT = 5
+FETCH_HOURLY_LIMIT = 20
 
 
 def _default_categ_id(env):
@@ -46,6 +54,28 @@ def _default_categ_id(env):
 _logger = logging.getLogger(__name__)
 
 CATEGORY_LIMIT = 4000
+
+
+def _fetch_suggestion(params, clean_params, brands, packages, total):
+    """Offer an on-demand fetch only for an exact query with no other filters.
+
+    Filters would hide the fetched row anyway, and a fuzzy keyword cannot be
+    resolved deterministically - both cases return ``None``.
+    """
+    if total:
+        return None
+    if (params.get('category_id') or brands or packages or clean_params
+            or params.get('stock_only') or params.get('cursor')):
+        return None
+    kind, norm = lcsc_remote.normalize_query(params.get('query') or '')
+    if not kind:
+        return None
+    return {
+        'kind': kind,
+        'query': norm,
+        'can_fetch': True,
+        'message': '本地库尚未收录，可立即抓取。',
+    }
 
 
 class LabCatalogController(http.Controller):
@@ -83,9 +113,100 @@ class LabCatalogController(http.Controller):
             'items': items,
             'next_cursor': next_cursor,
             'total': total,
+            'param_index_ready': model.param_index_ready(),
             'inventory_revision': model._revision('inventory'),
             'catalog_revision': model._revision('catalog'),
+            'fetch_suggestion': _fetch_suggestion(
+                params, clean_params, brands, packages, total),
         }
+
+    # ------------------------------------------------------------------ fetch
+    @http.route('/lab/api/catalog/fetch', type='jsonrpc', auth='user', methods=['POST'])
+    @api_route
+    def catalog_fetch(self, params):
+        """入队一条按需抓取；只接受精确 C 编号或完整 MPN。
+
+        用户仍可选择候选：带 ``catalog_code`` 再次提交即可。
+        """
+        raw = (params.get('query') or '').strip()
+        selected = (params.get('catalog_code') or '').strip()
+        if selected:
+            kind, norm = lcsc_remote.normalize_query(selected)
+            if kind != 'c_code':
+                raise LabApiError(VALIDATION_ERROR, 'C 编号无效。',
+                                  {'catalog_code': 'invalid'})
+            raw = selected
+        else:
+            kind, norm = lcsc_remote.normalize_query(raw)
+        if not kind:
+            raise LabApiError(
+                VALIDATION_ERROR,
+                '请输入完整 C 编号（如 C32445874）或完整型号（如 TLV77333PDBVR）。',
+                {'query': 'not_exact'})
+
+        Item = request.env['lab.catalog.item']
+        if kind == 'c_code':
+            existing = Item.search([('catalog_code', '=', norm),
+                                    ('market', '=', 'cn')], limit=1)
+        else:
+            existing = Item.search([('mpn', '=ilike', norm),
+                                    ('market', '=', 'cn')], limit=1)
+        if existing:
+            return {
+                'request_id': None, 'state': 'done', 'query': raw,
+                'query_kind': kind,
+                'catalog_code': existing.catalog_code,
+                'item_key': 'lcsc:%s' % existing.catalog_code,
+                'message': '资料库已有该器件。', 'candidates': [],
+                'created_at': '', 'finished_at': '',
+            }
+
+        user = request.env.user
+        Fetch = request.env['lab.catalog.fetch.request'].sudo()
+        active = Fetch.search([('query_norm', '=', norm),
+                               ('state', 'in', FETCH_ACTIVE_STATES)], limit=1)
+        if active:
+            return active.status_payload()
+        if Fetch.search_count([('requested_by', '=', user.id),
+                               ('state', 'in', FETCH_ACTIVE_STATES)]) >= FETCH_ACTIVE_LIMIT:
+            raise LabApiError(RATE_LIMITED, '你有多个抓取任务正在进行，请稍后再试。',
+                              {'limit': 'active'})
+        since = fields.Datetime.to_string(
+            fields.Datetime.now() - timedelta(hours=1))
+        if Fetch.search_count([('requested_by', '=', user.id),
+                               ('create_date', '>=', since)]) >= FETCH_HOURLY_LIMIT:
+            raise LabApiError(RATE_LIMITED, '本小时抓取次数已达上限，请稍后再试。',
+                              {'limit': 'hourly'})
+        try:
+            with request.env.cr.savepoint():
+                record = Fetch.create({
+                    'query_raw': raw[:200],
+                    'query_norm': norm,
+                    'query_kind': kind,
+                    'requested_by': user.id,
+                })
+        except Exception:
+            # 并发提交违反活动唯一索引：复用已经创建的那一条。
+            record = Fetch.search([('query_norm', '=', norm),
+                                   ('state', 'in', FETCH_ACTIVE_STATES)], limit=1)
+            if not record:
+                raise
+        return record.status_payload()
+
+    @http.route('/lab/api/catalog/fetch_status', type='jsonrpc', auth='user',
+                methods=['POST'])
+    @api_route
+    def catalog_fetch_status(self, params):
+        request_id = as_int(params.get('request_id'), 'request_id', minimum=1)
+        require(request_id, 'request_id 不能为空。', {'request_id': 'required'})
+        record = request.env['lab.catalog.fetch.request'].sudo().browse(
+            request_id).exists()
+        if not record:
+            raise LabApiError(NOT_FOUND, '抓取任务不存在。',
+                              {'request_id': 'not_found'})
+        # 同一查询在库里只有一个活动任务（唯一索引），因此别的同事先提交时
+        # 这里必须能读到同一条：抓取的是公开商品资料，不含业务数据。
+        return record.status_payload()
 
     # ------------------------------------------------------------------ detail
     @http.route('/lab/api/catalog/detail', type='jsonrpc', auth='user', methods=['POST'])
@@ -236,6 +357,10 @@ class LabCatalogController(http.Controller):
                                    ('product_template_id', '=', tmpl.id)], limit=1):
                 Binding.create({'catalog_code': code, 'product_template_id': tmpl.id,
                                 'source': 'import'})
+            else:
+                # 绑定早已存在：照样把资料库事实补进仍为空的字段
+                # （只建绑定关系不补字段的话，标签仍然只有占位名称）。
+                tmpl._lab_apply_catalog_facts(code)
             request.env['lab.catalog.item']._touch_inventory_revision()
             return {
                 'product_template_id': tmpl.id,

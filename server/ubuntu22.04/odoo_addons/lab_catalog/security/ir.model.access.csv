@@ -8,5 +8,7 @@ access_lab_catalog_param_manager,lab.catalog.param manager,model_lab_catalog_par
 access_lab_catalog_category_manager,lab.catalog.category manager,model_lab_catalog_category,group_lab_catalog_manager,1,1,1,1
 access_lab_catalog_binding_manager,lab.catalog.binding manager,model_lab_catalog_binding,group_lab_catalog_manager,1,1,1,1
 access_lab_catalog_import_run_manager,lab.catalog.import.run manager,model_lab_catalog_import_run,group_lab_catalog_manager,1,1,1,1
+access_lab_catalog_fetch_user,lab.catalog.fetch.request user,model_lab_catalog_fetch_request,group_lab_catalog_user,1,0,0,0
+access_lab_catalog_fetch_manager,lab.catalog.fetch.request manager,model_lab_catalog_fetch_request,group_lab_catalog_manager,1,1,1,1
 access_product_template_lab_user,product.template for lab catalog user,product.model_product_template,group_lab_catalog_user,1,1,1,0
 access_product_product_lab_user,product.product for lab catalog user,product.model_product_product,group_lab_catalog_user,1,1,1,0

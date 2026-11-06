@@ -609,29 +609,49 @@ class LabWorkflowCommon(models.AbstractModel):
         """为 lcsc:Cxxx 建一个最小可用物料档案（可被 lab_catalog 后续补全）。
 
         * 只写必要字段：名称、C 编号、可库存、批次跟踪
+        * 资料库索引里已有该 C 编号时，同时带上名称/型号/品牌/封装/参数，
+          这样袋标签、库存卡片当场就有正确文字；索引缺失才落"待补全"占位
         * SN 由 lab_inventory 的 ``lab.component.sn`` 序列生成
         * 不伪造任何库存；库存仍然只能由真实入库移动产生
         """
         category = self.env.ref('product.product_category_all', raise_if_not_found=False)
+        # 事实取自 lab_catalog（绑定/建档/修复共用同一份来源）。
+        facts = self.env['product.template']._lab_catalog_facts(catalog_code)
         vals = {
-            'name': '立创物料 %s（待补全）' % catalog_code,
+            'name': facts.get('name') or '立创物料 %s（待补全）' % catalog_code,
             'type': 'consu',
             'is_storable': True,
             'tracking': 'lot',
             'lab_lcsc_code': catalog_code,
-            'lab_description': '由 lab_workflow 在%s时自动建立的最小档案，'
-                               '请到统一器件库补全型号/品牌/封装/参数。' % origin,
+            'lab_description': ('由 lab_workflow 在%s时按资料库自动建档。' % origin
+                                if facts else
+                                '由 lab_workflow 在%s时自动建立的最小档案，'
+                                '请到统一器件库补全型号/品牌/封装/参数。' % origin),
             'sale_ok': False,
             'purchase_ok': True,
         }
+        if facts.get('mpn'):
+            vals['lab_mpn'] = facts['mpn']
+        if facts.get('brand'):
+            vals['lab_brand'] = facts['brand']
+        if facts.get('package'):
+            vals['lab_package'] = facts['package']
+        if facts.get('datasheet_url'):
+            vals['lab_datasheet_url'] = facts['datasheet_url']
+        if facts.get('source_url'):
+            vals['lab_source_url'] = facts['source_url']
+        if facts.get('specifications'):
+            vals['lab_specifications'] = json.dumps(
+                facts['specifications'], ensure_ascii=False)
         if category:
             vals['categ_id'] = category.id
         # 建档属于系统内部维护动作：调用方已经在 @internal_only + 角色校验里把关，
         # 这里用 sudo 建最小档案，避免普通操作员必须拥有 product.template 建权限。
         template = self.env['product.template'].sudo().with_context(
             lab_workflow_autocreate=True).create(vals)
-        _logger.warning('lab_workflow: 为 %s 自动建立最小物料档案 id=%s（待 lab_catalog 补全）',
-                        catalog_code, template.id)
+        _logger.warning('lab_workflow: 为 %s 自动建立物料档案 id=%s（资料库事实：%s）',
+                        catalog_code, template.id,
+                        '已带入' if facts else '索引缺失，待补全')
         return template
 
     @api.model

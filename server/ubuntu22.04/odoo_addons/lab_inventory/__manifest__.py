@@ -1,6 +1,6 @@
 {
     'name': '实验室元器件库存扩展',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Inventory/Inventory',
     'summary': '实验室元器件库存管理：立创编号、库位类型、BOM 分配、类别→库位映射',
     'author': 'Lab',

@@ -25,21 +25,24 @@ class OfflineBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       width: double.infinity,
-      color: theme.colorScheme.tertiaryContainer,
+      color: scheme.tertiary.withValues(alpha: 0.14),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.cloud_off, size: 18),
+          Icon(Icons.cloud_off, size: 18, color: scheme.tertiary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               detail
                   ? '离线只读缓存资料：未登录服务器，不含库存、SN、库位与追溯记录。'
                   : '离线只读缓存资料：未登录服务器，仅显示曾浏览过的公开器件资料'
-                      '${entryCount == null ? '' : '（本机共 $entryCount 条）'}。库存相关操作不可用。',
-              style: theme.textTheme.labelSmall,
+                        '${entryCount == null ? '' : '（本机共 $entryCount 条）'}。库存相关操作不可用。',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -141,8 +144,10 @@ class _OfflineCatalogViewState extends ConsumerState<OfflineCatalogView> {
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: FilterChip(
-                            label: Text(option.display,
-                                style: const TextStyle(fontSize: 11)),
+                            label: Text(
+                              option.display,
+                              style: const TextStyle(fontSize: 11),
+                            ),
                             selected: query.brands.contains(option.value),
                             onSelected: (selected) {
                               final brands = Set<String>.of(query.brands);
@@ -159,8 +164,10 @@ class _OfflineCatalogViewState extends ConsumerState<OfflineCatalogView> {
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: FilterChip(
-                            label: Text(option.display,
-                                style: const TextStyle(fontSize: 11)),
+                            label: Text(
+                              option.display,
+                              style: const TextStyle(fontSize: 11),
+                            ),
                             selected: query.packages.contains(option.value),
                             onSelected: (selected) {
                               final packages = Set<String>.of(query.packages);
@@ -189,7 +196,8 @@ class _OfflineCatalogViewState extends ConsumerState<OfflineCatalogView> {
               if (page.totalAvailable == 0) {
                 return const EmptyView(
                   title: '本机还没有缓存资料',
-                  subtitle: '联网登录并浏览过器件后，本机会保存公开的器件资料'
+                  subtitle:
+                      '联网登录并浏览过器件后，本机会保存公开的器件资料'
                       '（图片、参数、手册），之后离线也能查看。',
                   icon: Icons.cloud_off_outlined,
                 );
@@ -224,11 +232,11 @@ class _OfflineCatalogViewState extends ConsumerState<OfflineCatalogView> {
                       padding: const EdgeInsets.all(8),
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 240,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        mainAxisExtent: 236,
-                      ),
+                            maxCrossAxisExtent: 240,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            mainAxisExtent: 236,
+                          ),
                       itemCount: page.items.length,
                       itemBuilder: (context, index) {
                         final item = page.items[index];
@@ -275,7 +283,8 @@ class OfflineItemDetailView extends ConsumerWidget {
             loading: () => const LoadingView(label: '正在读取本机缓存资料…'),
             error: (error, _) => ErrorView(
               message: '读取本机缓存失败：$error',
-              onRetry: () => ref.invalidate(offlineCatalogDetailProvider(itemKey)),
+              onRetry: () =>
+                  ref.invalidate(offlineCatalogDetailProvider(itemKey)),
             ),
             data: (detail) {
               final item = detail.item;
@@ -307,10 +316,15 @@ class OfflineItemDetailView extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
-                                Text(item.title, style: theme.textTheme.titleMedium),
+                                Text(
+                                  item.title,
+                                  style: theme.textTheme.titleMedium,
+                                ),
                                 if (item.subtitle.isNotEmpty)
-                                  Text(item.subtitle,
-                                      style: theme.textTheme.bodySmall),
+                                  Text(
+                                    item.subtitle,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
                                 const SizedBox(height: 6),
                                 Wrap(
                                   spacing: 6,
@@ -350,7 +364,9 @@ class OfflineItemDetailView extends ConsumerWidget {
                           else
                             for (final parameter in item.parameters)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 2,
+                                ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
@@ -358,9 +374,12 @@ class OfflineItemDetailView extends ConsumerWidget {
                                       width: 110,
                                       child: Text(
                                         parameter.label,
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
                                       ),
                                     ),
                                     Expanded(child: Text(parameter.value)),

@@ -12,6 +12,7 @@ import '../providers/inventory_providers.dart';
 import '../providers/unified_providers.dart';
 import '../unified_routes.dart';
 import '../widgets/item_picker.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
 
 /// 领料 (issue): pick the source bags and quantities, the 领用人 and the project.
@@ -36,7 +37,8 @@ class IssueScreen extends ConsumerStatefulWidget {
 class _IssueScreenState extends ConsumerState<IssueScreen> {
   final TextEditingController _project = TextEditingController();
   final TextEditingController _note = TextEditingController();
-  final Map<int, TextEditingController> _quantities = <int, TextEditingController>{};
+  final Map<int, TextEditingController> _quantities =
+      <int, TextEditingController>{};
   bool _prefilled = false;
 
   @override
@@ -47,10 +49,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
       _prefilled = true;
       final itemKey = widget.initialItemKey?.trim();
       if (itemKey != null && itemKey.isNotEmpty) {
-        ref.read(issueControllerProvider.notifier).setItem(
-              itemKey: itemKey,
-              itemName: widget.initialItemName ?? '',
-            );
+        ref
+            .read(issueControllerProvider.notifier)
+            .setItem(itemKey: itemKey, itemName: widget.initialItemName ?? '');
       }
     });
   }
@@ -72,10 +73,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
   Future<void> _pickItem() async {
     final item = await ItemPickerDialog.show(context, title: '选择要领用的器件');
     if (item == null || !mounted) return;
-    ref.read(issueControllerProvider.notifier).setItem(
-          itemKey: item.itemKey,
-          itemName: item.title,
-        );
+    ref
+        .read(issueControllerProvider.notifier)
+        .setItem(itemKey: item.itemKey, itemName: item.title);
   }
 
   Future<void> _confirmAndSubmit() async {
@@ -133,11 +133,13 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
     final state = ref.watch(issueControllerProvider);
     final theme = Theme.of(context);
     final itemKey = state.itemKey;
-    final detailAsync =
-        itemKey.isEmpty ? null : ref.watch(catalogDetailProvider(itemKey));
+    final detailAsync = itemKey.isEmpty
+        ? null
+        : ref.watch(catalogDetailProvider(itemKey));
 
     return Scaffold(
-      appBar: LabAppBar(fallbackLocation: '/catalog',
+      appBar: LabAppBar(
+        fallbackLocation: '/catalog',
         title: const Text('领料'),
         actions: <Widget>[
           IconButton(
@@ -205,7 +207,8 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
                       ),
                       error: (error, _) => ErrorView(
                         message: '读取袋明细失败：$error',
-                        onRetry: () => ref.invalidate(catalogDetailProvider(itemKey)),
+                        onRetry: () =>
+                            ref.invalidate(catalogDetailProvider(itemKey)),
                         compact: true,
                       ),
                       data: (result) => _BagSelector(
@@ -232,7 +235,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: ref.watch(inventoryBootstrapProvider).when(
+              child: ref
+                  .watch(inventoryBootstrapProvider)
+                  .when(
                     loading: () => const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: LinearProgressIndicator(),
@@ -246,8 +251,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
                       bootstrap: bootstrap,
                       currentUid: ref.watch(currentUidProvider),
                       selected: state.borrowerId,
-                      onSelected: (id) =>
-                          ref.read(issueControllerProvider.notifier).setBorrower(id),
+                      onSelected: (id) => ref
+                          .read(issueControllerProvider.notifier)
+                          .setBorrower(id),
                     ),
                   ),
             ),
@@ -262,8 +268,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
                   TextField(
                     controller: _project,
                     enabled: !state.isBusy,
-                    onChanged: (value) =>
-                        ref.read(issueControllerProvider.notifier).setProject(value),
+                    onChanged: (value) => ref
+                        .read(issueControllerProvider.notifier)
+                        .setProject(value),
                     decoration: const InputDecoration(
                       labelText: '项目 *',
                       hintText: '例如 项目A / 课题编号',
@@ -274,8 +281,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
                   TextField(
                     controller: _note,
                     enabled: !state.isBusy,
-                    onChanged: (value) =>
-                        ref.read(issueControllerProvider.notifier).setNote(value),
+                    onChanged: (value) => ref
+                        .read(issueControllerProvider.notifier)
+                        .setNote(value),
                     decoration: const InputDecoration(
                       labelText: '备注（可选）',
                       border: OutlineInputBorder(),
@@ -288,13 +296,17 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
           const SizedBox(height: 8),
 
           if (state.error != null) _Banner(message: state.error!, error: true),
-          if (state.notice != null && !state.succeeded) _Banner(message: state.notice!),
+          if (state.notice != null && !state.succeeded)
+            _Banner(message: state.notice!),
 
           FilledButton.icon(
             onPressed: state.isBusy ? null : _confirmAndSubmit,
             icon: state.submitting
                 ? const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.outbox_outlined),
             label: Text('确认领料（共 ${_format(state.totalQuantity)} 件）'),
           ),
@@ -304,8 +316,9 @@ class _IssueScreenState extends ConsumerState<IssueScreen> {
     );
   }
 
-  static String _format(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2);
+  static String _format(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(2);
 }
 
 class _BagSelector extends StatelessWidget {
@@ -342,8 +355,9 @@ class _BagSelector extends StatelessWidget {
           Builder(
             builder: (context) {
               final selected = lines.any((line) => line.bagId == bag.id);
-              final matches =
-                  lines.where((candidate) => candidate.bagId == bag.id).toList();
+              final matches = lines
+                  .where((candidate) => candidate.bagId == bag.id)
+                  .toList();
               final line = matches.isEmpty ? null : matches.first;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,7 +382,8 @@ class _BagSelector extends StatelessWidget {
                     subtitle: Text(
                       <String>[
                         if (bag.sn.isNotEmpty) 'SN ${bag.sn}',
-                        if (bag.locationCode.isNotEmpty) '库位 ${bag.locationCode}',
+                        if (bag.locationCode.isNotEmpty)
+                          '库位 ${bag.locationCode}',
                         '可用 ${_format(bag.remaining)}',
                       ].join(' · '),
                     ),
@@ -382,9 +397,14 @@ class _BagSelector extends StatelessWidget {
                             width: 140,
                             child: TextField(
                               controller: controllerFor(bag.id!),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               inputFormatters: <TextInputFormatter>[
-                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.]'),
+                                ),
                               ],
                               onChanged: (value) => onQuantity(bag.id!, value),
                               decoration: InputDecoration(
@@ -400,8 +420,9 @@ class _BagSelector extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 '超过袋内可用数量',
-                                style: theme.textTheme.labelSmall
-                                    ?.copyWith(color: theme.colorScheme.error),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
                               ),
                             ),
                         ],
@@ -415,8 +436,9 @@ class _BagSelector extends StatelessWidget {
     );
   }
 
-  static String _format(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2);
+  static String _format(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(2);
 }
 
 /// System-account borrower picker.
@@ -448,10 +470,12 @@ class _BorrowerSelector extends StatelessWidget {
           Text(
             bootstrap.borrowers.isEmpty
                 ? '服务器没有返回可用的领用人账号。领用人必须是已建立的系统账号，'
-                    '请联系管理员为操作员建立账号后再领料。'
+                      '请联系管理员为操作员建立账号后再领料。'
                 : '当前账号不在可代领名单中，且服务器未返回本人的领用账号，无法自助领料。'
-                    '请联系库存管理员。',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                      '请联系库存管理员。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
           ),
         ],
       );
@@ -471,7 +495,9 @@ class _BorrowerSelector extends StatelessWidget {
         const SizedBox(height: 6),
         DropdownButtonFormField<int?>(
           isExpanded: true,
-          value: selectable.any((borrower) => borrower.id == selected) ? selected : null,
+          value: selectable.any((borrower) => borrower.id == selected)
+              ? selected
+              : null,
           decoration: const InputDecoration(
             labelText: '选择领用人',
             border: OutlineInputBorder(),
@@ -549,14 +575,8 @@ class _Banner extends StatelessWidget {
   final bool error;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: error ? theme.colorScheme.errorContainer : theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(message, style: theme.textTheme.bodySmall),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusBanner(
+    message: message,
+    tone: error ? StatusTone.error : StatusTone.notice,
+  );
 }

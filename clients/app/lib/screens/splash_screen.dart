@@ -31,6 +31,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       body: Center(
@@ -41,7 +42,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.inventory_2, size: 64, color: Colors.blue),
+                Icon(
+                  Icons.inventory_2,
+                  size: 64,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(height: 24),
                 const Text(
                   '实验室元器件库存系统',
@@ -58,7 +63,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   authState.status == AuthStatus.authenticating
                       ? '正在自动登录…'
                       : '正在读取本机保存的登录信息…',
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
