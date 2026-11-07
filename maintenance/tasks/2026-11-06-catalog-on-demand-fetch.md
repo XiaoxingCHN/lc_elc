@@ -376,5 +376,5 @@ done + bump catalog revision
 - **健康检查**：脚本把 `/web/login` 的 303 判为失败（既有脚本缺陷，303 → `/web/database/selector`）；独立复核带 `X-Odoo-Database` 为 200、`odoo.service` active/enabled、14:31:36Z `Modules loaded`。
 - **运行证据**：Odoo 日志自升级至 2026-11-07T13:11Z 0 条 ERROR/CRITICAL/Traceback；cron「器件库：处理在线补抓队列」（id 25，每 1 分钟）自 2026-11-06T14:31:16Z 起 1356 次运行、0 失败、队列为空。
 - **DB 行核对（2026-11-07T13:17:07Z）**：四模块 `installed`（`lab_catalog 19.0.2.0.10` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2` / `lab_team_web 19.0.1.2.1`）；`lab_catalog_fetch_request` 表存在、7 个索引含部分唯一索引 `lab_catalog_fetch_active_uniq`（`state IN (queued,resolving,fetching)`）；`lab_catalog.ir_cron_lab_catalog_fetch` → `res_id=25` 与运行中的 job 25 一致。
-- **仍未核对**：catalog/param/fetch_request 行数——第一步脚本在 `ir_cron.model_id` 处中断（Odoo 19 该列在 `ir_act_server`），第二步 `verify_deploy2.sh` 待密码。
+- **数据未受影响（2026-11-07T13:32Z）**：`lab_catalog_item` 695,217 行（与 2026-11-04 相同）、`lab_catalog_param` 4,110,477 行、`lab_catalog_fetch_request` 0 行；`ir_cron` 25 号行存在（列清单证实 Odoo 19 用 `ir_actions_server_id`，第一步脚本因此中断）。
 - **仍未做**：真实网络端到端（C32445874 / TLV77333PDBVR / TLV77733PDBVR + 非电子样本）、Flutter widget 测试、客户端包构建、source manifest 冻结。
