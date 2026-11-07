@@ -375,5 +375,6 @@ done + bump catalog revision
 - **备份**：`/var/backups/lc-elc/20261106T142949Z-before-upgrade/`（`db.dump` 118,970,696 B / `40863d500fffc8f36013cd99da8625d3ed988799826f6633cc178f41d3ba0d66`；`filestore.tar.gz` 12,819,190 B / `5b9e5d42a03d339dcbab225ad3e1da09913b4b853dcded117fcb29614a3f5fc0`；旧三模块源码在 `module-source-before-upgrade/`）。
 - **健康检查**：脚本把 `/web/login` 的 303 判为失败（既有脚本缺陷，303 → `/web/database/selector`）；独立复核带 `X-Odoo-Database` 为 200、`odoo.service` active/enabled、14:31:36Z `Modules loaded`。
 - **运行证据**：Odoo 日志自升级至 2026-11-07T13:11Z 0 条 ERROR/CRITICAL/Traceback；cron「器件库：处理在线补抓队列」（id 25，每 1 分钟）自 2026-11-06T14:31:16Z 起 1356 次运行、0 失败、队列为空。
-- **未核对**：DB 行级事实（`ir_module_module` 版本/状态、`to_regclass`、部分唯一索引谓词、catalog 行数）——`verify_deploy.sh` 停在 sudo 密码提示未执行。**不得把本节记作数据库层已核验。**
+- **DB 行核对（2026-11-07T13:17:07Z）**：四模块 `installed`（`lab_catalog 19.0.2.0.10` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2` / `lab_team_web 19.0.1.2.1`）；`lab_catalog_fetch_request` 表存在、7 个索引含部分唯一索引 `lab_catalog_fetch_active_uniq`（`state IN (queued,resolving,fetching)`）；`lab_catalog.ir_cron_lab_catalog_fetch` → `res_id=25` 与运行中的 job 25 一致。
+- **仍未核对**：catalog/param/fetch_request 行数——第一步脚本在 `ir_cron.model_id` 处中断（Odoo 19 该列在 `ir_act_server`），第二步 `verify_deploy2.sh` 待密码。
 - **仍未做**：真实网络端到端（C32445874 / TLV77333PDBVR / TLV77733PDBVR + 非电子样本）、Flutter widget 测试、客户端包构建、source manifest 冻结。
