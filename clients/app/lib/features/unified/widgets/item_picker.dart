@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/lab_api_exception.dart';
+import '../../../widgets/lab_ui.dart';
 import '../models/catalog_query.dart';
 import '../models/identity.dart';
 import '../models/unified_item.dart';
@@ -161,96 +162,101 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
-        child: Column(
-          children: <Widget>[
-            // AppBar's preferred height is only applied by Scaffold. In a
-            // Column its flexibleSpace receives unbounded height and breaks
-            // layout. A content-sized header also survives large system text.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '关闭',
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: TextField(
-                controller: _search,
-                autofocus: false,
-                textInputAction: TextInputAction.search,
-                onChanged: _onSearchChanged,
-                onSubmitted: (value) {
-                  _debounce?.cancel();
-                  _query = _query.copyWith(text: value);
-                  _loadFirstPage();
-                },
-                decoration: const InputDecoration(
-                  isDense: true,
-                  hintText: 'C 编号 / 型号 / 名称',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            if (widget.onCreate != null)
+      backgroundColor: Colors.transparent,
+      child: GlassSurface(
+        blur: GlassTokens.ofContext(context).blurOverlay,
+        padding: EdgeInsets.zero,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
+          child: Column(
+            children: <Widget>[
+              // AppBar's preferred height is only applied by Scaffold. In a
+              // Column its flexibleSpace receives unbounded height and breaks
+              // layout. A content-sized header also survives large system text.
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: widget.onCreate,
-                    icon: const Icon(Icons.add),
-                    label: const Text('自定义 / 新建器件'),
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      _loading
-                          ? '正在读取立创资料与自定义器件…'
-                          : '匹配 $_total 条，已显示 ${_items.length} 条',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
-                  if (_error != null)
-                    Text(
-                      '加载失败',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
+                padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
-                ],
-              ),
-            ),
-            const Divider(height: 8),
-            Expanded(child: _buildList()),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  _error!,
-                  style: Theme.of(context).textTheme.bodySmall,
+                    IconButton(
+                      tooltip: '关闭',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
                 ),
               ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: TextField(
+                  controller: _search,
+                  autofocus: false,
+                  textInputAction: TextInputAction.search,
+                  onChanged: _onSearchChanged,
+                  onSubmitted: (value) {
+                    _debounce?.cancel();
+                    _query = _query.copyWith(text: value);
+                    _loadFirstPage();
+                  },
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'C 编号 / 型号 / 名称 / 参数（如 10R）',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              if (widget.onCreate != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: widget.onCreate,
+                      icon: const Icon(Icons.add),
+                      label: const Text('自定义 / 新建器件'),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        _loading
+                            ? '正在读取立创资料与自定义器件…'
+                            : '匹配 $_total 条，已显示 ${_items.length} 条',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ),
+                    if (_error != null)
+                      Text(
+                        '加载失败',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 8),
+              Expanded(child: _buildList()),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    _error!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -268,7 +274,10 @@ class _ItemPickerDialogState extends ConsumerState<ItemPickerDialog> {
       );
     }
     if (_items.isEmpty) {
-      return const EmptyView(title: '没有匹配的器件', subtitle: '换个关键词或 C 编号再试');
+      return const EmptyView(
+        title: '没有匹配的器件',
+        subtitle: '换个关键词或 C 编号再试；参数可写 10R / 4R7 / 100nF',
+      );
     }
 
     return NotificationListener<ScrollNotification>(

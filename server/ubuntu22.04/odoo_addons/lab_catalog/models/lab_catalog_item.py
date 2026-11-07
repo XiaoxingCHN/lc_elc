@@ -21,14 +21,23 @@ import base64
 import io
 import json
 import logging
+import re
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
+
+from odoo.addons.lab_inventory.tools.param_search import (
+    build_search_params, search_tokens)
 
 from .lab_catalog_identity import normalize_catalog_code
 
 _logger = logging.getLogger(__name__)
 _log = _logger
+
+# Characters that continue a parameter token.  Anything else (space, ``/``,
+# ``~``, ``@``, ``(``, ``±`` …) separates tokens, so a query word can match one
+# part of a compound value such as ``1.71V~3.63V`` or ``5.9Ω@100kHz``.
+_PARAM_TOKEN_CHARS = r'0-9A-Za-z_.Ωµμω%'
 
 # 可失效的 facets 缓存：key 含完整筛选组合 + 目录/库存版本，
 # 任何导入或绑定都会 bump 版本 -> 自动失效。全库实测约 8.7s，缓存后重访为毫秒级。
@@ -85,6 +94,9 @@ class LabCatalogItem(models.Model):
     param_count = fields.Integer(string='参数个数', default=0)
 
     search_text = fields.Char(string='检索文本', index=True)
+    search_params = fields.Text(
+        string='参数检索文本',
+        help='关键参数值的归一化文本；由导入器或参数变更时维护。')
 
     fetched_at = fields.Datetime(string='采集时间', index=True)
     source_fingerprint = fields.Char(string='来源指纹', index=True)
@@ -126,6 +138,8 @@ class LabCatalogItem(models.Model):
                        'ON lab_catalog_item USING gin (search_text gin_trgm_ops)')
             cr.execute('CREATE INDEX IF NOT EXISTS lab_catalog_item_name_trgm_idx '
                        'ON lab_catalog_item USING gin (name gin_trgm_ops)')
+            cr.execute('CREATE INDEX IF NOT EXISTS lab_catalog_item_params_trgm_idx '
+                       'ON lab_catalog_item USING gin (search_params gin_trgm_ops)')
             cr.execute('RELEASE SAVEPOINT lc_trgm')
             _logger.info('lab_catalog: pg_trgm indexes ready')
         except Exception as exc:
@@ -136,6 +150,41 @@ class LabCatalogItem(models.Model):
     @api.model
     def _norm(self, value):
         return normalize_catalog_code(value)
+
+    def _recompute_search_params(self):
+        """Rebuild the normalized parameter text for these catalog items."""
+        for item in self.exists():
+            params = item.param_ids.sorted(
+                key=lambda p: (p.sequence or 0, p.id or 0))
+            text = build_search_params([
+                (p.code or '', p.name or '', p.value or '', p.detail_value or '')
+                for p in params
+            ]) or ' '
+            # Odoo converts an empty Char/Text value to NULL.  Use a single
+            # space as the "computed, but nothing searchable" sentinel so the
+            # readiness NULL scan only reports rows that were never processed.
+            if item.search_params != text:
+                item.sudo().write({'search_params': text})
+
+    @api.model
+    def param_index_ready(self):
+        """Whether the derived parameter text has been fully populated.
+
+        The explicit state marker is set by the batched backfill script after a
+        complete run.  Before that, a null-free table is also considered ready
+        (fresh install / a complete importer run).
+        """
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('lab_catalog.param_index_state') == 'ready':
+            return True
+        cr = self.env.cr
+        cr.execute('SELECT EXISTS (SELECT 1 FROM lab_catalog_item)')
+        if not cr.fetchone()[0]:
+            return True
+        # Stop at the first unpopulated row instead of counting the whole table.
+        cr.execute('SELECT 1 FROM lab_catalog_item '
+                   'WHERE search_params IS NULL LIMIT 1')
+        return cr.fetchone() is None
 
     @api.model
     def _revision(self, key, bump=False):
@@ -385,6 +434,26 @@ class LabCatalogItem(models.Model):
 
     # ------------------------------------------------------------------ lab side
     @api.model
+    def _lab_domain(self, query, brands=None, packages=None):
+        """Local-archive domain: every whitespace token must hit one field."""
+        dom = []
+        for token in search_tokens(query):
+            leaves = [
+                ('name', 'ilike', token),
+                ('lab_sn', 'ilike', token),
+                ('default_code', 'ilike', token),
+                ('lab_mpn', 'ilike', token),
+                ('lab_lcsc_code', '=ilike', token),
+                ('lab_search_specs', 'ilike', token),
+            ]
+            dom += ['|'] * (len(leaves) - 1) + leaves
+        if brands:
+            dom.append(('lab_brand', 'in', list(brands)))
+        if packages:
+            dom.append(('lab_package', 'in', list(packages)))
+        return dom
+
+    @api.model
     def _lab_rows(self, query, brands, packages, has_dimension_filter, matched_codes):
         """构造本地物料行。返回 (rows, matched_codes_updated)。
 
@@ -393,19 +462,9 @@ class LabCatalogItem(models.Model):
           避免本地物料因为没被采集而消失，也不会与索引里已有的同码卡片重复。
         """
         Tmpl = self.env['product.template']
-        # 本地档案的检索维度：名称 / SN / 内部编码 / 型号 / **C 编号**
+        # 本地档案的检索维度：名称 / SN / 内部编码 / 型号 / C 编号 / 参数检索文本
         # （直接搜 C 编号必须能命中"有码但资料库未采集"的本地件）
-        dom = []
-        if query:
-            q = query.strip()
-            dom = ['|', '|', '|', '|',
-                   ('name', 'ilike', q), ('lab_sn', 'ilike', q),
-                   ('default_code', 'ilike', q), ('lab_mpn', 'ilike', q),
-                   ('lab_lcsc_code', '=ilike', q)]
-        if brands:
-            dom.append(('lab_brand', 'in', list(brands)))
-        if packages:
-            dom.append(('lab_package', 'in', list(packages)))
+        dom = self._lab_domain(query, brands, packages)
         templates = Tmpl.search(dom)
 
         # 1) **先无条件求 matched_codes**：本地 SN / 名称命中的绑定 C 码必须带出对应卡片，
@@ -492,16 +551,9 @@ class LabCatalogItem(models.Model):
         matched = set()
         if not query:
             return matched
-        dom = ['|', '|', '|', '|',
-               ('name', 'ilike', query), ('lab_sn', 'ilike', query),
-               ('default_code', 'ilike', query), ('lab_mpn', 'ilike', query),
-               # 直接搜 C 编号也必须命中本地档案（否则"有码未采集"的物料搜不到）
-               ('lab_lcsc_code', '=ilike', query)]
-        if brands:
-            dom.append(('lab_brand', 'in', list(brands)))
-        if packages:
-            dom.append(('lab_package', 'in', list(packages)))
-        for t in self.env['product.template'].search(dom):
+        # 直接搜 C 编号也必须命中本地档案（否则"有码未采集"的物料搜不到）
+        for t in self.env['product.template'].search(
+                self._lab_domain(query, brands, packages)):
             if t.lab_lcsc_code_norm:
                 matched.add(t.lab_lcsc_code_norm)
         return matched
@@ -518,15 +570,32 @@ class LabCatalogItem(models.Model):
         args = [MARKET_CN]
         q = (query or '').strip()
         if q:
-            like = '%' + q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
-            matched = self._matched_codes_for_query(q, brands, packages)
-            if matched:
-                where.append("(i.search_text ILIKE %s OR i.catalog_code = %s "
-                             "OR i.catalog_code = ANY(%s))")
-                args.extend([like, q.upper(), sorted(matched)])
-            else:
-                where.append("(i.search_text ILIKE %s OR i.catalog_code = %s)")
-                args.extend([like, q.upper()])
+            tokens = search_tokens(q)
+            for token in tokens:
+                # Resolve local matches per token: a C-code card may be pulled
+                # in because its bound local archive matches this token, but it
+                # must not bypass the other tokens' AND conditions.
+                matched = self._matched_codes_for_query(token, brands, packages)
+                like = ('%' + token.replace('\\', '\\\\')
+                        .replace('%', '\\%').replace('_', '\\_') + '%')
+                # ``search_params`` is a space-separated token list.  Match a
+                # complete token, not a substring: ``10R`` must not match
+                # ``110R``/``210R`` and ``R1`` must not match ``R10``.
+                # Separators such as ``/``/``~``/``@``/``(`` still end a token,
+                # so a compound value like ``1.71V~3.63V`` or ``10uF/16V``
+                # stays reachable by its parts.
+                param_re = (r'(^|[^' + _PARAM_TOKEN_CHARS + r'])' +
+                            re.escape(token) +
+                            r'([^' + _PARAM_TOKEN_CHARS + r']|$)')
+                clause = ("(i.search_text ILIKE %s OR i.search_params ~* %s "
+                          "OR i.catalog_code = %s")
+                clause_args = [like, param_re, token.upper()]
+                if matched:
+                    clause += " OR i.catalog_code = ANY(%s)"
+                    clause_args.append(sorted(matched))
+                clause += ")"
+                where.append(clause)
+                args.extend(clause_args)
         if category_id:
             # 关键：解析与"追加 SQL + 追加参数"必须分开。
             # 早期把 where.append 和 args.extend 放在同一个 try 里，

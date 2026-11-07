@@ -243,6 +243,8 @@ function setup(options) {
     loadingText: '正在检索器件资料…',
     emptyText: '没有匹配的器件。',
     errorText: function (err) { return '检索失败：' + ((err && err.code) || 'NETWORK'); },
+    viewAllLabel: opts.viewAllLabel,
+    viewAllHref: opts.viewAllHref,
     fetch: function (query) {
       calls.push(query);
       if (!queue.length) return Promise.resolve(ROWS);
@@ -597,6 +599,47 @@ test('关闭面板会丢弃待发查询（不会在关闭后又弹出来）', as
   gates.forEach(function (fn) { fn(); });
   await tick(10);
   assert.equal(ctx.box.isOpen(), false, '晚到响应不得重新打开面板');
+});
+
+test('有结果时显示「查看全部结果」，空结果/失败时隐藏', async () => {
+  const hrefs = [];
+  const ctx = setup({
+    debounceMs: 1,
+    viewAllLabel: '查看全部结果',
+    viewAllHref: function (text) {
+      hrefs.push(text);
+      return '/team/lab?q=' + encodeURIComponent(text);
+    }
+  });
+  type(ctx.input, '电阻');
+  await tick(15);
+  const footer = ctx.pop.children.filter(function (node) {
+    return node.classList.contains('lc-combobox-viewall');
+  })[0];
+  assert.ok(footer, '有结果时应出现查看全部入口');
+  assert.equal(footer.hasAttribute('hidden'), false);
+  assert.deepEqual(hrefs, ['电阻']);
+  const link = footer.children[0];
+  assert.equal(link.tagName, 'A');
+  assert.equal(link.getAttribute('href'), '/team/lab?q=%E7%94%B5%E9%98%BB');
+  assert.equal(link.textContent, '查看全部结果');
+
+  ctx.queue.push([]);
+  type(ctx.input, '没有匹配');
+  await tick(15);
+  assert.equal(footer.hasAttribute('hidden'), true, '空结果不该保留查看全部入口');
+
+  ctx.queue.push(new Error('boom'));
+  type(ctx.input, '电容');
+  await tick(20);
+  assert.equal(footer.hasAttribute('hidden'), true, '请求失败也不该保留查看全部入口');
+
+  const plain = setup({ debounceMs: 1 });
+  type(plain.input, '电阻');
+  await tick(15);
+  assert.equal(plain.pop.children.filter(function (node) {
+    return node.classList.contains('lc-combobox-viewall');
+  }).length, 0, '未提供 viewAllHref 时不改变原有 DOM');
 });
 
 /* 手工控制 settle 时机的夹具：用来验证"槽位必须真实释放才补发"与"销毁/锁定作废待发"。

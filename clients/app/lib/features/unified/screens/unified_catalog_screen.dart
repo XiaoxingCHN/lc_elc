@@ -1,5 +1,7 @@
 import 'package:lab_inventory_client/widgets/lab_ui.dart';
+
 import 'dart:async';
+
 import '../../../updates/update_ui.dart';
 
 import 'package:flutter/material.dart';
@@ -14,6 +16,7 @@ import '../unified_routes.dart';
 import '../widgets/category_sidebar.dart';
 import '../widgets/filter_panel.dart';
 import '../widgets/item_card.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
 import 'offline_views.dart';
 
@@ -45,7 +48,8 @@ class UnifiedCatalogScreen extends ConsumerStatefulWidget {
   final bool offline;
 
   @override
-  ConsumerState<UnifiedCatalogScreen> createState() => _UnifiedCatalogScreenState();
+  ConsumerState<UnifiedCatalogScreen> createState() =>
+      _UnifiedCatalogScreenState();
 }
 
 class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
@@ -86,7 +90,8 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
 
     final notifier = ref.read(catalogProvider.notifier);
     final query = ref.read(catalogQueryProvider);
-    final wantsQuery = (widget.initialQuery?.trim().isNotEmpty ?? false) ||
+    final wantsQuery =
+        (widget.initialQuery?.trim().isNotEmpty ?? false) ||
         widget.initialCategoryId != null;
 
     if (wantsQuery) {
@@ -111,7 +116,9 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
     final query = ref.read(catalogQueryProvider);
     if (query.categoryId == categoryId) return;
     unawaited(
-      ref.read(catalogProvider.notifier).updateQuery(query.copyWith(categoryId: categoryId)),
+      ref
+          .read(catalogProvider.notifier)
+          .updateQuery(query.copyWith(categoryId: categoryId)),
     );
   }
 
@@ -161,7 +168,8 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
               ),
               IconButton(
                 tooltip: '刷新',
-                onPressed: () => unawaited(ref.read(catalogProvider.notifier).refresh()),
+                onPressed: () =>
+                    unawaited(ref.read(catalogProvider.notifier).refresh()),
                 icon: const Icon(Icons.refresh),
               ),
               _FilterButton(wide: wide),
@@ -173,9 +181,7 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
               ? null
               : const FilterDrawer(child: FilterPanel(showCategories: true)),
           // Desktop: filters stay reachable without stealing grid width.
-          endDrawer: wide
-              ? const FilterDrawer(child: FilterPanel())
-              : null,
+          endDrawer: wide ? const FilterDrawer(child: FilterPanel()) : null,
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => context.push(UnifiedRoutes.pendingReceipt),
             icon: const Icon(Icons.qr_code_scanner),
@@ -208,7 +214,9 @@ class _FilterButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final count = ref.watch(catalogProvider.select((state) => state.query.activeFilterCount));
+    final count = ref.watch(
+      catalogProvider.select((state) => state.query.activeFilterCount),
+    );
     return IconButton(
       tooltip: '筛选条件',
       onPressed: () {
@@ -256,20 +264,7 @@ class _CatalogBody extends ConsumerWidget {
       );
     }
     if (state.isEmpty) {
-      return EmptyView(
-        title: '没有匹配的器件',
-        subtitle: state.query.isFiltered
-            ? '当前条件：${state.query.description}。可清空筛选后重试。'
-            : '服务端没有返回任何已采集资料。',
-        action: state.query.isFiltered
-            ? TextButton(
-                onPressed: () => unawaited(
-                  ref.read(catalogProvider.notifier).updateQuery(const CatalogQuery()),
-                ),
-                child: const Text('清空筛选'),
-              )
-            : null,
-      );
+      return _buildEmpty(context, ref, state);
     }
 
     return Column(
@@ -291,8 +286,9 @@ class _CatalogBody extends ConsumerWidget {
                       state.query.description,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -307,23 +303,14 @@ class _CatalogBody extends ConsumerWidget {
           ),
         ),
         if (state.error != null)
-          Container(
-            width: double.infinity,
-            color: theme.colorScheme.errorContainer,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    '加载下一页失败：${state.error}',
-                    style: theme.textTheme.labelSmall,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => unawaited(ref.read(catalogProvider.notifier).loadMore()),
-                  child: const Text('重试'),
-                ),
-              ],
+          StatusBanner(
+            message: '加载下一页失败：${state.error}',
+            tone: StatusTone.error,
+            dense: true,
+            action: TextButton(
+              onPressed: () =>
+                  unawaited(ref.read(catalogProvider.notifier).loadMore()),
+              child: const Text('重试'),
             ),
           ),
         Expanded(
@@ -334,7 +321,9 @@ class _CatalogBody extends ConsumerWidget {
               }
               return false;
             },
-            child: grid ? _buildGrid(context, ref, state) : _buildList(context, ref, state),
+            child: grid
+                ? _buildGrid(context, ref, state)
+                : _buildList(context, ref, state),
           ),
         ),
       ],
@@ -408,13 +397,225 @@ class _CatalogBody extends ConsumerWidget {
       child: Center(
         child: state.loadingMore
             ? const SizedBox(
-                width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : OutlinedButton.icon(
-                onPressed: () => unawaited(ref.read(catalogProvider.notifier).loadMore()),
+                onPressed: () =>
+                    unawaited(ref.read(catalogProvider.notifier).loadMore()),
                 icon: const Icon(Icons.expand_more),
                 label: const Text('加载更多'),
               ),
       ),
     );
+  }
+
+  /// Zero rows: keep the real empty message, and offer the server's on-demand
+  /// fetch only when it explicitly said the query is one exact C code / MPN.
+  Widget _buildEmpty(BuildContext context, WidgetRef ref, CatalogState state) {
+    final theme = Theme.of(context);
+    final notifier = ref.read(catalogProvider.notifier);
+    final suggestion = state.fetchSuggestion;
+    final status = state.fetchStatus;
+    final running = status != null && !status.isTerminal;
+    final canFetch = suggestion != null && suggestion.isValid && !running;
+
+    final actions = <Widget>[
+      if (canFetch)
+        FilledButton.icon(
+          onPressed: state.fetchBusy
+              ? null
+              : () => unawaited(notifier.startFetch()),
+          icon: state.fetchBusy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.travel_explore),
+          label: Text(status == null ? '立即从立创商城抓取' : '重新抓取'),
+        ),
+      if (state.query.isFiltered)
+        TextButton(
+          onPressed: () =>
+              unawaited(notifier.updateQuery(const CatalogQuery())),
+          child: const Text('清空筛选'),
+        ),
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: <Widget>[
+          EmptyView(
+            title: '没有匹配的器件',
+            subtitle: state.query.isFiltered
+                ? (state.query.text.trim().isEmpty
+                      ? '当前条件：${state.query.description}。可清空筛选后重试。'
+                      : '当前条件：${state.query.description}。参数可换写法：10R = 10Ω、'
+                            '4R7 = 4.7Ω、100nF = 0.1uF。')
+                : '服务端没有返回任何已采集资料。',
+            action: actions.isEmpty
+                ? null
+                : Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+          ),
+          if (suggestion != null && suggestion.message.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+              child: Text(
+                suggestion.message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (status != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _FetchStatusPanel(
+                status: status,
+                onChoose: (candidate) =>
+                    unawaited(notifier.chooseFetchCandidate(candidate)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Progress and result of one on-demand LCSC fetch.
+///
+/// Every state pairs its colour with an icon and words; candidates are real
+/// buttons because the server only lists variants whose MPN matched exactly.
+class _FetchStatusPanel extends StatelessWidget {
+  const _FetchStatusPanel({
+    required this.status,
+    required this.onChoose,
+  });
+
+  final CatalogFetchStatus status;
+  final ValueChanged<CatalogFetchCandidate> onChoose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final running = !status.isTerminal;
+    final (IconData icon, Color tone) = switch (status.state) {
+      'done' => (Icons.check_circle_outline, theme.colorScheme.primary),
+      'failed' || 'not_found' => (
+          Icons.error_outline,
+          theme.colorScheme.error,
+        ),
+      'skipped_non_electronic' => (
+          Icons.block,
+          theme.colorScheme.onSurfaceVariant,
+        ),
+      'review' => (Icons.fact_check_outlined, theme.colorScheme.tertiary),
+      _ => (Icons.hourglass_top, theme.colorScheme.primary),
+    };
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(icon, size: 20, color: tone),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _title(status.state),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+            if (running) ...<Widget>[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+              const SizedBox(height: 8),
+              Text(
+                status.state == 'queued'
+                    ? '排队等待后台处理，通常一分钟内开始。可离开本页，稍后回来再查。'
+                    : '正在读取立创商城的中文详情页，请稍候…',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            if (!running && status.message.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(status.message, style: theme.textTheme.bodySmall),
+            ],
+            if (status.isDone && status.message.isEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text('已写入器件库，正在刷新检索结果…',
+                  style: theme.textTheme.bodySmall),
+            ],
+            if (status.isCandidates && status.candidates.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                '型号匹配到多个封装，请选择要入库的一个：',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              ...status.candidates.map(
+                (candidate) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(candidate.label),
+                  trailing: TextButton(
+                    onPressed: () => onChoose(candidate),
+                    child: const Text('抓取'),
+                  ),
+                ),
+              ),
+              Text(
+                '不确定时请先核对封装，避免把同系列不同封装的参数写进同一条记录。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _title(String state) {
+    switch (state) {
+      case 'queued':
+        return '已加入抓取队列';
+      case 'resolving':
+        return '正在立创商城匹配型号';
+      case 'fetching':
+        return '正在抓取中文详情';
+      case 'done':
+        return '已抓取并入库';
+      case 'failed':
+        return '抓取失败';
+      case 'skipped_non_electronic':
+        return '已跳过：非电子元器件';
+      case 'review':
+        return '已记录，分类需人工复核';
+      case 'not_found':
+        return '立创商城未找到完全匹配的型号';
+      case 'candidates':
+        return '型号匹配到多个结果';
+      default:
+        return '抓取状态';
+    }
   }
 }

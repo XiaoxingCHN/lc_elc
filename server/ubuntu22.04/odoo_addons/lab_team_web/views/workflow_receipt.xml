@@ -124,6 +124,7 @@
                         </div>
 
                         <p class="lc-hint lc-hint-warn" data-lc-slot="search-denied" role="status" hidden="hidden"></p>
+                        <p class="lc-hint lc-hint-warn" data-lc-slot="param-index" role="status" hidden="hidden"></p>
 
                         <div class="lc-material-picked" data-lc-selected="material" hidden="hidden">
                             <p class="lc-toolbar-note">已选物料</p>
@@ -253,6 +254,29 @@
                         <div class="lc-label-plan" data-lc-plan="pending" hidden="hidden"></div>
                         <p class="lc-alert lc-alert-error" role="alert"
                            data-lc-error="print" hidden="hidden"></p>
+                    </div>
+
+                    <div class="lc-scanrow" data-lc-filter="pending">
+                        <div class="lc-scanrow-field">
+                            <label class="lc-field">
+                                <span class="lc-field-label">筛选待入库袋</span>
+                                <input class="lc-input" type="search" autocomplete="off"
+                                       data-lc-field="pending_query"
+                                       placeholder="追溯码 / 名称 / 型号 / 封装 / SN"/>
+                            </label>
+                        </div>
+                        <div class="lc-scanrow-field">
+                            <label class="lc-field">
+                                <span class="lc-field-label">状态</span>
+                                <select class="lc-input" data-lc-field="pending_state"
+                                        aria-label="按状态筛选待入库袋">
+                                    <option value="pending" selected="selected">待入库</option>
+                                    <option value="all">全部</option>
+                                    <option value="done">已入库</option>
+                                    <option value="cancelled">已取消</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="lc-table-wrap">

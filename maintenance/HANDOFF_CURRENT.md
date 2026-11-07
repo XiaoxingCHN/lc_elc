@@ -1,6 +1,24 @@
-# 当前维护交接：2026-11-03 P3 Web 生产部署完成（r3 已在生产生效；公网回归通过）
+# 当前维护交接：2026-11-07 按需抓取源码已冻结（repo_check PASS）
+
+最新：[冻结任务](tasks/2026-11-07-freeze-catalog-fetch-sources.md)｜[按需抓取交接](handoffs/2026-11-06-catalog-on-demand-fetch.md)｜[部署任务](tasks/2026-11-06-catalog-on-demand-fetch.md)。active 源码清单已切到 `source-server-catalog-fetch-20261106.json`（271 文件 / tree `10c3aa4a…4cf7757f`）与 `source-client-catalog-fetch-20261106.json`（178 文件 / tree `a2d5d42c…6add70abeb`）；`python tools/repo_check.py` **exit 0 / PASS / 52 项 / 0 错误**（原 `frozen-source` 两条错误消除），16 条既有 payload 警告照旧。清单只登记源码哈希，不含可安装产物；生产仍是 2026-11-06 部署的 `lab_catalog 19.0.2.0.10` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2` / `lab_team_web 19.0.1.2.1`，未再变更。**未做**：真实网络端到端抓取（三个目标料号）、客户端包构建、推送。
+
+## 此前交接：2026-11-06 器件库按需抓取已部署生产（2026-11-06T14:29–14:31Z）
+
+最新：[按需抓取交接](handoffs/2026-11-06-catalog-on-demand-fetch.md)｜[任务](tasks/2026-11-06-catalog-on-demand-fetch.md)。`lab_catalog 19.0.2.0.10` **已部署**（同批 `-u` 还覆盖 `lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2`；`lab_team_web 19.0.1.2.1` 未参与），`-u` 退出码 0、0 条 ERROR/CRITICAL/Traceback。备份 `/var/backups/lc-elc/20261106T142949Z-before-upgrade/`（`db.dump` 118,970,696 B / `40863d50…3ba0d66`；`filestore.tar.gz` 12,819,190 B / `5b9e5d42…a3f5fc0`；旧三模块源码在同目录）。升级脚本仍把 `/web/login` 的 303 判为失败（既有缺陷，不是故障）：独立复核带 DB 头 200、`odoo.service` active/enabled。`ir.cron`「器件库：处理在线补抓队列」（id 25，每 1 分钟）自 2026-11-06T14:31:16Z 起每约 62 秒运行，至 2026-11-07T13:11Z 共 1356 次、0 失败、队列为空；Odoo 日志同期 0 条 ERROR/CRITICAL/Traceback。客户端源码仍 `1.2.0+7`，`flutter test` **326 passed / 5 skipped / 0 failed**、纯 Python 15/15。DB 行已核对（2026-11-07T13:17Z）：四模块 `installed`，`lab_catalog_fetch_request` 表与 7 个索引含部分唯一索引 `lab_catalog_fetch_active_uniq`（`state IN (queued,resolving,fetching)`），`lab_catalog.ir_cron_lab_catalog_fetch` → `res_id=25` 与运行中的 job 25 一致；行数补查（2026-11-07T13:32Z）：`lab_catalog_item` 695,217（与 2026-11-04 相同）、`lab_catalog_param` 4,110,477、`lab_catalog_fetch_request` 0（队列空），数据未受升级影响。**未做真实网络端到端（三个目标料号）、未构建客户端包、未冻结 source manifest。**
+
+## 此前维护交接：2026-11-06 Flutter Liquid Glass 三端候选构建（未发布/未部署）
+
+[三端候选构建交接](handoffs/2026-11-06-client-glass-candidates.md)｜[构建任务](tasks/2026-11-06-client-glass-candidates.md)。客户端 `1.2.0+7` 冻结源保持 177 文件一致。Windows 与 Linux 完整候选包已生成，主会话重算 SHA256 与归档完整性一致；Android 因 16 项 Gradle/Maven 运行时依赖无法离线解析而 blocked，**没有 APK**。三端 Flutter 测试均 319 passed / 5 skipped / 0 failed。Windows 原构建脚本两次失败后由隔离生成目录的私有 CMake 适配完成，不记为原脚本全链通过。真实 GUI、业务、OS 安全存储、扫码、实体打印和性能未验证。候选包只在 Git 排除的 `F:/lc_elc/local/build/`；未发布、部署、提交或推送。
+
+## 此前维护交接：2026-11-06 Flutter Liquid Glass 源码候选（未发布/未部署）
+
+最新：[Flutter Liquid Glass 交接](handoffs/2026-11-06-client-liquid-glass.md)｜[基础层任务](tasks/2026-11-06-client-glass-foundation.md)｜[业务屏任务](tasks/2026-11-06-client-glass-screens.md)｜[客户端冻结源](registry/source-client-liquid-glass-20261106.json)。客户端 `1.2.0+7` 采用深色玻璃 + 荧光绿，保留业务结构、路由、参数搜索、待入库筛选与登录/更新生命周期。真实模糊仅用于 chrome 与浮层，内容卡片无模糊；A4 白底黑字。Flutter 测试 **319 passed / 5 skipped / 0 failed**，分析 **0 error / 0 warning / 118 info（exit 1）**；已查看登录、目录、详情、两阶段入库和 A4 共 6 张离屏 PNG。新客户端源清单 177 文件、tree `a19e0ddf…da1d0e4e`，已激活。**未构建/发布安装包，未部署生产，未提交/推送；真机、读屏、实体打印未验证。** `repo_check` 的客户端冻结已通过，但全仓仍有另一项服务端源码晚于 active r2 的冻结差异，详见交接。
+
+## 此前维护交接：2026-11-03 P3 Web 生产部署完成（r3 已在生产生效；公网回归通过）
 
 **模型政策（2026-11-02 用户指令，长期有效）**：禁用来自 Codex 的所有模型，后续只允许使用 DeepSeek 模型；不得唤醒 root/Codex 桥、不得派发 GPT/codex 系子代理，接手代理按此执行。
+
+最新（2026-11-04）：[参数关键词搜索交接](handoffs/2026-11-04-receipt-parameter-search.md)｜[任务](tasks/2026-11-04-receipt-parameter-search.md)｜[冻结源 r2](registry/source-server-param-search-20261104-r2.json)。实现分支 `feat/receipt-param-search`（基线 `main` `c808065`），版本 `lab_inventory 19.0.1.1.0` / `lab_catalog 19.0.2.0.6` / `lab_workflow 19.0.2.0.1` / `lab_team_web 19.0.1.2.1`。已实现参数归一化（含 `10Ω=10R`、`4R7`、`R1`、`4k7`、`1k5`、`100nF=0.1uF`）、本地/目录参数检索、分词 AND、待入库 query/state/total、Web 筛选与“查看全部结果”。本机可执行的纯逻辑/JS 测试 8/8、21/21、19/19 通过，`py_compile`/`generate_routes --check`/`git diff --check` 通过；**ORM/HttpCase、真实浏览器、Flutter 未验证**；`repo_check` 仅剩既有 `frozen-source:client`（`clients/app/t.obj`）错误。**2026-11-04T12:59–13:09Z 已部署到生产**：四模块升级 exit 0、服务 active、参数回填 695,217/695,217 并 ready；备份与旧源码见 `/opt/odoo/backups/20261104T125944Z-before-upgrade/`。未提交/推送；未导入；未做真实业务写。
 
 最新（2026-11-03）：[生产部署交接](handoffs/2026-11-03-p3-production-deploy.md)｜[任务](tasks/2026-11-03-p3-production-deploy.md)｜[冻结源 r3](registry/source-server-web-ui-20261102-r3.json)｜[候选包登记 r3](registry/artifact-server-web-ui-20261102-r3.json)。
 **r3 已于 2026-11-03 00:16–00:36Z 部署到生产** `192.168.31.105`（DB `LcHardwareHouse`）：`lab_team_web 19.0.1.1.0 → 19.0.1.2.0`（`-u lab_team_web`，`UPGRADE_EXIT=0`、错误行 0），

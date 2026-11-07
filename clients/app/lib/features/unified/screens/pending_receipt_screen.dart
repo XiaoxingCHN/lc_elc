@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ import '../unified_routes.dart';
 import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
+import '../widgets/status_banner.dart';
 
 /// Re-keying discards forms and in-flight responses on account/company changes.
 class PendingReceiptScreen extends ConsumerWidget {
@@ -50,18 +52,6 @@ class PendingReceiptScreen extends ConsumerWidget {
         ),
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-        ),
-        inputDecorationTheme: base.inputDecorationTheme.copyWith(
-          fillColor: base.colorScheme.surfaceContainerHighest,
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
         ),
       ),
       child: _ReceiptWorkspace(
@@ -104,8 +94,14 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   String? _notice;
   bool _busy = false;
   bool _loaded = false;
-  bool _showProcessed = false;
   int _scanCycle = 0;
+
+  /// Server-side queue filters.  [state] uses the server's own vocabulary so
+  /// the queue never has to download records it is about to hide.
+  final _queueSearch = TextEditingController();
+  String _stateFilter = 'pending';
+  Timer? _queueDebounce;
+  int _queueSeq = 0;
   Map<String, dynamic>? _createAttempt;
   Map<String, dynamic>? _confirmAttempt;
 
@@ -142,7 +138,8 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
 
   @override
   void dispose() {
-    for (final c in [_quantity, _count, _note, _scan, _actual]) {
+    _queueDebounce?.cancel();
+    for (final c in [_quantity, _count, _note, _scan, _actual, _queueSearch]) {
       c.dispose();
     }
     super.dispose();
@@ -186,14 +183,28 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
 
   Future<void> _load() => _run(_reload);
 
+  /// Reloads the queue with the current keyword/state filters applied by the
+  /// server.  [seq] drops a response that a newer filter already superseded.
   Future<void> _reload() async {
-    final records = await _api.pendingReceipts();
-    if (mounted) {
-      setState(() {
-        _records = records;
-        _loaded = true;
-      });
-    }
+    final seq = ++_queueSeq;
+    final records = await _api.pendingReceipts(
+      query: _queueSearch.text,
+      state: _stateFilter,
+    );
+    if (!mounted || seq != _queueSeq) return;
+    setState(() {
+      _records = records;
+      _loaded = true;
+    });
+  }
+
+  /// Typing is debounced so one keystroke never costs one round trip.
+  void _scheduleQueueReload() {
+    _queueDebounce?.cancel();
+    _queueDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _run(_reload),
+    );
   }
 
   Future<void> _pickItem() async {
@@ -254,8 +265,9 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
         _item = item;
         _newMaterial = null;
         _materials = detail.materials;
-        _templateId =
-            _materials.length == 1 ? _materials.single.templateId : null;
+        _templateId = _materials.length == 1
+            ? _materials.single.templateId
+            : null;
         _createAttempt = null;
         _error = null;
       });
@@ -458,11 +470,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   }
 
   void _print() {
+    // The server already applied the queue filters; cancelled bags are never
+    // printed even when the operator filters for processed records.
     final ids = _records
-        .where(
-          (r) =>
-              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
-        )
+        .where((r) => r.selected && !r.isCancelled)
         .map((r) => r.id)
         .join(',');
     context.push(
@@ -474,7 +485,6 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   }
 
   Widget _section(List<Widget> children) => Card(
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
     elevation: 0,
     margin: const EdgeInsets.only(bottom: 20),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -492,18 +502,13 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     final theme = Theme.of(context);
     final locations = ref.watch(inventoryLocationsProvider);
     final selectedCount = _records
-        .where(
-          (r) =>
-              r.selected && !r.isCancelled && (_showProcessed || r.isPending),
-        )
+        .where((r) => r.selected && !r.isCancelled)
         .length;
     final attempt = _tab == 0 ? _createAttempt : _confirmAttempt;
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      appBar: LabAppBar(
         title: const Text('采购入库'),
-        backgroundColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.onSurface,
         leading: const LabBackButton(fallbackLocation: UnifiedRoutes.catalog),
         actions: [
           IconButton(
@@ -548,8 +553,11 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                           },
                   )
                 else
-                  CupertinoSlidingSegmentedControl<int>(
-                    groupValue: _tab,
+                  GlassSegmentedControl<int>(
+                    value: _tab,
+                    onChanged: _busy
+                        ? null
+                        : (value) => setState(() => _tab = value),
                     children: const {
                       0: Padding(
                         padding: EdgeInsets.all(12),
@@ -559,10 +567,6 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                         padding: EdgeInsets.all(12),
                         child: Text('2  扫码上架'),
                       ),
-                    },
-                    disabledChildren: _busy ? const {0, 1} : const {},
-                    onValueChanged: (value) {
-                      if (!_busy && value != null) setState(() => _tab = value);
                     },
                   ),
                 const SizedBox(height: 20),
@@ -576,11 +580,9 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Semantics(
                       liveRegion: true,
-                      child: Text(
-                        _error!,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
+                      child: StatusBanner(
+                        message: _error!,
+                        tone: StatusTone.error,
                       ),
                     ),
                   ),
@@ -589,7 +591,10 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Semantics(
                       liveRegion: true,
-                      child: Text(_notice!, style: theme.textTheme.bodyLarge),
+                      child: StatusBanner(
+                        message: _notice!,
+                        tone: StatusTone.notice,
+                      ),
                     ),
                   ),
                 if (attempt != null)
@@ -627,8 +632,9 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                         ),
                         trailing: IconButton(
                           tooltip: '清除选择',
-                          onPressed:
-                              _busy || attempt != null ? null : _clearItem,
+                          onPressed: _busy || attempt != null
+                              ? null
+                              : _clearItem,
                           icon: const Icon(Icons.close),
                         ),
                       ),
@@ -638,13 +644,15 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                         spacing: 8,
                         children: <Widget>[
                           TextButton(
-                            onPressed:
-                                _busy || attempt != null ? null : _pickItem,
+                            onPressed: _busy || attempt != null
+                                ? null
+                                : _pickItem,
                             child: const Text('从器件库选择'),
                           ),
                           TextButton(
-                            onPressed:
-                                _busy || attempt != null ? null : _newItem,
+                            onPressed: _busy || attempt != null
+                                ? null
+                                : _newItem,
                             child: const Text('资料库没有？新建器件'),
                           ),
                         ],
@@ -716,19 +724,86 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                     const Text('此步骤仅创建待入库记录，不增加库存。'),
                   ]),
                   Text('待入库与打印', style: theme.textTheme.titleLarge),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('显示已入库和已取消记录'),
-                    value: _showProcessed,
-                    onChanged: (value) =>
-                        setState(() => _showProcessed = value),
+                  const SizedBox(height: 8),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final search = TextField(
+                        controller: _queueSearch,
+                        enabled: !_busy,
+                        onChanged: (_) {
+                          setState(() {});
+                          _scheduleQueueReload();
+                        },
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: '筛选队列',
+                          hintText: '袋码 / 名称 / 型号 / 封装 / SN',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _queueSearch.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: '清空',
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    setState(_queueSearch.clear);
+                                    _scheduleQueueReload();
+                                  },
+                                ),
+                          border: const OutlineInputBorder(),
+                        ),
+                      );
+                      final state = DropdownButtonFormField<String>(
+                        initialValue: _stateFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: '记录状态',
+                          isDense: true,
+                        ),
+                        onChanged: _busy
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() => _stateFilter = value);
+                                _run(_reload);
+                              },
+                        items: const <DropdownMenuItem<String>>[
+                          DropdownMenuItem(
+                            value: 'pending',
+                            child: Text('待入库'),
+                          ),
+                          DropdownMenuItem(value: 'done', child: Text('已入库')),
+                          DropdownMenuItem(
+                            value: 'cancelled',
+                            child: Text('已取消'),
+                          ),
+                          DropdownMenuItem(value: 'all', child: Text('全部')),
+                        ],
+                      );
+                      if (constraints.maxWidth < 520) {
+                        return Column(
+                          children: [search, const SizedBox(height: 12), state],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: search),
+                          const SizedBox(width: 12),
+                          SizedBox(width: 160, child: state),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   if (_loaded && _records.isEmpty)
-                    _section([const Text('还没有待入库袋。选择器件后，生成第一批标签。')]),
-                  for (final record in _records.where(
-                    (r) => _showProcessed || r.isPending,
-                  ))
+                    _section([
+                      Text(
+                        _queueSearch.text.trim().isEmpty &&
+                                _stateFilter == 'pending'
+                            ? '还没有待入库袋。选择器件后，生成第一批标签。'
+                            : '没有匹配的袋。换个关键词或状态再试。',
+                      ),
+                    ]),
+                  for (final record in _records)
                     _section([
                       Text(record.name, style: theme.textTheme.titleMedium),
                       const SizedBox(height: 6),

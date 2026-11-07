@@ -27,6 +27,8 @@ CONFLICT = 'CONFLICT'
 INTERNAL_ERROR = 'INTERNAL_ERROR'
 # 同一 C 编号下有多个本地档案且调用方未指定 SN -> 明确歧义，绝不随机取 first
 AMBIGUOUS_MATERIAL = 'AMBIGUOUS_MATERIAL'
+# 按需补抓限流（每用户进行中/每小时上限）
+RATE_LIMITED = 'RATE_LIMITED'
 
 
 class LabApiError(Exception):

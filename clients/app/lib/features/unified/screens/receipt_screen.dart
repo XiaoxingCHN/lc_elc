@@ -14,6 +14,7 @@ import '../unified_routes.dart';
 import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
 
 /// 入库 (receipt): scan / type a code, pick the internal location, confirm the
@@ -95,15 +96,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Future<void> _pickItem() async {
     final item = await ItemPickerDialog.show(context, title: '选择要入库的器件');
     if (item == null || !mounted) return;
-    ref.read(receiptControllerProvider.notifier).setItem(
-          itemKey: item.itemKey,
-          itemName: item.title,
-        );
+    ref
+        .read(receiptControllerProvider.notifier)
+        .setItem(itemKey: item.itemKey, itemName: item.title);
   }
 
   void _commitSuggestion(UnifiedItem item) {
     _suggestPicked = item.itemKey;
-    ref.read(receiptControllerProvider.notifier).setItem(
+    ref
+        .read(receiptControllerProvider.notifier)
+        .setItem(
           itemKey: item.itemKey,
           itemName: item.name.isNotEmpty
               ? item.name
@@ -194,16 +196,14 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     if (!mounted) return;
     if (location == null) {
       final error = ref.read(locationCreateProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? '创建库位失败。')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error ?? '创建库位失败。')));
       return;
     }
     // The new 库码 is a real, independent code printed on its own label.
-    ref.read(receiptControllerProvider.notifier).setLocation(
-          location.id,
-          label: location.display,
-        );
+    ref
+        .read(receiptControllerProvider.notifier)
+        .setLocation(location.id, label: location.display);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已创建库位 ${location.display}（库码 ${location.code}）')),
     );
@@ -218,8 +218,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
     // The card's local archives: needed so a multi-archive C code makes the
     // operator choose the SN BEFORE anything is submitted.
-    final detail =
-        itemKey.isEmpty ? null : ref.watch(catalogDetailProvider(itemKey));
+    final detail = itemKey.isEmpty
+        ? null
+        : ref.watch(catalogDetailProvider(itemKey));
     if (detail != null) {
       final materials =
           detail.valueOrNull?.detail.materials ?? const <LabMaterial>[];
@@ -233,12 +234,14 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
     // Archives of a freshly picked card are still on their way: hold the submit
     // so this C code cannot be received against an implicitly guessed archive.
-    final archivesLoading = itemKey.isNotEmpty &&
+    final archivesLoading =
+        itemKey.isNotEmpty &&
         state.materials.isEmpty &&
         (detail?.isLoading ?? false);
 
     return Scaffold(
-      appBar: LabAppBar(fallbackLocation: '/catalog',
+      appBar: LabAppBar(
+        fallbackLocation: '/catalog',
         title: const Text('入库'),
         actions: <Widget>[
           IconButton(
@@ -268,7 +271,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     enabled: !state.isBusy,
                     autofocus: widget.initialCode == null,
                     onSubmit: (code) {
-                      ref.read(receiptControllerProvider.notifier).setInput(code);
+                      ref
+                          .read(receiptControllerProvider.notifier)
+                          .setInput(code);
                       ref.read(receiptControllerProvider.notifier).resolve();
                     },
                   ),
@@ -366,12 +371,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   TextField(
                     controller: _quantity,
                     enabled: !state.isBusy,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: <TextInputFormatter>[
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
-                    onChanged: (value) =>
-                        ref.read(receiptControllerProvider.notifier).setQuantity(value),
+                    onChanged: (value) => ref
+                        .read(receiptControllerProvider.notifier)
+                        .setQuantity(value),
                     decoration: const InputDecoration(
                       labelText: '入库数量',
                       hintText: '正整数或小数，例如 100',
@@ -382,8 +390,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   TextField(
                     controller: _note,
                     enabled: !state.isBusy,
-                    onChanged: (value) =>
-                        ref.read(receiptControllerProvider.notifier).setNote(value),
+                    onChanged: (value) => ref
+                        .read(receiptControllerProvider.notifier)
+                        .setNote(value),
                     decoration: const InputDecoration(
                       labelText: '备注（可选）',
                       border: OutlineInputBorder(),
@@ -395,7 +404,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           ),
           const SizedBox(height: 8),
 
-          if (state.error != null) _MessageCard(message: state.error!, error: true),
+          if (state.error != null)
+            _MessageCard(message: state.error!, error: true),
           if (state.notice != null && !state.succeeded)
             _MessageCard(message: state.notice!),
           if (!state.canSubmit && !state.isBusy)
@@ -408,11 +418,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
             ),
 
           FilledButton.icon(
-            onPressed:
-                state.isBusy || archivesLoading ? null : _confirmAndSubmit,
+            onPressed: state.isBusy || archivesLoading
+                ? null
+                : _confirmAndSubmit,
             icon: state.submitting
                 ? const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.check),
             label: Text(state.succeeded ? '再入库一袋（同一器件）' : '确认入库'),
           ),
@@ -422,15 +436,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     );
   }
 
-  static String _format(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2);
+  static String _format(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(2);
 
   /// Cheap comparison used to avoid re-pushing the same archive list.
   static bool _sameMaterials(List<LabMaterial> a, List<LabMaterial> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
     for (var index = 0; index < a.length; index++) {
-      if (a[index].templateId != b[index].templateId || a[index].sn != b[index].sn) {
+      if (a[index].templateId != b[index].templateId ||
+          a[index].sn != b[index].sn) {
         return false;
       }
     }
@@ -495,9 +511,10 @@ class _ArchiveSelector extends StatelessWidget {
       children: <Widget>[
         DropdownButtonFormField<int?>(
           isExpanded: true,
-          value: state.materials.any(
-            (material) => material.templateId == state.templateId,
-          )
+          value:
+              state.materials.any(
+                (material) => material.templateId == state.templateId,
+              )
               ? state.templateId
               : null,
           decoration: InputDecoration(
@@ -507,7 +524,10 @@ class _ArchiveSelector extends StatelessWidget {
             border: const OutlineInputBorder(),
           ),
           items: <DropdownMenuItem<int?>>[
-            const DropdownMenuItem<int?>(value: null, child: Text('请选择档案 / SN')),
+            const DropdownMenuItem<int?>(
+              value: null,
+              child: Text('请选择档案 / SN'),
+            ),
             for (final material in state.materials)
               DropdownMenuItem<int?>(
                 value: material.templateId,
@@ -538,8 +558,9 @@ class _ArchiveSelector extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '选择只决定新袋归属哪个 SN/档案，不改变历史档案与旧袋记录。',
-          style: theme.textTheme.labelSmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -580,12 +601,17 @@ class _LocationField extends StatelessWidget {
               for (final location in locations)
                 DropdownMenuItem<int?>(
                   value: location.id,
-                  child: Text(location.display, overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    location.display,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
             ],
             onChanged: enabled
                 ? (value) {
-                    final match = locations.where((location) => location.id == value);
+                    final match = locations.where(
+                      (location) => location.id == value,
+                    );
                     onSelected(value, match.isEmpty ? '' : match.first.display);
                   }
                 : null,
@@ -659,15 +685,16 @@ class _ResultCard extends ConsumerWidget {
             Text('本次入库已完成', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(state.notice ?? ''),
-            if (result?.bag != null)
-              Text('追溯袋：${result!.bag!.display}（可打印标签）'),
+            if (result?.bag != null) Text('追溯袋：${result!.bag!.display}（可打印标签）'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: <Widget>[
                 FilledButton.tonalIcon(
                   onPressed: () {
-                    ref.read(receiptControllerProvider.notifier).startNewSubmission();
+                    ref
+                        .read(receiptControllerProvider.notifier)
+                        .startNewSubmission();
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('继续入库'),
@@ -703,14 +730,8 @@ class _MessageCard extends StatelessWidget {
   final bool error;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: error ? theme.colorScheme.errorContainer : theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(message, style: theme.textTheme.bodySmall),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => StatusBanner(
+    message: message,
+    tone: error ? StatusTone.error : StatusTone.notice,
+  );
 }

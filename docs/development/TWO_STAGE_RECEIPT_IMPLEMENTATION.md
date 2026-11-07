@@ -31,7 +31,7 @@
 
 | 路由后缀（前缀 /lab/api/inventory） | 请求 | 返回 data |
 |---|---|---|
-| /pending/list | 可选 cursor（递减整数 ID） | records、下一页 cursor；每页最多 100 项 |
+| /pending/list | 可选 cursor（递减整数 ID）、query、state（`pending` / `done` / `cancelled` / `all`） | records、下一页 cursor、过滤后的 total；每页最多 100 项。不传 state 时保持旧行为（不按状态过滤）；Web 默认传 pending |
 | /pending/create | request_key、quantity、count；item_key 与可选 product_template_id，或 material | records；每袋独立 ID 和码，同请求回放原结果 |
 | /pending/update | pending_id、action=select 与 selected 布尔值；或 action=cancel | record |
 | /pending/resolve | raw 袋码 | record、recommendations；历史正式袋返回 bag |

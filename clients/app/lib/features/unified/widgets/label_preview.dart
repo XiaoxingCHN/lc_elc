@@ -41,9 +41,13 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
       final result = await action();
       if (!mounted) return;
       if (openAfterSave && result.ok && result.path != null) {
-        final opened = await ref.read(pdfOutputProvider).openSaved(result.path!);
+        final opened = await ref
+            .read(pdfOutputProvider)
+            .openSaved(result.path!);
         if (!mounted) return;
-        _tell(opened.ok ? '${result.message}\n${opened.message}' : result.message);
+        _tell(
+          opened.ok ? '${result.message}\n${opened.message}' : result.message,
+        );
         return;
       }
       _tell(result.message);
@@ -53,7 +57,8 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
   }
 
   void _tell(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -113,10 +118,12 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
                               FilledButton.tonalIcon(
                                 onPressed: _busy
                                     ? null
-                                    : () => _run(() => service.save(
+                                    : () => _run(
+                                        () => service.save(
                                           widget.pdf.bytes,
                                           widget.pdf.filename,
-                                        )),
+                                        ),
+                                      ),
                                 icon: const Icon(Icons.save_alt),
                                 label: const Text('保存 PDF'),
                               ),
@@ -124,12 +131,12 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
                                 onPressed: _busy
                                     ? null
                                     : () => _run(
-                                          () => service.save(
-                                            widget.pdf.bytes,
-                                            widget.pdf.filename,
-                                          ),
-                                          openAfterSave: true,
+                                        () => service.save(
+                                          widget.pdf.bytes,
+                                          widget.pdf.filename,
                                         ),
+                                        openAfterSave: true,
+                                      ),
                                 icon: const Icon(Icons.open_in_new),
                                 label: const Text('保存并打开'),
                               ),
@@ -137,10 +144,12 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
                                 FilledButton.icon(
                                   onPressed: _busy
                                       ? null
-                                      : () => _run(() => service.print(
+                                      : () => _run(
+                                          () => service.print(
                                             widget.pdf.bytes,
                                             widget.pdf.filename,
-                                          )),
+                                          ),
+                                        ),
                                   icon: const Icon(Icons.print),
                                   label: const Text('系统打印'),
                                 ),
@@ -148,10 +157,12 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
                                 OutlinedButton.icon(
                                   onPressed: _busy
                                       ? null
-                                      : () => _run(() => service.share(
+                                      : () => _run(
+                                          () => service.share(
                                             widget.pdf.bytes,
                                             widget.pdf.filename,
-                                          )),
+                                          ),
+                                        ),
                                   icon: const Icon(Icons.share),
                                   label: const Text('分享'),
                                 ),
@@ -176,7 +187,11 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
 /// This is a diagram of the CONFIGURED millimetres, not a fake render of the
 /// server PDF - the real PDF is only ever shown from the server bytes.
 class LabelLayoutPreview extends StatelessWidget {
-  const LabelLayoutPreview({super.key, required this.layout, this.height = 180});
+  const LabelLayoutPreview({
+    super.key,
+    required this.layout,
+    this.height = 180,
+  });
 
   final LabelLayout layout;
   final double height;
@@ -184,6 +199,8 @@ class LabelLayoutPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Paper stays white and its caption stays black regardless of app theme.
+    final paperText = theme.textTheme.labelSmall?.copyWith(color: Colors.black);
 
     return Container(
       height: height,
@@ -191,7 +208,7 @@ class LabelLayoutPreview extends StatelessWidget {
         color: Colors.white,
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      padding: EdgeInsets.all(layout.usableWidthMm <= 0 ? 4 : 4),
+      padding: const EdgeInsets.all(4),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
@@ -199,24 +216,26 @@ class LabelLayoutPreview extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                for (var column = 0; column < layout.columns.clamp(0, 8); column++)
+                for (
+                  var column = 0;
+                  column < layout.columns.clamp(0, 8);
+                  column++
+                )
                   Container(
                     width: 26,
                     height: 16,
                     margin: const EdgeInsets.all(1),
                     decoration: BoxDecoration(
-                      border: Border.all(color: theme.colorScheme.primary),
-                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                      border: Border.all(color: Colors.black54),
+                      color: Colors.black.withValues(alpha: 0.04),
                     ),
                   ),
               ],
             ),
           const SizedBox(height: 4),
           Text(
-            layout.isValid
-                ? '${layout.columns}×${layout.rows} / 页'
-                : '布局不可用',
-            style: theme.textTheme.labelSmall,
+            layout.isValid ? '${layout.columns}×${layout.rows} / 页' : '布局不可用',
+            style: paperText,
           ),
         ],
       ),

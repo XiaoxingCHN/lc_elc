@@ -53,6 +53,28 @@ void main() {
     },
   );
 
+  test('queue filters are sent to the server, not applied locally', () async {
+    FakeLabApi fake() => FakeLabApi(
+      onCall: (path, params) async => path == LabApiRoutes.pendingList
+          ? <String, dynamic>{'records': <Map<String, dynamic>>[], 'cursor': null}
+          : <String, dynamic>{},
+    );
+
+    final filtered = fake();
+    await filtered.client.pendingReceipts(query: ' 10R ', state: 'done');
+    final sent = filtered.onlyParams(LabApiRoutes.pendingList);
+    expect(sent['query'], '10R');
+    expect(sent['state'], 'done');
+    expect(sent.containsKey('cursor'), isFalse);
+
+    // No filters -> no filter keys, so old servers keep their behavior.
+    final unfiltered = fake();
+    await unfiltered.client.pendingReceipts();
+    final plain = unfiltered.onlyParams(LabApiRoutes.pendingList);
+    expect(plain.containsKey('query'), isFalse);
+    expect(plain.containsKey('state'), isFalse);
+  });
+
   test('pending label defaults omit volatile location and quantity', () {
     final fields = LabelKind.pending.defaultFields;
     expect(

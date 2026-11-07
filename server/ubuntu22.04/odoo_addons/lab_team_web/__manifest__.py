@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "战队管理站点（仓库 Web 入口）",
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.2.1",
     "summary": "独立于 Odoo 原生 WebClient 的战队管理前端入口：欢迎、登录、仓库检索与器件详情",
     "description": """
 战队管理站点

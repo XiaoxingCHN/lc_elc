@@ -1,6 +1,6 @@
 {
     "name": "实验室立创资料库 (LCSC catalog index)",
-    "version": "19.0.2.0.5",
+    "version": "19.0.2.0.10",
     "summary": "立创商城中文资料库的只读索引镜像，与实验室物料合并为一份统一器件库",
     "description": """
 统一器件库（catalog side）
@@ -24,6 +24,7 @@
         "security/lab_catalog_security.xml",
         "security/ir.model.access.csv",
         "data/lab_catalog_data.xml",
+        "data/lab_catalog_cron.xml",
         "views/lab_catalog_views.xml",
         "views/lab_catalog_menu.xml",
     ],

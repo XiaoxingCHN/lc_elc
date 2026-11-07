@@ -9,8 +9,11 @@ import '../providers/inventory_providers.dart';
 import '../providers/label_providers.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/label_preview.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
+
 import 'package:go_router/go_router.dart';
+
 import '../unified_routes.dart';
 
 /// 标签 (labels): design the physical size in millimetres, preview the real A4
@@ -75,9 +78,7 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     if (ids.isNotEmpty) {
       // A deep link carries bare ids; the human label is resolved later (from the
       // item detail or the location list), so no internal number is shown here.
-      notifier.setSelection(<int, String>{
-        for (final id in ids) id: '',
-      });
+      notifier.setSelection(<int, String>{for (final id in ids) id: ''});
     }
   }
 
@@ -96,9 +97,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     final detail = await ref.read(catalogDetailProvider(item.itemKey).future);
     if (!mounted) return;
     if (detail.detail.bags.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('该器件没有已入库的实物袋，无法打印追溯标签。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('该器件没有已入库的实物袋，无法打印追溯标签。')));
       return;
     }
 
@@ -125,19 +126,20 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       subtitle: Text(
                         <String>[
                           if (bag.sn.isNotEmpty) 'SN ${bag.sn}',
-                          if (bag.locationCode.isNotEmpty) '库位 ${bag.locationCode}',
+                          if (bag.locationCode.isNotEmpty)
+                            '库位 ${bag.locationCode}',
                         ].join(' · '),
                       ),
                       onChanged: !bag.hasId
                           ? null
                           : (value) => setDialogState(() {
-                                if (value == true) {
-                                  selection[bag.id!] =
-                                      '${item.title} ${bag.display}';
-                                } else {
-                                  selection.remove(bag.id);
-                                }
-                              }),
+                              if (value == true) {
+                                selection[bag.id!] =
+                                    '${item.title} ${bag.display}';
+                              } else {
+                                selection.remove(bag.id);
+                              }
+                            }),
                     ),
                 ],
               ),
@@ -177,7 +179,8 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: LabAppBar(fallbackLocation: '/catalog',
+      appBar: LabAppBar(
+        fallbackLocation: '/catalog',
         title: const Text('标签设计与打印'),
         actions: <Widget>[
           IconButton(
@@ -199,15 +202,30 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                   Text('标签类型', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<LabelKind>(
-                    value: state.kind, isExpanded: true,
+                    value: state.kind,
+                    isExpanded: true,
                     items: const [
-                      DropdownMenuItem(value: LabelKind.pending, child: Text('待入库袋标签')),
-                      DropdownMenuItem(value: LabelKind.bag, child: Text('已入库袋标签')),
-                      DropdownMenuItem(value: LabelKind.location, child: Text('库位标签')),
+                      DropdownMenuItem(
+                        value: LabelKind.pending,
+                        child: Text('待入库袋标签'),
+                      ),
+                      DropdownMenuItem(
+                        value: LabelKind.bag,
+                        child: Text('已入库袋标签'),
+                      ),
+                      DropdownMenuItem(
+                        value: LabelKind.location,
+                        child: Text('库位标签'),
+                      ),
                     ],
-                    onChanged: state.submitting ? null : (value) {
-                      if (value != null) ref.read(labelDesignerProvider.notifier).setKind(value);
-                    },
+                    onChanged: state.submitting
+                        ? null
+                        : (value) {
+                            if (value != null)
+                              ref
+                                  .read(labelDesignerProvider.notifier)
+                                  .setKind(value);
+                          },
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -233,13 +251,17 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          state.kind != LabelKind.location ? '要打印的追溯袋' : '要打印的库位',
+                          state.kind != LabelKind.location
+                              ? '要打印的追溯袋'
+                              : '要打印的库位',
                           style: theme.textTheme.titleSmall,
                         ),
                       ),
                       if (state.kind == LabelKind.bag)
                         TextButton.icon(
-                          onPressed: state.submitting ? null : () => _pickBags(state),
+                          onPressed: state.submitting
+                              ? null
+                              : () => _pickBags(state),
                           icon: const Icon(Icons.search, size: 18),
                           label: const Text('按器件选择'),
                         ),
@@ -247,19 +269,25 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                         onPressed: state.selection.isEmpty
                             ? null
                             : () => ref
-                                .read(labelDesignerProvider.notifier)
-                                .clearSelection(),
+                                  .read(labelDesignerProvider.notifier)
+                                  .clearSelection(),
                         child: const Text('清空'),
                       ),
                     ],
                   ),
                   if (state.kind == LabelKind.pending)
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('已选 ${state.selection.length} 袋；补打沿用原袋码。'),
-                    TextButton.icon(
-                      onPressed: () => context.push(UnifiedRoutes.pendingReceipt),
-                      icon: const Icon(Icons.playlist_add), label: const Text('在制袋列表管理打印选择'),
-                    )])
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('已选 ${state.selection.length} 袋；补打沿用原袋码。'),
+                        TextButton.icon(
+                          onPressed: () =>
+                              context.push(UnifiedRoutes.pendingReceipt),
+                          icon: const Icon(Icons.playlist_add),
+                          label: const Text('在制袋列表管理打印选择'),
+                        ),
+                      ],
+                    )
                   else if (state.kind == LabelKind.bag)
                     Text(
                       state.selection.isEmpty
@@ -279,7 +307,8 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                             error: (error, _) => ErrorView(
                               message: '库位加载失败：$error',
                               compact: true,
-                              onRetry: () => ref.invalidate(inventoryLocationsProvider),
+                              onRetry: () =>
+                                  ref.invalidate(inventoryLocationsProvider),
                             ),
                             data: (locations) => locations.isEmpty
                                 ? const Text('还没有内部库位，请先在入库页新建库位。')
@@ -289,18 +318,24 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                                         CheckboxListTile(
                                           dense: true,
                                           contentPadding: EdgeInsets.zero,
-                                          value: location.id != null &&
-                                              state.selection.containsKey(location.id),
+                                          value:
+                                              location.id != null &&
+                                              state.selection.containsKey(
+                                                location.id,
+                                              ),
                                           title: Text(location.display),
                                           subtitle: Text('库码 ${location.code}'),
                                           onChanged: location.id == null
                                               ? null
                                               : (value) => ref
-                                                  .read(labelDesignerProvider.notifier)
-                                                  .toggleSelection(
-                                                    location.id!,
-                                                    location.display,
-                                                  ),
+                                                    .read(
+                                                      labelDesignerProvider
+                                                          .notifier,
+                                                    )
+                                                    .toggleSelection(
+                                                      location.id!,
+                                                      location.display,
+                                                    ),
                                         ),
                                     ],
                                   ),
@@ -323,17 +358,49 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: <Widget>[
-                      Expanded(child: _mmField(_width, '标签宽', (value) => ref.read(labelDesignerProvider.notifier).setWidth(value))),
+                      Expanded(
+                        child: _mmField(
+                          _width,
+                          '标签宽',
+                          (value) => ref
+                              .read(labelDesignerProvider.notifier)
+                              .setWidth(value),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _mmField(_height, '标签高', (value) => ref.read(labelDesignerProvider.notifier).setHeight(value))),
+                      Expanded(
+                        child: _mmField(
+                          _height,
+                          '标签高',
+                          (value) => ref
+                              .read(labelDesignerProvider.notifier)
+                              .setHeight(value),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: <Widget>[
-                      Expanded(child: _mmField(_margin, '页边距', (value) => ref.read(labelDesignerProvider.notifier).setMargin(value))),
+                      Expanded(
+                        child: _mmField(
+                          _margin,
+                          '页边距',
+                          (value) => ref
+                              .read(labelDesignerProvider.notifier)
+                              .setMargin(value),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _mmField(_gap, '标签间距', (value) => ref.read(labelDesignerProvider.notifier).setGap(value))),
+                      Expanded(
+                        child: _mmField(
+                          _gap,
+                          '标签间距',
+                          (value) => ref
+                              .read(labelDesignerProvider.notifier)
+                              .setGap(value),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -344,12 +411,15 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                       IconButton(
                         onPressed: state.copies > 1
                             ? () => ref
-                                .read(labelDesignerProvider.notifier)
-                                .setCopies(state.copies - 1)
+                                  .read(labelDesignerProvider.notifier)
+                                  .setCopies(state.copies - 1)
                             : null,
                         icon: const Icon(Icons.remove_circle_outline),
                       ),
-                      Text('${state.copies}', style: theme.textTheme.titleMedium),
+                      Text(
+                        '${state.copies}',
+                        style: theme.textTheme.titleMedium,
+                      ),
                       IconButton(
                         onPressed: () => ref
                             .read(labelDesignerProvider.notifier)
@@ -357,7 +427,10 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                         icon: const Icon(Icons.add_circle_outline),
                       ),
                       const Spacer(),
-                      Text('共 ${layout.labelCount} 张', style: theme.textTheme.labelSmall),
+                      Text(
+                        '共 ${layout.labelCount} 张',
+                        style: theme.textTheme.labelSmall,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -387,7 +460,10 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                     children: <Widget>[
                       for (final field in kLabelFields)
                         FilterChip(
-                          label: Text(field.label, style: const TextStyle(fontSize: 11)),
+                          label: Text(
+                            field.label,
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           selected: state.fields.contains(field.id),
                           onSelected: (_) => ref
                               .read(labelDesignerProvider.notifier)
@@ -419,19 +495,24 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text(layout.summary, style: theme.textTheme.bodySmall),
+                            Text(
+                              layout.summary,
+                              style: theme.textTheme.bodySmall,
+                            ),
                             const SizedBox(height: 6),
                             for (final error in layout.errors)
                               Text(
                                 '✕ $error',
-                                style: theme.textTheme.labelSmall
-                                    ?.copyWith(color: theme.colorScheme.error),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
                               ),
                             for (final warning in layout.warnings)
                               Text(
                                 '! $warning',
-                                style: theme.textTheme.labelSmall
-                                    ?.copyWith(color: theme.colorScheme.tertiary),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.tertiary,
+                                ),
                               ),
                           ],
                         ),
@@ -445,28 +526,19 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
           const SizedBox(height: 8),
 
           if (state.error != null)
-            Card(
-              color: theme.colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(state.error!, style: theme.textTheme.bodySmall),
-              ),
-            ),
+            StatusBanner(message: state.error!, tone: StatusTone.error),
           if (state.notice != null)
-            Card(
-              color: theme.colorScheme.tertiaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(state.notice!, style: theme.textTheme.bodySmall),
-              ),
-            ),
+            StatusBanner(message: state.notice!, tone: StatusTone.notice),
           const SizedBox(height: 8),
 
           FilledButton.icon(
             onPressed: state.canPreview ? _preview : null,
             icon: state.submitting
                 ? const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.picture_as_pdf),
             label: const Text('生成 A4 PDF 并预览'),
           ),
@@ -511,7 +583,9 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
 
   /// Human summary of the current selection (never an internal id or key).
   static String _selectionSummary(LabelDesignerState state) {
-    final labels = state.selection.values.where((label) => label.isNotEmpty).toList();
+    final labels = state.selection.values
+        .where((label) => label.isNotEmpty)
+        .toList();
     if (labels.isEmpty) return '已选 ${state.selection.length} 项';
     return '已选 ${state.selection.length} 个袋：'
         '${labels.take(3).join('、')}'

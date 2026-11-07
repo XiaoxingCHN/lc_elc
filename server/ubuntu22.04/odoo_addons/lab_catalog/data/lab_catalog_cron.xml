@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+          按需补抓队列。Odoo 19 已移除 ir.cron 的 numbercall / doall，
+          因此这里只声明仍然有效的字段；任务由 state 自己取活，不依赖补跑语义。
+        -->
+        <record id="ir_cron_lab_catalog_fetch" model="ir.cron">
+            <field name="name">器件库：处理在线补抓队列</field>
+            <field name="model_id" ref="model_lab_catalog_fetch_request"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_queue(limit=2)</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="priority">20</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

@@ -28,7 +28,7 @@ class CategorySidebar extends ConsumerWidget {
     return SizedBox(
       width: width,
       child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.55),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -62,7 +62,8 @@ class CategorySidebar extends ConsumerWidget {
                       Text('$error', style: theme.textTheme.labelSmall),
                       const SizedBox(height: 8),
                       OutlinedButton(
-                        onPressed: () => ref.invalidate(catalogCategoriesProvider),
+                        onPressed: () =>
+                            ref.invalidate(catalogCategoriesProvider),
                         child: const Text('重试'),
                       ),
                     ],
@@ -81,7 +82,10 @@ class CategorySidebar extends ConsumerWidget {
                     if (categories.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(12),
-                        child: Text('服务端没有返回分类。', style: TextStyle(fontSize: 12)),
+                        child: Text(
+                          '服务端没有返回分类。',
+                          style: TextStyle(fontSize: 12),
+                        ),
                       ),
                   ],
                 ),
@@ -110,8 +114,8 @@ class CategorySidebar extends ConsumerWidget {
         tilePadding: EdgeInsets.only(left: 12 + depth * 12.0, right: 8),
         childrenPadding: EdgeInsets.zero,
         dense: true,
-        initiallyExpanded: selectedId != null &&
-            _containsSelection(node, selectedId!),
+        initiallyExpanded:
+            selectedId != null && _containsSelection(node, selectedId!),
         title: Text(node.display, style: const TextStyle(fontSize: 13)),
         onExpansionChanged: (_) {},
         children: <Widget>[
@@ -119,8 +123,10 @@ class CategorySidebar extends ConsumerWidget {
             dense: true,
             contentPadding: EdgeInsets.only(left: 24 + depth * 12.0, right: 8),
             selected: selectedId == node.id,
-            title: Text('全部 ${node.name}',
-                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+            title: Text(
+              '全部 ${node.name}',
+              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+            ),
             onTap: () => onSelected(node.id),
           ),
           for (final child in node.children) ..._buildNode(child, depth + 1),

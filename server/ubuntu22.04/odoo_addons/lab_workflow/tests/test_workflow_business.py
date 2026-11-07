@@ -190,6 +190,44 @@ class LabWorkflowTransactionTest(TransactionCase):
         with self.assertRaises(LabApiError):
             self._receipt(10, trace_code=record['trace_code'])
 
+    def test_16_pending_list_query_state_and_total(self):
+        records = self._pending(3)
+        common = self.common.with_user(self.operator)
+
+        pending = common.lab_pending_list(state='pending')
+        self.assertEqual(pending['total'], 3)
+        self.assertEqual(len(pending['records']), 3)
+
+        # Whitespace means AND: both tokens must hit one of the allowed fields.
+        self.assertEqual(
+            common.lab_pending_list(query='TEST-R-270 LAB-TEST-0001')['total'], 3)
+        self.assertEqual(
+            common.lab_pending_list(query='TEST-R-270 NOT-THERE')['total'], 0)
+
+        # Confirm one bag: it moves from pending to done, and the unfiltered
+        # call keeps the old (all states) behavior.
+        common.lab_pending_confirm({
+            'request_key': _key('confirm'),
+            'pending_id': records[0]['id'],
+            'location_id': self.location_a.id,
+            'quantity': 10,
+        })
+        self.assertEqual(common.lab_pending_list(state='pending')['total'], 2)
+        done = common.lab_pending_list(state='done')
+        self.assertEqual(done['total'], 1)
+        self.assertEqual(done['records'][0]['id'], records[0]['id'])
+        self.assertEqual(common.lab_pending_list()['total'], 3)
+        self.assertEqual(common.lab_pending_list(state='all')['total'], 3)
+
+        with self.assertRaises(LabApiError):
+            common.lab_pending_list(state='unknown')
+
+    def test_17_pending_list_is_owner_scoped(self):
+        self._pending(2)
+        other = self.common.with_user(self.other_operator)
+        self.assertEqual(other.lab_pending_list(state='pending')['total'], 0)
+        self.assertEqual(other.lab_pending_list(query='TEST-R-270')['total'], 0)
+
     def _issue(self, bag_id, quantity, borrower=None, project='测试项目', user=None):
         common = self.common.with_user(user or self.operator)
         return common.lab_issue({
@@ -271,6 +309,31 @@ class LabWorkflowTransactionTest(TransactionCase):
         self.assertTrue(template.is_storable)
         self.assertEqual(template.tracking, 'lot')
         self.assertEqual(data['bag']['quantity'], 7)
+
+    def test_06_on_demand_archive_copies_catalog_facts(self):
+        """现场建档必须带上资料库的名称/型号/品牌/封装/参数（否则标签全空）。"""
+        item = self.env['lab.catalog.item'].create({
+            'catalog_code': 'C888778',
+            'name': '厚膜电阻 100kΩ ±5% 100mW',
+            'mpn': 'RC0603JR-07100KL',
+            'brand': 'YAGEO(国巨)',
+            'package': '0603',
+            'search_text': 'C888778 厚膜电阻 100kΩ',
+        })
+        self.env['lab.catalog.param'].create([
+            {'item_id': item.id, 'sequence': 10, 'code': 'resistance',
+             'name': '阻值', 'value': '100kΩ'},
+            {'item_id': item.id, 'sequence': 20, 'code': 'tolerance',
+             'name': '精度', 'value': '±5%'},
+        ])
+        self._receipt(3, item_key='lcsc:C888778')
+        template = self.env['product.template'].search(
+            [('lab_lcsc_code', '=', 'C888778')], limit=1)
+        self.assertEqual(template.name, '厚膜电阻 100kΩ ±5% 100mW')
+        self.assertEqual(template.lab_mpn, 'RC0603JR-07100KL')
+        self.assertEqual(template.lab_brand, 'YAGEO(国巨)')
+        self.assertEqual(template.lab_package, '0603')
+        self.assertIn('100kΩ', template.lab_specifications or '')
 
     # ==================================================================
     # 2. 领用 / 归还

@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../widgets/lab_ui.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/catalog_query.dart';
@@ -100,7 +103,7 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
           decoration: InputDecoration(
             isDense: true,
             labelText: '搜索器件',
-            hintText: 'C 编号 / 型号 / 名称 / 品牌',
+            hintText: 'C 编号 / 型号 / 名称 / 品牌 / 参数',
             prefixIcon: const Icon(Icons.search),
             suffixIcon: _search.text.isEmpty
                 ? null
@@ -120,8 +123,10 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
           dense: true,
           contentPadding: EdgeInsets.zero,
           title: const Text('只看内部有库存'),
-          subtitle: const Text('按实验室实际库存过滤（不含商城现货）',
-              style: TextStyle(fontSize: 11)),
+          subtitle: const Text(
+            '按实验室实际库存过滤（不含商城现货）',
+            style: TextStyle(fontSize: 11),
+          ),
           value: query.stockOnly,
           onChanged: (value) => _apply(query.copyWith(stockOnly: value)),
         ),
@@ -150,9 +155,12 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
                     labelText: '分类',
                     border: OutlineInputBorder(),
                   ),
-                  value: query.categoryId,
+                  initialValue: query.categoryId,
                   items: <DropdownMenuItem<int?>>[
-                    const DropdownMenuItem<int?>(value: null, child: Text('全部分类')),
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('全部分类'),
+                    ),
                     for (final option in options)
                       DropdownMenuItem<int?>(
                         value: option.category.id,
@@ -162,7 +170,8 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
                         ),
                       ),
                   ],
-                  onChanged: (value) => _apply(query.copyWith(categoryId: value)),
+                  onChanged: (value) =>
+                      _apply(query.copyWith(categoryId: value)),
                 ),
               );
             },
@@ -204,16 +213,19 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
                     onChanged: (values) =>
                         _apply(query.copyWith(packages: values.toSet())),
                   ),
-                for (final parameter in (_showAllParameters
-                    ? facets.parameters
-                    : facets.parameters.take(_visibleParameterCount)))
+                for (final parameter
+                    in (_showAllParameters
+                        ? facets.parameters
+                        : facets.parameters.take(_visibleParameterCount)))
                   _FacetGroup(
                     title: parameter.label,
                     options: parameter.values,
-                    selected: query.parameters[parameter.code] ?? const <String>{},
+                    selected:
+                        query.parameters[parameter.code] ?? const <String>{},
                     onChanged: (values) {
-                      final parameters =
-                          Map<String, Set<String>>.of(query.parameters);
+                      final parameters = Map<String, Set<String>>.of(
+                        query.parameters,
+                      );
                       if (values.isEmpty) {
                         parameters.remove(parameter.code);
                       } else {
@@ -230,14 +242,16 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
                         () => _showAllParameters = !_showAllParameters,
                       ),
                       icon: Icon(
-                        _showAllParameters ? Icons.expand_less : Icons.expand_more,
+                        _showAllParameters
+                            ? Icons.expand_less
+                            : Icons.expand_more,
                         size: 18,
                       ),
                       label: Text(
                         _showAllParameters
                             ? '收起参数'
                             : '展开更多参数（还有 '
-                                '${facets.parameters.length - _visibleParameterCount} 项）',
+                                  '${facets.parameters.length - _visibleParameterCount} 项）',
                       ),
                     ),
                   ),
@@ -251,7 +265,9 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
           children: <Widget>[
             Expanded(
               child: Text(
-                query.isFiltered ? '已启用 ${query.activeFilterCount} 个条件' : '未设置筛选条件',
+                query.isFiltered
+                    ? '已启用 ${query.activeFilterCount} 个条件'
+                    : '未设置筛选条件',
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -336,7 +352,10 @@ class _FacetGroupState extends State<_FacetGroup> {
             children: <Widget>[
               for (final option in values)
                 FilterChip(
-                  label: Text(option.display, style: const TextStyle(fontSize: 11)),
+                  label: Text(
+                    option.display,
+                    style: const TextStyle(fontSize: 11),
+                  ),
                   selected: widget.selected.contains(option.value),
                   onSelected: (selected) {
                     final next = Set<String>.of(widget.selected);
@@ -376,9 +395,7 @@ class _InlineError extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.error_outline, size: 16, color: theme.colorScheme.error),
           const SizedBox(width: 6),
-          Expanded(
-            child: Text(message, style: theme.textTheme.bodySmall),
-          ),
+          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
           if (onRetry != null)
             TextButton(onPressed: onRetry, child: const Text('重试')),
         ],
@@ -398,18 +415,26 @@ class FilterDrawer extends StatelessWidget {
     return Drawer(
       width: MediaQuery.of(context).size.width * 0.86,
       child: SafeArea(
-        child: Column(
-          children: <Widget>[
-            ListTile(
-              title: const Text('筛选条件'),
-              trailing: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+        child: GlassSurface(
+          blur: GlassTokens.ofContext(context).blurOverlay,
+          radius: 0,
+          padding: EdgeInsets.zero,
+          showEdge: false,
+          showShadow: false,
+          child: Column(
+            children: <Widget>[
+              ListTile(
+                title: const Text('筛选条件'),
+                trailing: IconButton(
+                  tooltip: '关闭筛选',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(child: child),
-          ],
+              const Divider(height: 1),
+              Expanded(child: child),
+            ],
+          ),
         ),
       ),
     );

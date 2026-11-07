@@ -6,7 +6,7 @@
 """
 import logging
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -48,3 +48,24 @@ class LabCatalogParam(models.Model):
             except Exception as exc:
                 cr.execute('ROLLBACK TO SAVEPOINT lc_param_idx')
                 _logger.warning('lab_catalog: param index skipped: %s', exc)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records.mapped('item_id')._recompute_search_params()
+        return records
+
+    def write(self, vals):
+        items = self.mapped('item_id')
+        result = super().write(vals)
+        items |= self.mapped('item_id')
+        if any(key in vals for key in
+               ('item_id', 'sequence', 'code', 'name', 'value', 'detail_value')):
+            items._recompute_search_params()
+        return result
+
+    def unlink(self):
+        items = self.mapped('item_id')
+        result = super().unlink()
+        items._recompute_search_params()
+        return result

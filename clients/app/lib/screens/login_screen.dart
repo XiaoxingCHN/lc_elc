@@ -41,6 +41,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// The single operator choice on this screen.
   bool _rememberLogin = OdooConfig.rememberLoginDefault;
 
+  /// A build with `--dart-define=LAB_ODOO_URL=...` hides the address field, so
+  /// daily use is just account + password. "切换服务器" reveals it again —
+  /// a wrong build must never be a dead end.
+  bool _editServer = !OdooConfig.hasFixedServer;
+  bool _editDatabase = !OdooConfig.hasFixedDatabase;
+
   /// Set once the remembered account has been applied, so later rebuilds never
   /// overwrite what the operator is typing.
   /// True while the code (not the operator) edits the text fields.
@@ -93,10 +99,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   LoginScope _currentScope() => LoginScope.fromInput(
-        baseUrl: _urlController.text,
-        database: _dbController.text,
-        login: _userController.text,
-      );
+    baseUrl: _urlController.text,
+    database: _dbController.text,
+    login: _userController.text,
+  );
 
   /// The typed password belongs to the account captured in [_passwordScope].
   /// Any change of server/database/user invalidates it immediately.
@@ -123,7 +129,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (saved == null) return;
 
     final scope = saved.scope;
-    final password = await ref.read(authProvider.notifier).revealRememberedPassword(
+    final password = await ref
+        .read(authProvider.notifier)
+        .revealRememberedPassword(
           baseUrl: scope.baseUrl,
           database: scope.database,
           login: scope.login,
@@ -191,7 +199,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Switching it off erases the stored password for this exact account right
     // away - it must not survive until the next login.
-    await ref.read(authProvider.notifier).setRememberLoginPreference(
+    await ref
+        .read(authProvider.notifier)
+        .setRememberLoginPreference(
           baseUrl: _urlController.text,
           database: _dbController.text,
           login: _userController.text,
@@ -206,7 +216,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
     if (!confirmed || !mounted) return;
 
-    await ref.read(authProvider.notifier).forgetSavedPassword(
+    await ref
+        .read(authProvider.notifier)
+        .forgetSavedPassword(
           baseUrl: _urlController.text,
           database: _dbController.text,
           login: _userController.text,
@@ -247,7 +259,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
-  Future<bool> _confirm({required String title, required String message}) async {
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+  }) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -279,10 +294,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // dashboard: list and captured data live in the same screen.
         context.go(UnifiedRoutes.catalog);
       } else if (next.hasError && next.errorMessage != null) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.errorMessage!),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
+            content: Text(
+              next.errorMessage!,
+              style: TextStyle(color: theme.colorScheme.onError),
+            ),
             duration: const Duration(seconds: 8),
           ),
         );
@@ -292,13 +311,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Safety net: the router keeps the splash screen up while initializing, so
     // this only happens if the screen is built directly.
     if (authState.isInitializing) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final busy = authState.isLoading;
     final canRememberPassword = authState.canRememberPassword;
+    final tokens = GlassTokens.ofContext(context);
 
     return Scaffold(
       appBar: LabAppBar(
@@ -315,14 +333,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               }
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'password',
-                child: Text('清除本机保存的密码'),
-              ),
-              PopupMenuItem(
-                value: 'all',
-                child: Text('清除记住的全部账号'),
-              ),
+              PopupMenuItem(value: 'password', child: Text('清除本机保存的密码')),
+              PopupMenuItem(value: 'all', child: Text('清除记住的全部账号')),
             ],
           ),
         ],
@@ -333,200 +345,261 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             padding: const EdgeInsets.all(24.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.inventory_2, size: 64, color: Colors.blue),
-                  const SizedBox(height: 24),
-                  const Text(
-                    '实验室元器件库存系统',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 24),
+              child: GlassPanel(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.inventory_2,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '实验室元器件库存系统',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
-                  // --- startup / auto-login outcome -------------------------
-                  if (authState.noticeMessage != null) ...[
-                    _Banner(
-                      icon: Icons.info_outline,
-                      color: Colors.amber,
-                      text: authState.noticeMessage!,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (authState.errorMessage != null) ...[
-                    _Banner(
-                      icon: Icons.error_outline,
-                      color: Colors.red,
-                      text: authState.errorMessage!,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (_scopeChangedNotice != null) ...[
-                    _Banner(
-                      icon: Icons.sync_problem,
-                      color: Colors.blueGrey,
-                      text: _scopeChangedNotice!,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                    // --- startup / auto-login outcome -------------------------
+                    if (authState.noticeMessage != null) ...[
+                      _Banner(
+                        icon: Icons.info_outline,
+                        color: Theme.of(context).colorScheme.tertiary,
+                        text: authState.noticeMessage!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (authState.errorMessage != null) ...[
+                      _Banner(
+                        icon: Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        text: authState.errorMessage!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (_scopeChangedNotice != null) ...[
+                      _Banner(
+                        icon: Icons.sync_problem,
+                        color: Theme.of(context).colorScheme.secondary,
+                        text: _scopeChangedNotice!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
-                  TextField(
-                    controller: _urlController,
-                    enabled: !busy,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: 'Odoo 服务器地址 *',
-                      hintText: 'http://192.168.31.105:8069',
-                      prefixIcon: const Icon(Icons.dns),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _dbController,
-                    enabled: !busy,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: '数据库名 *',
-                      hintText: '例如 LcHardwareHouse',
-                      prefixIcon: const Icon(Icons.storage),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _userController,
-                    enabled: !busy,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: '用户名 *',
-                      prefixIcon: const Icon(Icons.person),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    enabled: !busy,
-                    obscureText: !_passwordVisible,
-                    onSubmitted: (_) => busy ? null : _handleLogin(),
-                    decoration: InputDecoration(
-                      labelText: '密码 *',
-                      prefixIcon: const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _passwordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
+                    if (_editServer)
+                      TextField(
+                        controller: _urlController,
+                        enabled: !busy,
+                        keyboardType: TextInputType.url,
+                        autocorrect: false,
+                        decoration: InputDecoration(
+                          labelText: 'Odoo 服务器地址 *',
+                          hintText: 'http://192.168.31.105:8069',
+                          prefixIcon: const Icon(Icons.dns),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              tokens.radiusField,
+                            ),
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() => _passwordVisible = !_passwordVisible);
-                        },
+                      )
+                    else
+                      _FixedIdentity(
+                        icon: Icons.dns,
+                        label: '服务器',
+                        value: _urlController.text,
+                        actionLabel: '切换服务器',
+                        onAction: busy
+                            ? null
+                            : () => setState(() {
+                                // A different server usually means a different
+                                // database, so reveal both.
+                                _editServer = true;
+                                _editDatabase = true;
+                              }),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // --- the ONE switch the operator sees --------------------
-                  // Material (not a decorated Container): a ListTile paints its
-                  // background and ink splashes on the nearest Material, and a
-                  // DecoratedBox in between would hide them.
-                  Material(
-                    color: canRememberPassword
-                        ? Colors.blue.shade50
-                        : Colors.orange.shade50,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: canRememberPassword
-                            ? Colors.blue.shade100
-                            : Colors.orange.shade200,
-                      ),
-                    ),
-                    child: SwitchListTile(
-                      value: canRememberPassword && _rememberLogin,
-                      onChanged: busy || !canRememberPassword
-                          ? null
-                          : _onRememberLoginChanged,
-                      title: const Text(
-                        '记住登录',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        canRememberPassword
-                            ? '10 天内再次打开自动登录，免输密码。'
-                            : '当前系统无法安全保存密码，仍可直接登录。',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      secondary: Icon(
-                        canRememberPassword ? Icons.key : Icons.key_off,
-                        color: canRememberPassword
-                            ? Colors.blue
-                            : Colors.orange.shade800,
-                      ),
-                    ),
-                  ),
-
-                  if (_formError != null) ...[
                     const SizedBox(height: 16),
-                    _Banner(
-                      icon: Icons.warning_amber,
-                      color: Colors.red,
-                      text: _formError!,
+                    if (_editDatabase)
+                      TextField(
+                        controller: _dbController,
+                        enabled: !busy,
+                        autocorrect: false,
+                        decoration: InputDecoration(
+                          labelText: '数据库名 *',
+                          hintText: '例如 LcHardwareHouse',
+                          prefixIcon: const Icon(Icons.storage),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              tokens.radiusField,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      _FixedIdentity(
+                        icon: Icons.storage,
+                        label: '数据库',
+                        value: _dbController.text,
+                        actionLabel: '切换数据库',
+                        onAction: busy
+                            ? null
+                            : () => setState(() => _editDatabase = true),
+                      ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _userController,
+                      enabled: !busy,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: '用户名 *',
+                        prefixIcon: const Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            tokens.radiusField,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      enabled: !busy,
+                      obscureText: !_passwordVisible,
+                      onSubmitted: (_) => busy ? null : _handleLogin(),
+                      decoration: InputDecoration(
+                        labelText: '密码 *',
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          tooltip: _passwordVisible ? '隐藏密码' : '显示密码',
+                          icon: Icon(
+                            _passwordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setState(
+                              () => _passwordVisible = !_passwordVisible,
+                            );
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            tokens.radiusField,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // --- the ONE switch the operator sees --------------------
+                    // Material (not a decorated Container): a ListTile paints its
+                    // background and ink splashes on the nearest Material, and a
+                    // DecoratedBox in between would hide them.
+                    Material(
+                      color:
+                          (canRememberPassword
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.error)
+                              .withValues(alpha: 0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(tokens.radiusField),
+                        side: BorderSide(
+                          color:
+                              (canRememberPassword
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.error)
+                                  .withValues(alpha: 0.4),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: SwitchListTile(
+                        value: canRememberPassword && _rememberLogin,
+                        onChanged: busy || !canRememberPassword
+                            ? null
+                            : _onRememberLoginChanged,
+                        title: const Text(
+                          '记住登录',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          canRememberPassword
+                              ? '10 天内再次打开自动登录，免输密码。'
+                              : '当前系统无法安全保存密码，仍可直接登录。',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        secondary: Icon(
+                          canRememberPassword ? Icons.key : Icons.key_off,
+                          color: canRememberPassword
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+
+                    if (_formError != null) ...[
+                      const SizedBox(height: 16),
+                      _Banner(
+                        icon: Icons.warning_amber,
+                        color: Theme.of(context).colorScheme.error,
+                        text: _formError!,
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: busy ? null : _handleLogin,
+                        child: busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('登录'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '账号始终记住。连续 10 天未成功登录时，需要重新输入一次密码。',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Read-only offline entry: the same unified library, showing
+                    // only public catalog data that was cached while online. No
+                    // sign-in, no inventory numbers, no stock operations.
+                    TextButton.icon(
+                      onPressed: busy
+                          ? null
+                          : () => context.go(OfflineAccess.catalogLocation()),
+                      icon: const Icon(Icons.cloud_off, size: 18),
+                      label: const Text('查看本机缓存资料'),
+                    ),
+                    Text(
+                      '离线只读，不显示库存数量，不能入库/领料/打印。',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: busy ? null : _handleLogin,
-                      child: busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('登录'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '账号始终记住。连续 10 天未成功登录时，需要重新输入一次密码。',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Read-only offline entry: the same unified library, showing
-                  // only public catalog data that was cached while online. No
-                  // sign-in, no inventory numbers, no stock operations.
-                  TextButton.icon(
-                    onPressed: busy
-                        ? null
-                        : () => context.go(OfflineAccess.catalogLocation()),
-                    icon: const Icon(Icons.cloud_off, size: 18),
-                    label: const Text('查看本机缓存资料'),
-                  ),
-                  Text(
-                    '离线只读，不显示库存数量，不能入库/领料/打印。',
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -537,37 +610,85 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({
-    required this.icon,
-    required this.color,
-    required this.text,
-  });
+  const _Banner({required this.icon, required this.color, required this.text});
 
   final IconData icon;
-  final MaterialColor color;
+  final Color color;
   final String text;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.shade200),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: color.shade800),
+          Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 12, color: color.shade900),
+              style: TextStyle(fontSize: 12, color: scheme.onSurface),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Read-only server/database line shown when the build bakes them in.
+///
+/// The value is still editable through [actionLabel]; hiding the field only
+/// removes a daily decision, it never removes the operator's escape hatch.
+class _FixedIdentity extends StatelessWidget {
+  const _FixedIdentity({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = GlassTokens.ofContext(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.62,
+        ),
+        borderRadius: BorderRadius.circular(tokens.radiusField),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$label：$value',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          TextButton(onPressed: onAction, child: Text(actionLabel)),
         ],
       ),
     );

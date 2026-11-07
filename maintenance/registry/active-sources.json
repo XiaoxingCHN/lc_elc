@@ -1,5 +1,5 @@
 {
-  "client": "maintenance/registry/source-client-receipt-search-feedback-20261102.json",
-  "server": "maintenance/registry/source-server-web-ui-20261102-r3.json",
+  "client": "maintenance/registry/source-client-catalog-fetch-20261106.json",
+  "server": "maintenance/registry/source-server-catalog-fetch-20261106.json",
   "eda": "maintenance/registry/source-eda-baseline.json"
 }

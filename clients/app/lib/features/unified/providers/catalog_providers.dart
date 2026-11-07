@@ -25,6 +25,9 @@ class CatalogState {
     this.errorCode,
     this.inventoryRevision = '',
     this.catalogRevision = '',
+    this.fetchSuggestion,
+    this.fetchStatus,
+    this.fetchBusy = false,
   });
 
   final CatalogQuery query;
@@ -49,6 +52,15 @@ class CatalogState {
   final String inventoryRevision;
   final String catalogRevision;
 
+  /// Server offer to fetch an exact missing C code / MPN.
+  final CatalogFetchSuggestion? fetchSuggestion;
+
+  /// Current on-demand fetch state, when one was started from this screen.
+  final CatalogFetchStatus? fetchStatus;
+
+  /// True while the fetch request itself (not the polling) is in flight.
+  final bool fetchBusy;
+
   bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
 
   /// True only when the server really answered with zero rows and no error.
@@ -69,6 +81,9 @@ class CatalogState {
     Object? errorCode = _unset,
     String? inventoryRevision,
     String? catalogRevision,
+    Object? fetchSuggestion = _unset,
+    Object? fetchStatus = _unset,
+    bool? fetchBusy,
   }) {
     return CatalogState(
       query: query ?? this.query,
@@ -82,6 +97,13 @@ class CatalogState {
       errorCode: identical(errorCode, _unset) ? this.errorCode : errorCode as String?,
       inventoryRevision: inventoryRevision ?? this.inventoryRevision,
       catalogRevision: catalogRevision ?? this.catalogRevision,
+      fetchSuggestion: identical(fetchSuggestion, _unset)
+          ? this.fetchSuggestion
+          : fetchSuggestion as CatalogFetchSuggestion?,
+      fetchStatus: identical(fetchStatus, _unset)
+          ? this.fetchStatus
+          : fetchStatus as CatalogFetchStatus?,
+      fetchBusy: fetchBusy ?? this.fetchBusy,
     );
   }
 
@@ -110,13 +132,29 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
     int pageSize = LabApiClient.defaultPageSize,
     CatalogQuery initialQuery = const CatalogQuery(),
     void Function(List<UnifiedItem> items)? onPageLoaded,
+    Duration fetchPollInterval = const Duration(seconds: 1),
+    int maxFetchPolls = 60,
   })  : _api = api,
         _pageSize = pageSize.clamp(1, LabApiClient.maxPageSize),
         _onPageLoaded = onPageLoaded,
+        _fetchPollInterval = fetchPollInterval,
+        _maxFetchPolls = maxFetchPolls,
         super(CatalogState(query: initialQuery));
 
   final LabApiClient _api;
   final int _pageSize;
+  final Duration _fetchPollInterval;
+  final int _maxFetchPolls;
+
+  Timer? _fetchTimer;
+  bool _fetchPolling = false;
+  int _fetchPolls = 0;
+
+  @override
+  void dispose() {
+    _cancelFetchTimer();
+    super.dispose();
+  }
 
   /// Called with every page the server returned, so the PUBLIC catalog metadata
   /// of what the operator actually looked at can be cached for offline browsing.
@@ -134,6 +172,7 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
   Future<void> updateQuery(CatalogQuery query) {
     _requestToken++;
     _seenKeys.clear();
+    _cancelFetchTimer();
     state = state.copyWith(
       query: query,
       items: const <UnifiedItem>[],
@@ -143,8 +182,131 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
       loadingMore: false,
       error: null,
       errorCode: null,
+      fetchSuggestion: null,
+      fetchStatus: null,
+      fetchBusy: false,
     );
     return _loadFirstPage(_requestToken);
+  }
+
+  /// Queues one exact C code / MPN for on-demand fetch and follows its state.
+  ///
+  /// [catalogCode] is passed only after the operator chooses among the
+  /// server's candidates; otherwise the current query / suggestion is used.
+  Future<void> startFetch({String? catalogCode}) async {
+    final suggestion = state.fetchSuggestion;
+    final query = catalogCode != null
+        ? (suggestion?.query ?? state.fetchStatus?.query ?? state.query.text).trim()
+        : (suggestion?.query ?? state.query.text).trim();
+    if (query.isEmpty) return;
+    _cancelFetchTimer();
+    _fetchPolls = 0;
+    state = state.copyWith(fetchBusy: true, fetchStatus: null);
+    try {
+      final status = await _api.requestCatalogFetch(
+        query,
+        catalogCode: catalogCode,
+      );
+      if (!mounted) return;
+      state = state.copyWith(fetchBusy: false, fetchStatus: status);
+      if (status.isDone) {
+        await refresh();
+      } else if (!status.isTerminal) {
+        _startFetchPolling();
+      }
+    } on LabApiException catch (error) {
+      if (!mounted) return;
+      state = state.copyWith(
+        fetchBusy: false,
+        fetchStatus: _failedStatus(query, error.message),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      state = state.copyWith(
+        fetchBusy: false,
+        fetchStatus: _failedStatus(query, '$error'),
+      );
+    }
+  }
+
+  /// Re-submits a "multiple candidates" result with the operator's choice.
+  Future<void> chooseFetchCandidate(CatalogFetchCandidate candidate) {
+    if (candidate.catalogCode.isEmpty) return Future<void>.value();
+    return startFetch(catalogCode: candidate.catalogCode);
+  }
+
+  void _startFetchPolling() {
+    _fetchTimer?.cancel();
+    _fetchTimer = Timer.periodic(_fetchPollInterval, (timer) {
+      unawaited(_pollFetch(timer));
+    });
+  }
+
+  Future<void> _pollFetch(Timer timer) async {
+    if (_fetchPolling) return;
+    final current = state.fetchStatus;
+    final requestId = current?.requestId;
+    if (current == null || requestId == null) {
+      timer.cancel();
+      return;
+    }
+    if (_fetchPolls >= _maxFetchPolls) {
+      timer.cancel();
+      state = state.copyWith(
+        fetchStatus: _failedStatus(current.query, '抓取超时，请稍后重试。'),
+      );
+      return;
+    }
+    _fetchPolling = true;
+    _fetchPolls++;
+    try {
+      final status = await _api.catalogFetchStatus(requestId);
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      state = state.copyWith(fetchStatus: status);
+      if (status.isDone) {
+        timer.cancel();
+        await refresh();
+      } else if (status.isTerminal) {
+        timer.cancel();
+      }
+    } on LabApiException catch (error) {
+      timer.cancel();
+      if (!mounted) return;
+      state = state.copyWith(
+        fetchStatus: _failedStatus(current.query, error.message),
+      );
+    } catch (error) {
+      timer.cancel();
+      if (!mounted) return;
+      state = state.copyWith(
+        fetchStatus: _failedStatus(current.query, '$error'),
+      );
+    } finally {
+      _fetchPolling = false;
+    }
+  }
+
+  void _cancelFetchTimer() {
+    _fetchTimer?.cancel();
+    _fetchTimer = null;
+    _fetchPolling = false;
+    _fetchPolls = 0;
+  }
+
+  CatalogFetchStatus _failedStatus(String query, String message) {
+    return CatalogFetchStatus(
+      requestId: null,
+      state: 'failed',
+      query: query,
+      queryKind: '',
+      catalogCode: '',
+      itemKey: '',
+      message: message,
+      candidates: const <CatalogFetchCandidate>[],
+    );
   }
 
   /// Reloads the first page of the current query (used after a write).
@@ -205,6 +367,7 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
         errorCode: null,
         inventoryRevision: page.inventoryRevision,
         catalogRevision: page.catalogRevision,
+        fetchSuggestion: page.fetchSuggestion,
       );
     } on LabApiException catch (error) {
       if (token != _requestToken) return;

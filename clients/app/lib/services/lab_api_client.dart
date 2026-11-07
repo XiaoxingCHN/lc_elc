@@ -39,6 +39,8 @@ class LabApiRoutes {
 
   // Catalog (one unified library - there is no second "lab library" endpoint).
   static const String catalogSearch = '/lab/api/catalog/search';
+  static const String catalogFetch = '/lab/api/catalog/fetch';
+  static const String catalogFetchStatus = '/lab/api/catalog/fetch_status';
   static const String catalogDetail = '/lab/api/catalog/detail';
   static const String catalogCategories = '/lab/api/catalog/categories';
   static const String catalogFacets = '/lab/api/catalog/facets';
@@ -121,6 +123,30 @@ class LabApiClient {
       query.toSearchParams(cursor: cursor, limit: size),
     );
     return CatalogSearchPage.fromJson(data);
+  }
+
+  /// `/lab/api/catalog/fetch` - queue one exact C code / MPN for on-demand fetch.
+  ///
+  /// [catalogCode] is only used after the operator picks one of the server's
+  /// candidates; the server still re-validates everything.
+  Future<CatalogFetchStatus> requestCatalogFetch(
+    String query, {
+    String? catalogCode,
+  }) async {
+    final data = await _invoke(
+      LabApiRoutes.catalogFetch,
+      <String, dynamic>{'query': query, 'catalog_code': catalogCode},
+    );
+    return CatalogFetchStatus.fromJson(data);
+  }
+
+  /// `/lab/api/catalog/fetch_status` - poll one queued fetch request.
+  Future<CatalogFetchStatus> catalogFetchStatus(int requestId) async {
+    final data = await _invoke(
+      LabApiRoutes.catalogFetchStatus,
+      <String, dynamic>{'request_id': requestId},
+    );
+    return CatalogFetchStatus.fromJson(data);
   }
 
   /// `/lab/api/catalog/detail` - parameters, files, locations, bags, history.
@@ -241,11 +267,25 @@ class LabApiClient {
   }
 
   /// Restores this account's prepared bags and print selections from the server.
-  Future<List<PendingReceipt>> pendingReceipts() async {
+  ///
+  /// [query] and [state] are server-side filters (the same ones the Web queue
+  /// uses): matching is done on the server, so the client never filters an
+  /// already-loaded page.  [state] is one of `pending`, `done`, `cancelled` or
+  /// `all`; omit it and the server keeps the historical "every state" behavior.
+  Future<List<PendingReceipt>> pendingReceipts({
+    String? query,
+    String? state,
+  }) async {
+    final text = (query ?? '').trim();
+    final filter = (state ?? '').trim();
     final records = <PendingReceipt>[];
     int? cursor;
     do {
-      final data = await _invoke(LabApiRoutes.pendingList, {if (cursor != null) 'cursor': cursor});
+      final data = await _invoke(LabApiRoutes.pendingList, {
+        if (cursor != null) 'cursor': cursor,
+        if (text.isNotEmpty) 'query': text,
+        if (filter.isNotEmpty) 'state': filter,
+      });
       records.addAll(asMapList(data['records']).map(PendingReceipt.fromJson));
       final next = firstInt(data, const ['cursor']);
       if (next != null && cursor != null && next >= cursor) {

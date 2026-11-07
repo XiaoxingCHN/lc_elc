@@ -12,6 +12,7 @@ import '../providers/material_providers.dart';
 import '../services/asset_cache.dart';
 import '../unified_routes.dart';
 import '../widgets/media_view.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
 import 'offline_views.dart';
 
@@ -66,7 +67,10 @@ class _UnifiedItemDetailScreenState
     final itemKey = widget.itemKey.trim();
     if (itemKey.isEmpty) {
       return Scaffold(
-        appBar: LabAppBar(title: const Text('器件详情'), fallbackLocation: UnifiedRoutes.catalog),
+        appBar: LabAppBar(
+          title: const Text('器件详情'),
+          fallbackLocation: UnifiedRoutes.catalog,
+        ),
         body: const ErrorView(message: '缺少器件标识，无法打开详情。'),
       );
     }
@@ -75,7 +79,12 @@ class _UnifiedItemDetailScreenState
       // Same screen, read-only body: the offline mode shows public catalog facts
       // and cached files only.
       return Scaffold(
-        appBar: LabAppBar(fallbackLocation: widget.offline ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,title: const Text('器件详情（离线缓存）')),
+        appBar: LabAppBar(
+          fallbackLocation: widget.offline
+              ? UnifiedRoutes.offlineCatalog
+              : UnifiedRoutes.catalog,
+          title: const Text('器件详情（离线缓存）'),
+        ),
         body: OfflineItemDetailView(itemKey: itemKey),
       );
     }
@@ -84,7 +93,10 @@ class _UnifiedItemDetailScreenState
     final row = ref.watch(catalogRowProvider(itemKey));
 
     return Scaffold(
-      appBar: LabAppBar(fallbackLocation: widget.offline ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
+      appBar: LabAppBar(
+        fallbackLocation: widget.offline
+            ? UnifiedRoutes.offlineCatalog
+            : UnifiedRoutes.catalog,
         title: Text(row?.title.isNotEmpty == true ? row!.title : '器件详情'),
         actions: <Widget>[
           IconButton(
@@ -139,7 +151,8 @@ class _DetailBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
-        if (result.fromCache) _OfflineBanner(result: result, onRetry: onRefresh),
+        if (result.fromCache)
+          _OfflineBanner(result: result, onRetry: onRefresh),
 
         // ----------------------------------------------------------------- header
         Card(
@@ -173,7 +186,9 @@ class _DetailBody extends ConsumerWidget {
                         children: <Widget>[
                           if (item?.catalogCode.isNotEmpty ?? false)
                             Chip(
-                              label: Text(displayCatalogCode(item!.catalogCode)),
+                              label: Text(
+                                displayCatalogCode(item!.catalogCode),
+                              ),
                               visualDensity: VisualDensity.compact,
                             ),
                           if (kind == IdentityKind.lab)
@@ -181,7 +196,8 @@ class _DetailBody extends ConsumerWidget {
                               label: Text('本地物料'),
                               visualDensity: VisualDensity.compact,
                             ),
-                          for (final sn in (item?.snCodes ?? const <String>[]).take(3))
+                          for (final sn
+                              in (item?.snCodes ?? const <String>[]).take(3))
                             Chip(
                               label: Text(sn),
                               visualDensity: VisualDensity.compact,
@@ -220,7 +236,9 @@ class _DetailBody extends ConsumerWidget {
                     if (item != null)
                       _Metric(
                         label: '可用（可领用）',
-                        value: UnifiedItem.formatQuantity(item.labAvailableQuantity),
+                        value: UnifiedItem.formatQuantity(
+                          item.labAvailableQuantity,
+                        ),
                       ),
                     _Metric(
                       label: '立创商城现货',
@@ -244,9 +262,14 @@ class _DetailBody extends ConsumerWidget {
           runSpacing: 8,
           children: <Widget>[
             OutlinedButton.icon(
-              onPressed: () => context.push(Uri(path: UnifiedRoutes.pendingReceipt,
-                queryParameters: {'item_key': itemKey}).toString()),
-              icon: const Icon(Icons.sell_outlined), label: const Text('制袋贴标'),
+              onPressed: () => context.push(
+                Uri(
+                  path: UnifiedRoutes.pendingReceipt,
+                  queryParameters: {'item_key': itemKey},
+                ).toString(),
+              ),
+              icon: const Icon(Icons.sell_outlined),
+              label: const Text('制袋贴标'),
             ),
             FilledButton.icon(
               onPressed: () => context.push(
@@ -271,14 +294,13 @@ class _DetailBody extends ConsumerWidget {
               onPressed: detail.bags.isEmpty
                   ? null
                   : () => context.push(
-                        UnifiedRoutes.labelsForBag(detail.bags.first.id!),
-                      ),
+                      UnifiedRoutes.labelsForBag(detail.bags.first.id!),
+                    ),
               icon: const Icon(Icons.qr_code_2),
               label: const Text('打印标签'),
             ),
             OutlinedButton.icon(
-              onPressed: () =>
-                  context.push(UnifiedRoutes.historyFor(itemKey)),
+              onPressed: () => context.push(UnifiedRoutes.historyFor(itemKey)),
               icon: const Icon(Icons.history),
               label: const Text('历史追溯'),
             ),
@@ -343,7 +365,9 @@ class _DetailBody extends ConsumerWidget {
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.location_on_outlined),
                         title: Text(location.display),
-                        subtitle: location.path.isEmpty ? null : Text(location.path),
+                        subtitle: location.path.isEmpty
+                            ? null
+                            : Text(location.path),
                         trailing: Text(
                           location.quantity == null
                               ? '—'
@@ -353,7 +377,9 @@ class _DetailBody extends ConsumerWidget {
                         onTap: location.hasId
                             ? () {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('库位码：${location.code}')),
+                                  SnackBar(
+                                    content: Text('库位码：${location.code}'),
+                                  ),
                                 );
                               }
                             : null,
@@ -405,8 +431,8 @@ class _DetailBody extends ConsumerWidget {
                           ),
                           onTap: bag.hasId
                               ? () => context.push(
-                                    UnifiedRoutes.labelsForBag(bag.id!),
-                                  )
+                                  UnifiedRoutes.labelsForBag(bag.id!),
+                                )
                               : null,
                         ),
                       ),
@@ -431,8 +457,9 @@ class _DetailBody extends ConsumerWidget {
                               width: 120,
                               child: Text(
                                 parameter.label,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                             Expanded(child: Text(parameter.value)),
@@ -501,8 +528,8 @@ class OperationTile extends StatelessWidget {
           operation.isReceipt
               ? Icons.login
               : operation.isReturn
-                  ? Icons.assignment_return_outlined
-                  : Icons.logout,
+              ? Icons.assignment_return_outlined
+              : Icons.logout,
           color: operation.isReceipt
               ? theme.colorScheme.primary
               : theme.colorScheme.tertiary,
@@ -512,7 +539,11 @@ class OperationTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (details.isNotEmpty)
-              Text(details.join(' · '), maxLines: 3, overflow: TextOverflow.ellipsis),
+              Text(
+                details.join(' · '),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
             if (operation.at != null)
               Text(
                 _formatTime(operation.at!),
@@ -587,16 +618,14 @@ class _CatalogOnlyActions extends ConsumerWidget {
     final id = int.tryParse(controller.text.trim());
     if (id == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请输入有效的本地档案 ID（数字）。')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('请输入有效的本地档案 ID（数字）。')));
       }
       return;
     }
-    await ref.read(materialActionProvider.notifier).bind(
-          productTemplateId: id,
-          catalogCode: catalogCode,
-        );
+    await ref
+        .read(materialActionProvider.notifier)
+        .bind(productTemplateId: id, catalogCode: catalogCode);
   }
 
   @override
@@ -606,10 +635,13 @@ class _CatalogOnlyActions extends ConsumerWidget {
 
     ref.listen<MaterialActionState>(materialActionProvider, (previous, next) {
       final message = next.error ?? next.notice;
-      if (message == null || message == previous?.error || message == previous?.notice) {
+      if (message == null ||
+          message == previous?.error ||
+          message == previous?.notice) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     });
 
     return _Section(
@@ -631,8 +663,8 @@ class _CatalogOnlyActions extends ConsumerWidget {
                 onPressed: state.running
                     ? null
                     : () => ref
-                        .read(materialActionProvider.notifier)
-                        .createMaterial(itemKey),
+                          .read(materialActionProvider.notifier)
+                          .createMaterial(itemKey),
                 icon: const Icon(Icons.add),
                 label: const Text('创建本地物料（生成 SN）'),
               ),
@@ -644,12 +676,16 @@ class _CatalogOnlyActions extends ConsumerWidget {
             ],
           ),
           if (state.created?.sn.isNotEmpty ?? false)
-            Text('已创建 SN：${state.created!.sn}', style: theme.textTheme.labelSmall),
+            Text(
+              '已创建 SN：${state.created!.sn}',
+              style: theme.textTheme.labelSmall,
+            ),
           if (state.error != null)
             Text(
               state.error!,
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: theme.colorScheme.error),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
         ],
       ),
@@ -665,29 +701,17 @@ class _OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final savedAt = result.savedAt;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: <Widget>[
-          const Icon(Icons.cloud_off, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '当前显示本机离线缓存${savedAt == null ? '' : '（${savedAt.toLocal().toString().substring(0, 16)}）'}。'
-              '这里的库存数量是缓存值，可能已经过期，不能当作实时数量；'
-              '恢复连接后请点“重连”刷新。已缓存的图片和手册可以直接打开。',
-              style: theme.textTheme.labelSmall,
-            ),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('重连')),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: StatusBanner(
+        icon: Icons.cloud_off,
+        message:
+            '当前显示本机离线缓存${savedAt == null ? '' : '（${savedAt.toLocal().toString().substring(0, 16)}）'}。'
+            '这里的库存数量是缓存值，可能已经过期，不能当作实时数量；'
+            '恢复连接后请点“重连”刷新。已缓存的图片和手册可以直接打开。',
+        tone: StatusTone.notice,
+        action: TextButton(onPressed: onRetry, child: const Text('重连')),
       ),
     );
   }
@@ -746,22 +770,26 @@ class _Metric extends StatelessWidget {
     final color = highlight
         ? theme.colorScheme.primary
         : muted
-            ? theme.colorScheme.outline
-            : theme.colorScheme.onSurface;
+        ? theme.colorScheme.outline
+        : theme.colorScheme.onSurface;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(label, style: theme.textTheme.labelSmall),
         Text(
           value,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(color: color, fontWeight: FontWeight.w700),
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         if (subtitle != null)
           Text(
             subtitle!,
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.outline, fontSize: 9),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.outline,
+              fontSize: 9,
+            ),
           ),
       ],
     );

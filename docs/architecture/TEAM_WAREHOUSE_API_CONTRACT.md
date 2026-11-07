@@ -23,7 +23,9 @@ lab_workflow 19.0.1.2.0、lab_inventory 19.0.1.0.0。
 
 | 接口 | 方法/路由 | 权限 | 关键参数 | 返回要点 |
 |---|---|---|---|---|
-| 统一检索 | POST `/lab/api/catalog/search` | lab_catalog 读取组 / lab_catalog 管理组 / system | query, category_id, brands[], packages[], parameters{}, stock_only, cursor, limit(1..200) | items[], next_cursor, total, inventory_revision, catalog_revision |
+| 统一检索 | POST `/lab/api/catalog/search` | lab_catalog 读取组 / lab_catalog 管理组 / system | query, category_id, brands[], packages[], parameters{}, stock_only, cursor, limit(1..200) | items[], next_cursor, total, inventory_revision, catalog_revision, param_index_ready, fetch_suggestion（仅精确 C 码/MPN、无筛选、零结果时） |
+| 按需抓取 | POST `/lab/api/catalog/fetch` | 登录用户 | query（精确 C 码或完整 MPN）, catalog_code?（选择候选时） | request_id, state, query_kind, catalog_code, item_key, message, candidates[] |
+| 抓取状态 | POST `/lab/api/catalog/fetch_status` | 登录用户 | request_id | 同上；state ∈ queued/resolving/fetching/done/failed/skipped_non_electronic/review/not_found/candidates |
 | 器件详情 | POST `/lab/api/catalog/detail` | 同上 | item_key（`lcsc:C123` / `lab:42`） | item, parameters[], files[], lab_templates[], locations[], bags[], issues[], history[] |
 | 分类树 | POST `/lab/api/catalog/categories` | 同上 | — | categories[]（id/parent_id 均为 PG id，另给 catalog_id） |
 | 分面 | POST `/lab/api/catalog/facets` | 同上 | query/category_id/brands/packages/parameters | brands[], packages[], parameters{}（含 total/has_more/timing_ms） |
@@ -34,6 +36,18 @@ lab_workflow 19.0.1.2.0、lab_inventory 19.0.1.0.0。
 检索排序语义：**有库存优先**（rank），同 rank 按 sort_key；游标 keyset 分页，
 不含"上一页"游标。首批页面照此实现"加载更多"。
 
+`query` 按空白拆词，每个词必须以 AND 命中身份字段（名称/SN/MPN/C 编号等）或关键参数值；
+不提供拼音、纠错或模糊匹配。参数值在导入/参数变更时归一化为独立检索文本，
+支持 SI 前缀、`Ω/ohm`、`100nF = 0.1uF`、`±1%` 以及低阻 R 记法（`10Ω = 10R`、
+`4.7Ω = 4R7`、`0.1Ω = R1`、`4.7kΩ = 4k7`）。`param_index_ready=false` 表示参数文本
+尚未全量回填，客户端应提示"参数索引未就绪"，不能用空结果推断不存在。
+
+按需抓取是**异步**的：`fetch` 只入队，Odoo cron 每分钟处理少量请求，客户端轮询
+`fetch_status`。只接受精确 C 码或完整 MPN；名称、品牌和短关键词返回 `VALIDATION_ERROR`。
+MPN 必须与立创 `productModel` 完全相等，模糊命中只作为 `candidates` 返回，必须由用户选择后
+带 `catalog_code` 重新提交。抓取只写 `lab.catalog.item` / `lab.catalog.param` 与
+`catalog_stock`，不创建产品、不写 `stock.quant` / `stock.move`；非电子一级分类不入库。
+
 ### 2.2 库存与作业（lab_workflow）
 
 | 接口 | 方法/路由 | 权限 | 首批用途 |
@@ -42,7 +56,7 @@ lab_workflow 19.0.1.2.0、lab_inventory 19.0.1.0.0。
 | 库位 | POST `/lab/api/inventory/locations` | lab 角色 | 第二批 |
 | 条码解析 | POST `/lab/api/inventory/resolve_code` | lab 角色 | 第二批 |
 | 入库 | POST `/lab/api/inventory/receipt` | operator | 第二批（当前为直接 receipt，新网页将走 pending 两阶段） |
-| 待入库 | POST `/lab/api/inventory/pending/{list,create,update,resolve,confirm}` | lab 角色 | 第二批 |
+| 待入库 | POST `/lab/api/inventory/pending/{list,create,update,resolve,confirm}` | lab 角色 | 第二批；`pending/list` 可选 query/state，返回过滤后的 total |
 | 领用/归还 | POST `/lab/api/inventory/{issue,return,issues,history}` | operator | 第二批 |
 | 历史遗留库存 | POST `/lab/api/inventory/{legacy_stock,adopt_stock}` | manager | 第三批 |
 | 标签排版/PDF | POST `/lab/api/labels/{plan,preview}` | operator | 第二批 |

@@ -292,6 +292,7 @@ class CatalogSearchPage {
     required this.total,
     required this.inventoryRevision,
     required this.catalogRevision,
+    this.fetchSuggestion,
     this.raw = const <String, dynamic>{},
   });
 
@@ -306,11 +307,16 @@ class CatalogSearchPage {
   final String inventoryRevision;
   final String catalogRevision;
 
+  /// When the server answered zero rows for an exact C code / MPN, it may offer
+  /// an on-demand fetch. `null` for ordinary empty results.
+  final CatalogFetchSuggestion? fetchSuggestion;
+
   final Map<String, dynamic> raw;
 
   bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
 
   factory CatalogSearchPage.fromJson(Map<String, dynamic> json) {
+    final suggestion = json['fetch_suggestion'];
     return CatalogSearchPage(
       items: asMapList(json['items']).map(UnifiedItem.fromJson).toList(),
       nextCursor: asString(json['next_cursor']),
@@ -318,6 +324,9 @@ class CatalogSearchPage {
       inventoryRevision:
           firstString(json, const ['inventory_revision']) ?? '',
       catalogRevision: firstString(json, const ['catalog_revision']) ?? '',
+      fetchSuggestion: suggestion is Map
+          ? CatalogFetchSuggestion.fromJson(asMap(suggestion))
+          : null,
       raw: json,
     );
   }
@@ -329,6 +338,109 @@ class CatalogSearchPage {
     inventoryRevision: '',
     catalogRevision: '',
   );
+}
+
+/// Server offer to fetch one exact missing component from LCSC.
+class CatalogFetchSuggestion {
+  const CatalogFetchSuggestion({
+    required this.kind,
+    required this.query,
+    required this.canFetch,
+    required this.message,
+  });
+
+  final String kind;
+  final String query;
+  final bool canFetch;
+  final String message;
+
+  bool get isValid => canFetch && query.isNotEmpty;
+
+  factory CatalogFetchSuggestion.fromJson(Map<String, dynamic> json) {
+    return CatalogFetchSuggestion(
+      kind: asStringOr(json['kind']),
+      query: asStringOr(json['query']),
+      canFetch: asBool(json['can_fetch']),
+      message: asStringOr(json['message']),
+    );
+  }
+}
+
+/// One selectable search hit when an MPN matches several packages/variants.
+class CatalogFetchCandidate {
+  const CatalogFetchCandidate({
+    required this.catalogCode,
+    required this.mpn,
+    required this.packageName,
+  });
+
+  final String catalogCode;
+  final String mpn;
+  final String packageName;
+
+  String get label => packageName.isEmpty
+      ? '$mpn ($catalogCode)'
+      : '$mpn · $packageName ($catalogCode)';
+
+  factory CatalogFetchCandidate.fromJson(Map<String, dynamic> json) {
+    return CatalogFetchCandidate(
+      catalogCode: asStringOr(json['catalog_code']),
+      mpn: asStringOr(json['mpn']),
+      packageName: asStringOr(json['package']),
+    );
+  }
+}
+
+/// State of one on-demand fetch request (`/lab/api/catalog/fetch_status`).
+class CatalogFetchStatus {
+  const CatalogFetchStatus({
+    required this.requestId,
+    required this.state,
+    required this.query,
+    required this.queryKind,
+    required this.catalogCode,
+    required this.itemKey,
+    required this.message,
+    required this.candidates,
+  });
+
+  static const Set<String> terminalStates = <String>{
+    'done',
+    'failed',
+    'skipped_non_electronic',
+    'review',
+    'not_found',
+    'candidates',
+  };
+
+  final int? requestId;
+  final String state;
+  final String query;
+  final String queryKind;
+  final String catalogCode;
+  final String itemKey;
+  final String message;
+  final List<CatalogFetchCandidate> candidates;
+
+  bool get isTerminal => terminalStates.contains(state);
+  bool get isDone => state == 'done';
+  bool get isCandidates => state == 'candidates';
+
+  factory CatalogFetchStatus.fromJson(Map<String, dynamic> json) {
+    return CatalogFetchStatus(
+      requestId: asInt(json['request_id']),
+      state: asStringOr(json['state'], 'queued'),
+      query: asStringOr(json['query']),
+      queryKind: asStringOr(json['query_kind']),
+      catalogCode: asStringOr(json['catalog_code']),
+      itemKey: asStringOr(json['item_key']),
+      message: asStringOr(json['message']),
+      candidates: asMapList(json['candidates'])
+          .map(CatalogFetchCandidate.fromJson)
+          .where((candidate) => candidate.catalogCode.isNotEmpty)
+          .toList(),
+    );
+  }
 }
 
 /// One selectable value of a filter facet.

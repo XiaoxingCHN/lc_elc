@@ -1065,6 +1065,7 @@
     var pop = el('div', { class: 'lc-combobox-pop', id: uid + '-pop' });
     var list = el('ul', { class: 'lc-combobox-list', role: 'listbox', id: uid + '-list' });
     var note = el('p', { class: 'lc-combobox-note', role: 'status', 'aria-live': 'polite' });
+    var footer = null;
     pop.appendChild(list);
     pop.appendChild(note);
     setHidden(pop, true);
@@ -1112,6 +1113,7 @@
       active = -1;
       isOpen = false;
       setHidden(pop, true);
+      hideFooter();
       input.setAttribute('aria-expanded', 'false');
       input.removeAttribute('aria-activedescendant');
       Array.prototype.forEach.call(list.children || [], function (node) {
@@ -1119,11 +1121,33 @@
       });
     }
 
+    function hideFooter() {
+      if (footer) setHidden(footer, true);
+    }
+
+    function showFooter(text) {
+      if (typeof opts.viewAllHref !== 'function') return;
+      var href = opts.viewAllHref(text);
+      if (!href) return;
+      if (!footer) {
+        footer = el('p', { class: 'lc-combobox-note lc-combobox-viewall' });
+        pop.insertBefore(footer, note);
+      }
+      clear(footer);
+      footer.appendChild(el('a', {
+        class: 'lc-card-link',
+        href: href,
+        text: opts.viewAllLabel || '查看全部结果'
+      }));
+      setHidden(footer, false);
+    }
+
     function setNote(text, kind) {
       note.textContent = text || '';
       note.setAttribute('data-kind', kind || '');
       if (!text) setHidden(note, true);
       else {
+        hideFooter();
         setHidden(note, false);
         open();
       }
@@ -1174,6 +1198,8 @@
         option.setAttribute('data-lc-index', String(index));
         list.appendChild(option);
       });
+      if (rows.length) showFooter(query());
+      else hideFooter();
       open();
       place();
     }
@@ -1241,6 +1267,7 @@
       if (query() !== text) return;
       items = [];
       clear(list);
+      hideFooter();
       lastFailed = text;
       var text2 = typeof opts.errorText === 'function'
         ? opts.errorText(error)
