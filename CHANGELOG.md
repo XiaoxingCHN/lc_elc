@@ -1,5 +1,11 @@
 # 变更记录
 
+## 2026.11.07 冻结按需抓取源码清单（repo_check 归零）
+
+- 新增并激活两份不可变源码清单：`maintenance/registry/source-server-catalog-fetch-20261106.json`（**271 文件**，tree `10c3aa4ad450dfb4bd1b127777b6c5f05cc0d9fdfc51f7287845e4b41cf7757f`，77,062 B，sha256 `fd0870000b5372eb72f0a778aa059231866ca444708941095a0507ddece555f0`）与 `source-client-catalog-fetch-20261106.json`（**178 文件**，tree `a2d5d42c5fa58ba8f07c70e5f95b831b3dc9de40b274134646955f6add70abeb`，45,543 B，sha256 `dd872ded69a47b849b9a2d1e506bc70e17150e0444f60cd8910f6b8dbaedf250`）；`active-sources.json` 的 `server`/`client` 指针已切换，旧清单未改写。
+- 检查结果：`python tools/repo_check.py` 由 exit 1（`frozen-source:client` 4 文件、`frozen-source:server` 13 文件）变为 **exit 0 / result=PASS / 52 项通过 / 0 错误**；16 条既有离线载荷警告照旧存在（未执行 `--verify-payloads`，不记作全仓零告警）。`generate_routes.py --check` exit 0、`git diff --check` exit 0。
+- 边界：只登记源码哈希，未改业务代码、未升级模块、未部署、未推送、未构建安装包；生产仍是 2026-11-06 部署的四模块版本。任务单见 `maintenance/tasks/2026-11-07-freeze-catalog-fetch-sources.md`。
+
 ## 2026.11.06 器件库按需抓取部署到生产（2026-11-06T14:29–14:31Z；cron 已运行）
 
 - 部署：在 `192.168.31.105`（DB `LcHardwareHouse`）执行 `upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261106/modules`，`-u lab_inventory,lab_catalog,lab_workflow` **退出码 0、ERROR/CRITICAL/Traceback 行数 0**。生产 `/opt/odoo/custom-addons` 现为 `lab_catalog 19.0.2.0.10` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2`；`lab_team_web 19.0.1.2.1` 未参与，客户端仍 `1.2.0+7`（未构建/发布）。

@@ -1,6 +1,13 @@
 # 当前状态与已知限制
 
-## 2026-11-06 器件库按需抓取已部署生产（cron 已在运行；DB 行核对待补）
+## 2026-11-07 按需抓取源码已冻结（repo_check 归零）
+
+- **active 清单**：server → `maintenance/registry/source-server-catalog-fetch-20261106.json`（271 文件，tree `10c3aa4a…4cf7757f`，清单 sha256 `fd087000…dce555f0`）；client → `source-client-catalog-fetch-20261106.json`（178 文件，tree `a2d5d42c…6add70abeb`，清单 sha256 `dd872ded…8dbaedf250`）。旧 `source-server-param-search-20261104-r2.json` 与 `source-client-liquid-glass-20261106.json` 未改写，指针回指即可回滚。
+- **检查**：`python tools/repo_check.py` **exit 0 / result=PASS / 52 项通过 / 0 错误**（冻结前 exit 1：`frozen-source:client` 4 文件、`frozen-source:server` 13 文件）；16 条既有离线载荷警告仍在，`--verify-payloads` 未执行，不记作全仓零告警。`generate_routes.py --check` exit 0、`git diff --check` exit 0。
+- **边界**：清单只记录源码哈希，不代表可安装产物；客户端未构建包，生产未再变更（仍为 2026-11-06 部署的 `lab_catalog 19.0.2.0.10` 等四模块）。未推送。
+- **任务单**：[冻结源码清单](../../maintenance/tasks/2026-11-07-freeze-catalog-fetch-sources.md)。
+
+## 2026-11-06 器件库按需抓取已部署生产（cron 已运行；DB 行已核对）
 
 - **版本与范围**：生产 `/opt/odoo/custom-addons` 现为 `lab_catalog 19.0.2.0.10`、`lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2`；本次 `-u` 覆盖这三个模块，`lab_team_web 19.0.1.2.1` 未参与。客户端源码仍 `1.2.0+7`，未构建/发布安装包。
 - **部署执行**：`server/ubuntu22.04/upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261106/modules`，2026-11-06T14:29–14:31Z；步骤 4 `-u lab_inventory,lab_catalog,lab_workflow` **退出码 0、ERROR/CRITICAL/Traceback 行数 0**。

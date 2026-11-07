@@ -1,5 +1,5 @@
 {
-  "client": "maintenance/registry/source-client-liquid-glass-20261106.json",
-  "server": "maintenance/registry/source-server-param-search-20261104-r2.json",
+  "client": "maintenance/registry/source-client-catalog-fetch-20261106.json",
+  "server": "maintenance/registry/source-server-catalog-fetch-20261106.json",
   "eda": "maintenance/registry/source-eda-baseline.json"
 }
