@@ -56,3 +56,14 @@
 ## 生产状态和回滚
 
 没有触碰生产：未升级模块、未建表、未注册定时任务、未发起抓取、未导入、未重启。生产仍是 2026-11-04 参数搜索部署后的状态（`lab_catalog 19.0.2.0.6` 已在生产，本候选为 `19.0.2.0.10` 源码）。若后续部署，需先做数据库与源码备份，升级失败时回滚模块源码并恢复备份。
+
+## 生产部署（2026-11-06T14:29–14:31Z，已完成）
+
+上一节「生产状态和回滚」是部署前时点，已被本节取代。
+
+- **执行**：`server/ubuntu22.04/upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261106/modules`（暂存目录 124 文件、不含 `tests/`），`-u lab_inventory,lab_catalog,lab_workflow` **退出码 0、ERROR/CRITICAL/Traceback 行数 0**；生产 `/opt/odoo/custom-addons` 现为 `lab_catalog 19.0.2.0.10` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2`，`lab_team_web 19.0.1.2.1` 未参与本次 `-u`。
+- **备份与回滚点**：`/var/backups/lc-elc/20261106T142949Z-before-upgrade/`——`db.dump` **118,970,696 B** / `40863d500fffc8f36013cd99da8625d3ed988799826f6633cc178f41d3ba0d66`；`filestore.tar.gz` **12,819,190 B** / `5b9e5d42a03d339dcbab225ad3e1da09913b4b853dcded117fcb29614a3f5fc0`；`MANIFEST.json` 17,246 B、`odoo.log.tail`；旧三模块源码在 `module-source-before-upgrade/`（回滚时先移走新代码再移回，勿删除）。
+- **健康检查的已知假阴性**：脚本步骤 5 见 `/web/login` 返回 **303**（→ `/web/database/selector`）即判失败，与 2026-11-04 相同的脚本缺陷，不是服务故障。独立复核：`X-Odoo-Database: LcHardwareHouse` 时 `/web/login` **200**、`odoo.service` **active/enabled**、14:31:36Z Odoo 打印 `Modules loaded`（55 模块）。
+- **运行证据**：`/var/log/odoo/odoo.log` 自 2026-11-06 14:30Z 至 2026-11-07 13:11Z **0 条 ERROR/CRITICAL/Traceback**；`ir.cron` 任务「器件库：处理在线补抓队列」（id 25，每 1 分钟、`model._cron_process_queue(limit=2)`）自 **2026-11-06 14:31:16Z** 起每约 62 秒运行，累计 **1356 次启动、0 次失败**，每次 `fully done (#loop 1; done 0; remaining 0)`（队列为空）。这同时证明新模型已加载、`lab_catalog_fetch_request` 可用、cron 记录已入库。
+- **未核对**：`ir_module_module` 的 `latest_version/state`、`to_regclass('lab_catalog_fetch_request')`、`lab_catalog_fetch_active_uniq` 谓词、`lab_catalog_item/param/fetch_request` 行数——只读脚本 `/home/hbut/lc-deploy-20261106/scripts/verify_deploy.sh` 停在 sudo 密码提示，**未执行、无输出文件**；这些项目不得记作已核验。
+- **仍未做**：真实网络端到端抓取（C32445874 / TLV77333PDBVR / TLV77733PDBVR 及一个非电子样本）、Flutter widget 测试、客户端包构建、`tools/release.py snapshot` 冻结与 `--activate`。回滚演练未做。

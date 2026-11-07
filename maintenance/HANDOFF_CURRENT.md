@@ -1,6 +1,6 @@
-# 当前维护交接：2026-11-06 器件库搜索未命中按需抓取（源码候选；未部署/未冻结）
+# 当前维护交接：2026-11-06 器件库按需抓取已部署生产（2026-11-06T14:29–14:31Z）
 
-最新：[按需抓取交接](handoffs/2026-11-06-catalog-on-demand-fetch.md)｜[任务](tasks/2026-11-06-catalog-on-demand-fetch.md)。`lab_catalog 19.0.2.0.9 → 19.0.2.0.10`（`components.json` 已同步），客户端源码变更但版本仍 `1.2.0+7`。搜索零结果且为精确 C 码/MPN 时显示“立即从立创商城抓取”；Odoo cron 每分钟处理 2 条，中文名称/品牌/分类/参数/CNY 全部来自中文详情页，只写 catalog 表不写库存；多候选必须人工选择，非电子分类在请求中文页前跳过。`flutter test` **326 passed / 5 skipped / 0 failed**，`flutter analyze` 0 error / 0 warning / 120 info（exit 1），纯 Python 15/15；`repo_check` exit 1，仅剩本轮未冻结的 client/server 源。**未在 Odoo 测试库跑 ORM、未做真实网络端到端、未做 widget 测试；未升级模块、未注册 cron、未建表、未部署、未提交/推送、未冻结源清单。**
+最新：[按需抓取交接](handoffs/2026-11-06-catalog-on-demand-fetch.md)｜[任务](tasks/2026-11-06-catalog-on-demand-fetch.md)。`lab_catalog 19.0.2.0.10` **已部署**（同批 `-u` 还覆盖 `lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2`；`lab_team_web 19.0.1.2.1` 未参与），`-u` 退出码 0、0 条 ERROR/CRITICAL/Traceback。备份 `/var/backups/lc-elc/20261106T142949Z-before-upgrade/`（`db.dump` 118,970,696 B / `40863d50…3ba0d66`；`filestore.tar.gz` 12,819,190 B / `5b9e5d42…a3f5fc0`；旧三模块源码在同目录）。升级脚本仍把 `/web/login` 的 303 判为失败（既有缺陷，不是故障）：独立复核带 DB 头 200、`odoo.service` active/enabled。`ir.cron`「器件库：处理在线补抓队列」（id 25，每 1 分钟）自 2026-11-06T14:31:16Z 起每约 62 秒运行，至 2026-11-07T13:11Z 共 1356 次、0 失败、队列为空；Odoo 日志同期 0 条 ERROR/CRITICAL/Traceback。客户端源码仍 `1.2.0+7`，`flutter test` **326 passed / 5 skipped / 0 failed**、纯 Python 15/15。**未核对 DB 行**（`ir_module_module` 版本/状态、`to_regclass`、唯一索引谓词、catalog 行数）——只读脚本停在 sudo 密码提示未执行；**未做真实网络端到端（三个目标料号）、未构建客户端包、未冻结 source manifest。**
 
 ## 此前维护交接：2026-11-06 Flutter Liquid Glass 三端候选构建（未发布/未部署）
 

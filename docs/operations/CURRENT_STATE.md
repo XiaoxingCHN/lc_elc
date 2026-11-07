@@ -1,8 +1,19 @@
 # 当前状态与已知限制
 
-## 2026-11-06 器件库按需抓取源码候选（未部署/未冻结）
+## 2026-11-06 器件库按需抓取已部署生产（cron 已在运行；DB 行核对待补）
 
-- **版本与边界**：`lab_catalog 19.0.2.0.9 → 19.0.2.0.10`（`components.json` 已同步）；客户端源码变更但版本仍为 `1.2.0+7`。未升级模块、未注册 `ir.cron`、未建表、未部署、未冻结 source manifest、未提交/推送。
+- **版本与范围**：生产 `/opt/odoo/custom-addons` 现为 `lab_catalog 19.0.2.0.10`、`lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2`；本次 `-u` 覆盖这三个模块，`lab_team_web 19.0.1.2.1` 未参与。客户端源码仍 `1.2.0+7`，未构建/发布安装包。
+- **部署执行**：`server/ubuntu22.04/upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261106/modules`，2026-11-06T14:29–14:31Z；步骤 4 `-u lab_inventory,lab_catalog,lab_workflow` **退出码 0、ERROR/CRITICAL/Traceback 行数 0**。
+- **备份/回滚**：`/var/backups/lc-elc/20261106T142949Z-before-upgrade/`——`db.dump` **118,970,696 B** / `40863d500fffc8f36013cd99da8625d3ed988799826f6633cc178f41d3ba0d66`；`filestore.tar.gz` **12,819,190 B** / `5b9e5d42a03d339dcbab225ad3e1da09913b4b853dcded117fcb29614a3f5fc0`；`MANIFEST.json` 17,246 B、`odoo.log.tail`；旧三模块源码在 `module-source-before-upgrade/`。
+- **健康检查**：脚本步骤 5 把 `/web/login` 的 **303**（→ `/web/database/selector`）判为失败，与 2026-11-04 相同的既有脚本缺陷，不是服务故障；独立复核：`X-Odoo-Database: LcHardwareHouse` 时 `/web/login` **200**、`odoo.service` **active/enabled**、Odoo 于 14:31:36Z 打印 `Modules loaded`（55 模块）。
+- **运行证据（免 sudo 可复核）**：`/var/log/odoo/odoo.log` 自 2026-11-06 14:30Z 至 2026-11-07 13:11Z **0 条 ERROR/CRITICAL/Traceback**；`ir.cron` 任务「器件库：处理在线补抓队列」（id 25，`data/lab_catalog_cron.xml` 声明每 1 分钟、`model._cron_process_queue(limit=2)`）自 **2026-11-06 14:31:16Z** 起持续运行，至 2026-11-07 13:11:47Z 共 **1356 次启动、0 次失败**，每次 `fully done (#loop 1; done 0; remaining 0)`（队列当前为空）。这同时说明新模型已加载、`lab_catalog_fetch_request` 表可用、cron 已入库。
+- **未核对（DB 行）**：`ir_module_module` 的 `latest_version/state`、`to_regclass('lab_catalog_fetch_request')`、部分唯一索引谓词、`lab_catalog_item/param` 行数——只读核对脚本 `verify_deploy.sh`（`/home/hbut/lc-deploy-20261106/scripts/`）停在 sudo 密码提示、**未执行、无输出文件**。上述 DB 行状态不得记作已核验。
+- **未做**：真实网络端到端（C32445874 / TLV77333PDBVR / TLV77733PDBVR 抓取与中文入库）、Flutter widget 测试、客户端包构建、source manifest 冻结。
+- **交接**：[按需抓取实施记录](../../maintenance/handoffs/2026-11-06-catalog-on-demand-fetch.md)。
+
+## 2026-11-06 器件库按需抓取源码候选（【已部署】见上一节；源清单未冻结）
+
+- **版本与边界**：`lab_catalog 19.0.2.0.9 → 19.0.2.0.10`（`components.json` 已同步）；客户端源码变更但版本仍为 `1.2.0+7`。**本节其余内容是 2026-11-06 部署前的时点记录**：其中「未升级模块、未注册 `ir.cron`、未建表、未部署、未提交」均已被后续动作改变（部署见上一节，改动已提交为 `e563da0`）；source manifest 仍未冻结。
 - **服务端**：`lab_catalog/tools/lcsc_remote.py` 用固定域名（`wmsc.lcsc.com`、`item.szlcsc.com`）完成 C 码/精确 MPN 取数，中文字段全部来自中文详情页；`lab.catalog.fetch.request` 状态机 + 部分唯一索引去重 + advisory lock 串行的每分钟 cron（2 条）；`/lab/api/catalog/search` 空结果返回 `fetch_suggestion`，新增 `/lab/api/catalog/fetch`、`/fetch_status`；只写 `lab.catalog.item/param` 与供应商库存，不写产品/quant/move。
 - **客户端**：空结果页“立即从立创商城抓取”，1 秒轮询最多 60 次，成功自动刷新；多候选必须人工选择；失败显示中文原因可重试；换查询取消轮询。
 - **实际验证**：`flutter test --no-pub` exit 0，**326 passed / 5 skipped / 0 failed**（基线 319/5）；`flutter analyze --no-pub lib test` exit 1，**0 error / 0 warning / 120 info**；`test_lcsc_remote.py` 15/15。`python tools/repo_check.py` exit 1，50 项通过，错误为本轮未冻结的 `frozen-source:client`（4 文件）与 `frozen-source:server`（13 文件），16 条 payload 警告为既有缺口；`generate_routes.py` 重新生成 `routes.json`（94 条）后 `--check` exit 0，`git diff --check` exit 0。
