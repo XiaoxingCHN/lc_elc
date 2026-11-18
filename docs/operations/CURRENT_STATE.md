@@ -2,7 +2,7 @@
 
 ## 2026-11-18 Linux 客户端 1.3.2+10 构建（WSL；未实机验收）
 
-- 三端补齐：Linux `1.3.2+10` 已在 WSL Ubuntu 22.04 用归档工具链构建，三步 exit 0，`flutter test` **340 passed / 5 skipped**；产物 `clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，16,505,688 B，sha256 `f928b96e…b36863`，bundle 内 `client-install.json` = 1.3.2 / build 10 / linux。
+- 三端补齐：Linux `1.3.2+10` 已在 WSL Ubuntu 22.04 用归档工具链构建，三步 exit 0，`flutter test` **340 passed / 5 skipped**；产物 `clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，16,503,485 B，sha256 `4f20594c…f78e5a`，bundle 内 `client-install.json` = 1.3.2 / build 10 / linux。
 - 未附 `deps/` 离线 DEB，运行时依赖系统 GTK3/libsecret/cups；真实登录、打印、扫码、SecretService、桌面实机与签名发布清单仍未验证；未推送。
 
 ## 2026-11-14 旧工作区审核与退役（F:\lc_elc_workspace 已删除；补档 2,870 文件；`repo_check` exit 0）

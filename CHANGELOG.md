@@ -3,7 +3,7 @@
 ## 2026.11.18 Flutter 客户端 Linux 1.3.2+10 构建（WSL Ubuntu 22.04；未实机验收）
 
 - 在 WSL Ubuntu 22.04 用归档工具链（Flutter 3.47.7 + `dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz` 的 pubcache/sysroot/prebuilt）执行 `tools/build_client.py --platform linux --test`，pub get / flutter test / flutter build linux 三步 **exit 0 / 0 / 0**，`flutter test` **340 passed / 5 skipped**。
-- 产物：`clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，**16,505,688 B**，sha256 `f928b96ef0406150a4523bdbc9bd44587196fcc481395e494133741c02b36863`；bundle 39 MB，`client-install.json` = 1.3.2 / build 10 / linux；`lib/libapp.so` 含“已选中，正在读取内部档案”等字符串；可执行文件 sha256 `1f555b91…1201e`。登记 `artifact-client-linux-1.3.2-10-20261118.json`。
+- 产物：`clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，**16,503,485 B**，sha256 `4f20594cfeadd040fa8d7116550560b9d4b314ec63e30eece8d036b64df78e5a`；bundle 39 MB，`client-install.json` = 1.3.2 / build 10 / linux；`lib/libapp.so` 含“已选中，正在读取内部档案”等字符串；可执行文件 sha256 `1f555b91…1201e`。登记 `artifact-client-linux-1.3.2-10-20261118.json`。
 - 边界：**未附 `deps/` 离线 DEB**，运行时需系统 GTK3/libsecret/cups；未做真实登录、打印、扫码、SecretService 与桌面实机验收；未提交签名发布清单、未推送。
 
 ## 2026.11.14 旧工作区审核与退役（F:\lc_elc_workspace 已删除；补档 2,870 文件；F: 可用 64.1 GB → 109 GB；`repo_check` exit 0；未提交/未推送）
