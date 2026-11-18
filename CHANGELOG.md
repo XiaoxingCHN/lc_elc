@@ -1,5 +1,14 @@
 # 变更记录
 
+## 2026.11.14 旧工作区审核与退役（F:\lc_elc_workspace 已删除；补档 2,870 文件；F: 可用 64.1 GB → 109 GB；`repo_check` exit 0；未提交/未推送）
+
+- 对象与结论：`F:\lc_elc_workspace` 原为 **178,156 文件 / 49,676,894,303 B**（2026-10-14 从桌面整包复制）；合并已在 **2026-10-19** 完成（commit `3b3c3af`、tag `archive-2026.10.19`、`original_files_deleted: 0`）。本次审核补档后删除原件，目录已不存在。
+- 审核（`local/manifests/merge-recheck-20261114.json` / `.log`）：台账 138,295 条，138,294 条有目标、1 条无目标跳过；**138,107** 个目标仍在；缺失 **187** 个全部是 `dependencies/sdk/windows/flutter/.pub-preload-cache/*.tar.gz`（SDK 可重建缓存）；抽查 **820** 个哈希，**51** 个与当时不同（迁移后仓库继续演进的源码），旧修订已补档。`lcscmigration/components.sqlite3` 与 `data/catalog/checkpoint-20261015/components.sqlite3` 全量 SHA256 一致：`ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823`（各 3,547,037,696 B）。26 个 reparse point 目标全在工作区内部；外部 junction `lc_elc\build_work\e -> E:\lcb\build` 用 `rmdir` 单独删除，`E:` 未受影响（该目标本就不存在）。
+- 补档（Git 排除，**2,870 文件 / 1,402,575,621 B**；逐文件见 `local/manifests/workspace-retirement-20261114.json`）：`local/archive/workspace-candidates/` **570** 个未发布构建候选（965,324,105 B，含 560 MiB 服务端离线重建包与两个 Linux 客户端 tar.gz）；`local/archive/eda/workspace-intermediates/` **30** 个 EDA 3.x 只留原件的构建产物（186,794,874 B）；`local/archive/evidence/analysis-workspace-20261014/` **2,219** 个 WorkBuddy 记录（249,753,330 B）；`local/archive/source-import-before-format/` 新增 **51** 个不在 Git 的旧修订（703,312 B；该目录原有 4 个）。
+- 删除：`robocopy <空目录> F:\lc_elc_workspace /MIR /XJ` 删除 **176,743 文件 / 46.243 GB**、**0 失败**，随后 `rmdir` 空根目录；F: 可用空间 **64.1 GB → 109 GB**；删除日志 `local/manifests/workspace-purge-20261114.log`。`python tools/repo_check.py` **exit 0**。
+- 未归档、随删除消失：可重建的构建缓存/运行时状态、`output\` 的接线图、`.workbuddy` 会话状态。
+- 未做：未 commit / 未 push（分支 `codex/receipt-search-feedback` 仍在工作区）；未改源码；未执行任何生产操作。
+
 ## 2026.11.10 修复制袋贴标“选择器件无反应”，客户端 1.3.2+10（Windows / Android；未上更新通道）
 
 - 版本：`clients/app` `1.3.1+9 → 1.3.2+10`（`pubspec.yaml`、`components.json` 一致）。`1.3.1+9` 成品已存在，按“旧包不覆盖”新开 `clients/{windows,android}/releases/1.3.2+10`。服务端未动。
