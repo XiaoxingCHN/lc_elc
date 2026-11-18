@@ -20,7 +20,7 @@
 | `releases/` | 发布入口索引；实际成品在各组件 `releases/` 下 | `releases/README.md` | 是 | 4.0K | [releases/README.md](../../releases/README.md) |
 | `evidence/` | 精选可公开的验收证据摘要 | `evidence/README.md` | 是 | 23K | [evidence/README.md](../../evidence/README.md) |
 | `archive/` | 历史资料索引；实物在 `local/archive/` | `archive/README.md` | 仅 `README.md` 入 Git | 4.0K | [archive/README.md](../../archive/README.md) |
-| `local/` | 本机缓存、迁移/退役记录、历史原物、私有签名、构建输出 | `local/README.md` | 不入 Git | 32.0G（34,409,281,819 B，含 `local/archive`） | [local/README.md](../../local/README.md) |
+| `local/` | 本机缓存、迁移/退役记录、历史原物、私有签名、构建输出 | `local/README.md` | 不入 Git | 32.0G（34,409,281,819 B，含 `local/archive`） | `local/README.md`（Git 排除，本机文件） |
 | `Python/` | 本机捆绑 Python 运行时 | 无（运行时，不参与源码） | 不入 Git | 184M | — |
 
 体积为 2026-11-15 02:12–02:15（+08:00）本机实测；`clients`/`server`/`plugins`/`services`/`data`/`docs`/`maintenance`/`tools`/`releases`/`evidence`/`archive`/`Python` 用 `du -sh`，`dependencies`/`local` 用 `dir /s /-c` 的字节合计（文件数分别为 184,663 与 118,744），未四舍五入到整 GB 的两项在括号内给出字节数。
