@@ -1,10 +1,12 @@
 # 当前发布入口
 
+> 2026-11-18：Windows/Android 客户端 `1.3.2+10` 已并入主仓；Linux 端仍为 `1.0.1+2`，`1.3.2` 待 Linux 环境构建。旧版成品保留不覆盖。
+
 | 组件 | 版本 | 本机成品目录 | 源码 |
 |---|---|---|---|
-| Windows客户端 | 1.0.1+2 | ../clients/windows/releases/1.0.1/ | ../clients/app/ |
-| Android客户端 | 1.1.3+6 stable | ../clients/android/releases/1.1.3+6/ | ../clients/app/ |
-| Linux客户端 | 1.0.1+2 | ../clients/linux/releases/1.0.1/ | ../clients/app/ |
+| Windows客户端 | 1.3.2+10 | ../clients/windows/releases/1.3.2+10/ | ../clients/app/ |
+| Android客户端 | 1.3.2+10 | ../clients/android/releases/1.3.2+10/ | ../clients/app/ |
+| Linux客户端 | 1.0.1+2（1.3.2 尚未构建） | ../clients/linux/releases/1.0.1/ | ../clients/app/ |
 | 嘉立创EDA专业版 | 3.0.3 | ../plugins/jlc-eda/releases/3.0.3/ | ../plugins/jlc-eda/ |
 | Odoo模块当前修复包 | 2026-10-18 | ../server/releases/2026-10-18/ | ../server/ubuntu22.04/odoo_addons/ |
 
