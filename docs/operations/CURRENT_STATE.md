@@ -1,5 +1,13 @@
 # 当前状态与已知限制
 
+## 2026-11-14 旧工作区审核与退役（F:\lc_elc_workspace 已删除；补档 2,870 文件；`repo_check` exit 0）
+
+- **结论**：旧工作区 `F:\lc_elc_workspace`（原 178,156 文件 / 49,676,894,303 B）经审核补档后于 **2026-11-14** 删除，目录已不存在；合并早在 2026-10-19 完成（commit `3b3c3af`、tag `archive-2026.10.19`、`original_files_deleted: 0`）。本轮未改源码、未提交/推送、未接触生产。
+- **审核**：138,294 个已迁移目标中 138,107 个仍在；缺失 187 个全为 `dependencies/sdk/windows/flutter/.pub-preload-cache/*.tar.gz`；820 个抽查哈希中 51 个因迁移后源码演进不同，旧修订已补档。`lcscmigration/components.sqlite3` 与 `data/catalog/checkpoint-20261015/components.sqlite3` 全量 SHA256 一致（`ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823`，各 3,547,037,696 B）。
+- **补档**：2,870 文件 / 1,402,575,621 B 进入 Git 排除目录 `local/archive/workspace-candidates`（570）、`local/archive/eda/workspace-intermediates`（30）、`local/archive/evidence/analysis-workspace-20261014`（2,219）、`local/archive/source-import-before-format`（新增 51）。
+- **记录路径**：逐文件来源与哈希 `local/manifests/workspace-retirement-20261114.json`；退役说明 `workspace-retirement-20261114.md`；复核 `merge-recheck-20261114.{json,log}`；删除日志 `workspace-purge-20261114.log`。
+- **空间与检查**：删除 176,743 文件 / 46.243 GB（`robocopy /MIR /XJ`，0 失败），F: 可用 64.1 GB → 109 GB；`python tools/repo_check.py` exit 0。未归档：可重建缓存/运行时状态、`output\` 接线图、`.workbuddy` 会话状态。
+
 ## 2026-11-03 P3 Web 生产部署完成（r3 → 生产 LcHardwareHouse；公网回归通过）
 
 - **结论**：r3 冻结候选已于 **2026-11-03 00:16–00:36Z** 部署到生产 `192.168.31.105`（DB `LcHardwareHouse`），

@@ -2,7 +2,9 @@
 
 **模型政策（2026-11-02 用户指令，长期有效）**：禁用来自 Codex 的所有模型，后续只允许使用 DeepSeek 模型；不得唤醒 root/Codex 桥、不得派发 GPT/codex 系子代理，接手代理按此执行。
 
-最新（2026-11-03）：[生产部署交接](handoffs/2026-11-03-p3-production-deploy.md)｜[任务](tasks/2026-11-03-p3-production-deploy.md)｜[冻结源 r3](registry/source-server-web-ui-20261102-r3.json)｜[候选包登记 r3](registry/artifact-server-web-ui-20261102-r3.json)。
+最新（2026-11-14）：[旧工作区退役交接](handoffs/2026-11-14-workspace-retirement.md)｜[任务](tasks/2026-11-14-workspace-retirement.md)。`F:\lc_elc_workspace` 已于 2026-11-14 审核补档后删除（原 178,156 文件 / 49,676,894,303 B）：138,294 个已迁移目标中 138,107 个仍在，缺失 187 个全为 Flutter SDK 可重建缓存，820 个抽查哈希中 51 个因源码演进不同并已补档旧修订；补档 2,870 文件 / 1,402,575,621 B 到 `local/archive`（workspace-candidates 570、eda/workspace-intermediates 30、evidence/analysis-workspace-20261014 2,219、source-import-before-format 新增 51）；`lcscmigration/components.sqlite3` 与 `data/catalog/checkpoint-20261015` 全量 SHA256 一致，仅保留后者为本机权威副本；`robocopy /MIR /XJ` 删除 176,743 文件 / 46.243 GB、0 失败，F: 可用 64.1 GB → 109 GB；`repo_check.py` exit 0；仅改文档，未 commit/push。记录见 `local/manifests/workspace-retirement-20261114.{json,md}`、`merge-recheck-20261114.{json,log}`、`workspace-purge-20261114.log`。
+
+上一轮（2026-11-03）：[生产部署交接](handoffs/2026-11-03-p3-production-deploy.md)｜[任务](tasks/2026-11-03-p3-production-deploy.md)｜[冻结源 r3](registry/source-server-web-ui-20261102-r3.json)｜[候选包登记 r3](registry/artifact-server-web-ui-20261102-r3.json)。
 **r3 已于 2026-11-03 00:16–00:36Z 部署到生产** `192.168.31.105`（DB `LcHardwareHouse`）：`lab_team_web 19.0.1.1.0 → 19.0.1.2.0`（`-u lab_team_web`，`UPGRADE_EXIT=0`、错误行 0），
 `lab_site` 仅权限归一（内容=冻结）、`lab_theme` 仅由 `deploy-theme.sh` 换冻结版，`lab_workflow 19.0.2.0.0` / `lab_catalog 19.0.2.0.5` / `lab_inventory 19.0.1.0.0` 未变；
 一致备份 `/opt/odoo/backups/20261103T001648Z-p3-web-20261103T000658Z/`（`db.dump` 110,944,415 B / `40c76d0679d2a7915ba5857d5009c291c18f17fdf239803a484246228993ba19`、
