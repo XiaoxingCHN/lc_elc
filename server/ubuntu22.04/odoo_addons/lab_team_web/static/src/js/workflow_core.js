@@ -1254,12 +1254,49 @@
       if (!list2.length) {
         items = [];
         clear(list);
-        setNote(opts.emptyText || '没有匹配的器件。', 'empty');
+        showEmptyNote();
         return;
       }
       setNote('');
       setHidden(note, true);
       render(list2);
+    }
+
+    // 空结果：文案 + 页面可选的一个下一步动作（例如"立即从立创商城抓取"）。
+    // 组件自己不判断业务、不自动触发任何写操作；动作是否出现由 emptyAction
+    // 针对**当前输入**决定，点一下才执行，且执行前先关掉面板。
+    function showEmptyNote() {
+      note.textContent = '';
+      note.setAttribute('data-kind', 'empty');
+      note.appendChild(el('span', {
+        class: 'lc-combobox-empty-text',
+        text: opts.emptyText || '没有匹配的器件。'
+      }));
+      var action = null;
+      try {
+        action = typeof opts.emptyAction === 'function' ? opts.emptyAction(query()) : null;
+      } catch (error) {
+        action = null;
+      }
+      if (action && action.label && typeof action.onClick === 'function') {
+        var button = el('button', {
+          type: 'button',
+          class: 'lc-combobox-retry',
+          text: action.label
+        });
+        button.addEventListener('click', function (event) {
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          if (disabled()) return;
+          bump();
+          close();
+          action.onClick();
+        });
+        note.appendChild(button);
+      }
+      setHidden(note, false);
+      open();
+      place();
     }
 
     function handleError(error, text, mySeq) {

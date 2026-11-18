@@ -151,6 +151,25 @@ class CatalogParamSearchTest(TransactionCase):
         self.assertEqual(template.lab_brand, '手填品牌')
         self.assertEqual(template.lab_package, '0603')
 
+    def test_template_without_binding_is_visible_by_catalog_code(self):
+        """网页入库按 lcsc:Cxxx 建的最小档案没有 binding 行。
+
+        详情/搜索若只查绑定表，就会"看不见"这个档案的库存、袋与流水；
+        必须同时按档案自身归一化的 C 码合并。
+        """
+        code = 'C9100030'
+        self._catalog_item(code, params=[])
+        template = self.env['product.template'].create({
+            'name': '立创物料 %s（待补全）' % code,
+            'type': 'consu',
+            'lab_lcsc_code': code,
+        })
+        mapped = self.Item._template_ids_by_codes([code])
+        self.assertIn(template.id, mapped.get(code, []))
+        detail = self.Item.detail('lcsc:%s' % code)
+        self.assertIn(template.id, detail['item']['lab_template_ids'])
+        self.assertIn(template.id, [t['id'] for t in detail['lab_templates']])
+
     def test_param_removal_keeps_index_ready(self):
         item = self._catalog_item('C9100007', params=[
             ('resistance', '阻值', '10Ω'),

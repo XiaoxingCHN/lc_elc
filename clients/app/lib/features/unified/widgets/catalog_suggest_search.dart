@@ -234,6 +234,7 @@ class CatalogSuggestField extends ConsumerStatefulWidget {
     super.key,
     required this.onSelected,
     this.onQueryChanged,
+    this.onFetchRequested,
     this.enabled = true,
     this.label = '搜索并选择器件',
     this.hintText = 'C 编号 / 型号 / 名称 / 参数（如 10R）',
@@ -249,6 +250,11 @@ class CatalogSuggestField extends ConsumerStatefulWidget {
   /// Called with the raw text on every operator edit, before searching.
   final ValueChanged<String>? onQueryChanged;
 
+  /// Called when the operator asks to fetch the server's exact suggestion from
+  /// LCSC. Only the zero-result panel offers this, and only when the server
+  /// said the term is one exact C code / MPN.
+  final ValueChanged<CatalogFetchSuggestion>? onFetchRequested;
+
   /// When false the field is read-only and the panel closes (submission lock).
   final bool enabled;
 
@@ -262,12 +268,12 @@ class CatalogSuggestField extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<CatalogSuggestField> createState() =>
-      _CatalogSuggestFieldState();
+      CatalogSuggestFieldState();
 }
 
 enum _SuggestStatus { idle, loading, results, empty, error }
 
-class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
+class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode(debugLabel: 'catalog-suggest');
   final LayerLink _link = LayerLink();
@@ -292,9 +298,17 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
   String? _errorCode;
   String? _errorMessage;
 
+  /// The server's offer to fetch, kept only for the CURRENT zero-result answer.
+  CatalogFetchSuggestion? _suggestion;
+
   /// Suppresses the parent-facing query callback when the field writes text
   /// back itself after a pick (that write is not a new search).
   bool _writingText = false;
+
+  /// The label this field wrote back after a pick. Tapping the field again must
+  /// not search for that label, but it must search for anything the operator
+  /// typed (the panel can be closed by an outside tap while the text stays).
+  String? _pickedLabel;
 
   @override
   void initState() {
@@ -401,8 +415,23 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
     }
   }
 
+  /// Re-opens the panel when the operator taps a field that still holds text.
+  ///
+  /// An outside tap or a blur closes the panel but leaves the query in the
+  /// field; without this the field looks dead - the text is there, no list, and
+  /// nothing responds until the operator edits a character. Re-running the
+  /// search costs one request and makes the state recoverable.
+  void _onFieldTap() {
+    if (!widget.enabled || _panelOpen) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty || text == _pickedLabel) return;
+    if (_controller.value.composing.isValid) return;
+    _retry();
+  }
+
   void _onChanged(String raw) {
     if (_writingText) return;
+    if (raw.trim() != _pickedLabel) _pickedLabel = null;
     _seq++;
     _debounce?.cancel();
     widget.onQueryChanged?.call(raw);
@@ -441,6 +470,7 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
         _active = null;
         _errorCode = null;
         _errorMessage = null;
+        _suggestion = page.fetchSuggestion;
         _status = groups.isEmpty
             ? _SuggestStatus.empty
             : _SuggestStatus.results;
@@ -469,6 +499,13 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
     }
   }
 
+  /// Re-runs the search for the text currently in the field.
+  ///
+  /// Used after an on-demand fetch wrote the missing component: the operator
+  /// still has to pick it, so the suggestion list must be refreshed, never
+  /// auto-committed.
+  void research() => _retry();
+
   void _retry() {
     final term = catalogSuggestTerm(_controller.text);
     if (!widget.enabled || term.runes.length < widget.minQueryLength) return;
@@ -483,6 +520,7 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
 
   void _clear() {
     if (!widget.enabled) return;
+    _pickedLabel = null;
     _controller.clear();
     _onChanged('');
     _focusNode.requestFocus();
@@ -500,6 +538,7 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
       text: label,
       selection: TextSelection.collapsed(offset: label.length),
     );
+    _pickedLabel = label;
     _writingText = false;
     setState(_resetResults);
     _focusNode.requestFocus();
@@ -512,6 +551,7 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
     _active = null;
     _errorCode = null;
     _errorMessage = null;
+    _suggestion = null;
     if (_status != _SuggestStatus.loading) _status = _SuggestStatus.idle;
   }
 
@@ -580,6 +620,8 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
             readOnly: !widget.enabled,
             autofocus: widget.autofocus,
             textInputAction: TextInputAction.search,
+            onTap: _onFieldTap,
+            onTapAlwaysCalled: true,
             onChanged: _onChanged,
             onSubmitted: (_) {
               final index = _active;
@@ -682,6 +724,10 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
           ),
         );
       case _SuggestStatus.empty:
+        final suggestion = _suggestion;
+        final canFetch = suggestion != null &&
+            suggestion.isValid &&
+            widget.onFetchRequested != null;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Column(
@@ -694,6 +740,18 @@ class _CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
                 '也可以继续扫码或新建器件。',
                 style: theme.textTheme.bodySmall,
               ),
+              if (canFetch) ...<Widget>[
+                if (suggestion.message.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(suggestion.message, style: theme.textTheme.bodySmall),
+                ],
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => widget.onFetchRequested!(suggestion),
+                  icon: const Icon(Icons.travel_explore, size: 18),
+                  label: const Text('立即从立创商城抓取'),
+                ),
+              ],
             ],
           ),
         );

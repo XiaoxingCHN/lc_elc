@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:lab_inventory_client/widgets/lab_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,11 +8,14 @@ import 'package:go_router/go_router.dart';
 import '../models/detail_models.dart';
 import '../models/identity.dart';
 import '../models/unified_item.dart';
+import '../providers/catalog_fetch_controller.dart';
 import '../providers/catalog_providers.dart';
 import '../providers/cache_writer_providers.dart';
 import '../providers/material_providers.dart';
+import '../providers/unified_providers.dart';
 import '../services/asset_cache.dart';
 import '../unified_routes.dart';
+import '../widgets/catalog_fetch_panel.dart';
 import '../widgets/media_view.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/status_views.dart';
@@ -306,6 +311,7 @@ class _DetailBody extends ConsumerWidget {
             ),
           ],
         ),
+        _CatalogRefreshSection(item: item),
         const SizedBox(height: 8),
 
         // ------------------------------------------------- local archives / SN
@@ -792,6 +798,100 @@ class _Metric extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "刷新资料": re-fetches the LCSC data of THIS ONE card.
+///
+/// There is deliberately no list-level or whole-library refresh anywhere in the
+/// app: the endpoint takes one exact C code, and this section passes exactly the
+/// code of the card being viewed. The top-bar "刷新" only reloads the local
+/// detail record - it never calls LCSC.
+class _CatalogRefreshSection extends ConsumerStatefulWidget {
+  const _CatalogRefreshSection({required this.item});
+
+  final UnifiedItem? item;
+
+  @override
+  ConsumerState<_CatalogRefreshSection> createState() =>
+      _CatalogRefreshSectionState();
+}
+
+class _CatalogRefreshSectionState
+    extends ConsumerState<_CatalogRefreshSection> {
+  late final CatalogFetchController _fetch;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch = CatalogFetchController(
+      api: ref.read(labApiProvider),
+      onDone: () async {
+        final key = widget.item?.itemKey;
+        if (key == null || key.isEmpty) return;
+        ref.invalidate(catalogDetailProvider(key));
+        ref.invalidate(catalogRowProvider(key));
+      },
+    )..addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _fetch.dispose();
+    super.dispose();
+  }
+
+  void _refresh(String code) {
+    unawaited(
+      _fetch.start(query: code, catalogCode: code, refresh: true),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = displayCatalogCode(widget.item?.catalogCode ?? '');
+    if (code.isEmpty) return const SizedBox.shrink();
+    final status = _fetch.status;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _fetch.busy || _fetch.running
+                  ? null
+                  : () => _refresh(code),
+              icon: const Icon(Icons.sync),
+              label: const Text('刷新资料'),
+            ),
+          ),
+          Text(
+            '只刷新这一个器件（$code）的立创资料，不影响其它条目。',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (_fetch.busy || status != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: status == null
+                  ? const CatalogFetchRunning()
+                  : CatalogFetchPanel(
+                      status: status,
+                      onChoose: (candidate) =>
+                          unawaited(_fetch.chooseCandidate(candidate)),
+                    ),
+            ),
+        ],
+      ),
     );
   }
 }

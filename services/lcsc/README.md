@@ -13,6 +13,8 @@ systemd-production是归档时从192.168.31.105只读导出的完整实际定义
 - lcsc-catalog-import.service：使用Odoo venv运行import_catalog.py，读取SQLite与分类，更新供应商资料，`--verify`；不是直接更新实验室库存。
 - odoo.service：现有实例启动定义，单独保留以便理解环境，不要在归档后批量覆盖线上unit。
 
+**2026-11-08 起的状态说明**：日常资料更新已改为按需抓取（搜索/入库命中精确 C 码或 MPN 时当场抓，详情页可单条刷新），夜间批量采集停止作为日常手段。上面的 timer 状态是归档时（2026-11-06）的实际定义；生产上已于 2026-11-08 01:00（本地）停用 `lcsc-crawler.timer` / `lcsc-crawler-stop.timer`（现均 `disabled`/`inactive`），执行记录见 `docs/operations/CURRENT_STATE.md`。unit 与采集器源码保留，手工全量重建仍用 `systemctl start lcsc-crawler.service`（成功后 `OnSuccess` 触发导入）。
+
 这些是配置已核对，不是归档时实际等待一个夜间窗口并重跑业务的验收。失败采集不会凭配置就叫成功导入。绝不要为‘验证’自动启动爬虫。
 
 ## 实际服务器路径

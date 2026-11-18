@@ -8,3 +8,4 @@ Odoo 数据库；``test_catalog_param_search_orm`` 需要 Odoo 测试运行器�
 from . import test_asset_cache  # noqa: F401
 from . import test_param_search  # noqa: F401
 from . import test_catalog_param_search_orm  # noqa: F401
+from . import test_catalog_fetch_inline  # noqa: F401

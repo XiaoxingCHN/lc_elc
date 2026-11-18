@@ -9,6 +9,7 @@ import 'package:lab_inventory_client/features/unified/models/unified_item.dart';
 import 'package:lab_inventory_client/features/unified/providers/unified_providers.dart';
 import 'package:lab_inventory_client/features/unified/screens/pending_receipt_screen.dart';
 import 'package:lab_inventory_client/features/unified/widgets/catalog_suggest_search.dart';
+import 'package:lab_inventory_client/models/lab_api_exception.dart';
 import 'package:lab_inventory_client/services/lab_api_client.dart';
 
 import 'support/fake_lab_api.dart';
@@ -115,16 +116,19 @@ void main() {
     late FakeLabApi api;
     late List<UnifiedItem> picks;
     late List<String> queries;
+    late List<CatalogFetchSuggestion> fetched;
 
     setUp(() {
       api = FakeLabApi();
       picks = <UnifiedItem>[];
       queries = <String>[];
+      fetched = <CatalogFetchSuggestion>[];
     });
 
     Widget harness({
       bool enabled = true,
       Duration debounce = const Duration(milliseconds: 250),
+      bool withFetch = false,
     }) {
       return ProviderScope(
         overrides: [labApiProvider.overrideWithValue(api.client)],
@@ -140,6 +144,7 @@ void main() {
                     debounce: debounce,
                     onSelected: picks.add,
                     onQueryChanged: queries.add,
+                    onFetchRequested: withFetch ? fetched.add : null,
                   ),
                   const SizedBox(height: 12),
                   const TextButton(onPressed: null, child: Text('其他控件')),
@@ -244,6 +249,59 @@ void main() {
       await answer(tester);
       expect(find.text('没有匹配的器件'), findsOneWidget);
       expect(find.textContaining('新建器件'), findsOneWidget);
+    });
+
+    testWidgets('zero results offer the server fetch only when it is exact',
+        (tester) async {
+      var withSuggestion = true;
+      api.onCall = (path, params) async => <String, dynamic>{
+        'items': <Map<String, dynamic>>[],
+        'total': 0,
+        if (withSuggestion)
+          'fetch_suggestion': <String, dynamic>{
+            'kind': 'c_code',
+            'query': 'C32445874',
+            'can_fetch': true,
+            'message': '本地库暂无该 C 编号，可立即从立创商城抓取。',
+          },
+      };
+      await tester.pumpWidget(harness(withFetch: true));
+
+      await type(tester, 'C32445874');
+      await answer(tester);
+      expect(find.text('立即从立创商城抓取'), findsOneWidget);
+      expect(find.text('本地库暂无该 C 编号，可立即从立创商城抓取。'), findsOneWidget);
+
+      await tester.tap(find.text('立即从立创商城抓取'));
+      await tester.pump();
+      expect(fetched.single.query, 'C32445874');
+      expect(fetched.single.kind, 'c_code');
+
+      // A bounded keyword never gets the button, even after a fetchable term.
+      withSuggestion = false;
+      await type(tester, '电容');
+      await answer(tester);
+      expect(find.text('立即从立创商城抓取'), findsNothing);
+    });
+
+    testWidgets('without an onFetchRequested callback no fetch is offered',
+        (tester) async {
+      api.onCall = (path, params) async => <String, dynamic>{
+        'items': <Map<String, dynamic>>[],
+        'total': 0,
+        'fetch_suggestion': <String, dynamic>{
+          'kind': 'mpn',
+          'query': 'TLV77733PDBVR',
+          'can_fetch': true,
+          'message': '可立即从立创商城抓取。',
+        },
+      };
+      await tester.pumpWidget(harness());
+
+      await type(tester, 'TLV77733PDBVR');
+      await answer(tester);
+      expect(find.text('没有匹配的器件'), findsOneWidget);
+      expect(find.text('立即从立创商城抓取'), findsNothing);
     });
 
     testWidgets('error shows a real retry that searches again', (tester) async {
@@ -368,6 +426,100 @@ void main() {
         reason: 'only the field text remains; the suggestion panel is gone',
       );
       expect(picks, isEmpty);
+    });
+
+    testWidgets(
+      'tapping the field again re-opens a panel closed by an outside tap',
+      (tester) async {
+        api.onCall = (path, params) async => <String, dynamic>{
+          'items': <Map<String, dynamic>>[
+            itemJson(itemKey: 'catalog:C100001', catalogCode: 'C100001'),
+          ],
+          'total': 1,
+        };
+        await tester.pumpWidget(harness());
+
+        await type(tester, 'C100001');
+        await answer(tester);
+        expect(find.text('C100001'), findsWidgets);
+
+        await tester.tapAt(const Offset(400, 400));
+        await tester.pump();
+        expect(find.text('C100001'), findsOneWidget);
+
+        // The text is still in the field, so a second tap on the field must
+        // search again and show the panel. Before this regression test that tap
+        // was a no-op and the form looked dead even though typing worked.
+        await tester.tap(find.byType(TextField));
+        await tester.pump();
+        await tester.pump();
+        expect(api.countFor(LabApiRoutes.catalogSearch), 2);
+        expect(find.text('C100001'), findsWidgets);
+        expect(picks, isEmpty);
+      },
+    );
+
+    testWidgets('tapping the field after a pick does not search the label', (
+      tester,
+    ) async {
+      api.onCall = (path, params) async => <String, dynamic>{
+        'items': <Map<String, dynamic>>[
+          itemJson(
+            itemKey: 'lab:42',
+            catalogCode: 'C100001',
+            name: '本地器件',
+            labTemplateIds: <int>[9],
+          ),
+        ],
+        'total': 1,
+      };
+      await tester.pumpWidget(harness());
+
+      await type(tester, 'C100001');
+      await answer(tester);
+      await tester.tap(find.text('本地器件'));
+      await tester.pump();
+      expect(picks, hasLength(1));
+      final searches = api.countFor(LabApiRoutes.catalogSearch);
+
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        api.countFor(LabApiRoutes.catalogSearch),
+        searches,
+        reason: 'the label written back by the pick is not a query',
+      );
+      expect(find.text('本地器件'), findsNothing);
+    });
+
+    testWidgets('a slow touch tap that spans a frame still commits', (
+      tester,
+    ) async {
+      api.onCall = (path, params) async => <String, dynamic>{
+        'items': <Map<String, dynamic>>[
+          itemJson(
+            itemKey: 'lab:42',
+            catalogCode: 'C100001',
+            name: '本地器件',
+            labTemplateIds: <int>[9],
+          ),
+        ],
+        'total': 1,
+      };
+      await tester.pumpWidget(harness());
+
+      await type(tester, 'C100001');
+      await answer(tester);
+      // A real finger holds the row across at least one frame; the row must
+      // still register as a tap, not as a cancelled press.
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('本地器件')),
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(picks.single.itemKey, 'lab:42');
     });
 
     testWidgets('arrow keys highlight, Enter commits, Escape and Tab close', (
@@ -732,6 +884,170 @@ void main() {
         });
         await tester.pumpAndSettle();
         expect(api.countFor(LabApiRoutes.pendingCreate), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('a pick shows up immediately, before the archive read', (
+      tester,
+    ) async {
+      final detail = Completer<Map<String, dynamic>>();
+      api = FakeLabApi(
+        onCall: (path, params) async {
+          switch (path) {
+            case LabApiRoutes.pendingList:
+              return <String, dynamic>{'records': <Map<String, dynamic>>[]};
+            case LabApiRoutes.catalogSearch:
+              return <String, dynamic>{
+                'items': <Map<String, dynamic>>[
+                  itemJson(
+                    itemKey: 'lab:42',
+                    catalogCode: 'C100001',
+                    name: '本地器件',
+                    labTemplateIds: <int>[9],
+                  ),
+                ],
+                'total': 1,
+              };
+            case LabApiRoutes.catalogDetail:
+              return detail.future;
+            default:
+              return <String, dynamic>{
+                'locations': <Map<String, dynamic>>[],
+              };
+          }
+        },
+      );
+      await tallView(tester);
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+
+      await searchAndPick(tester);
+
+      // The tap must be visible at once. Waiting for the (possibly slow) archive
+      // read before showing the selection is what made the tap look dead.
+      expect(find.text('已选：本地器件'), findsOneWidget);
+      expect(find.text('已选中，正在读取内部档案…'), findsOneWidget);
+      final create = find.widgetWithText(FilledButton, '生成袋码并加入待打印');
+      expect(
+        tester.widget<FilledButton>(create).onPressed,
+        isNull,
+        reason: 'create waits for the archive list it is about to offer',
+      );
+
+      detail.complete(
+        detailWith(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'product_template_id': 9,
+            'name': '本地器件',
+            'sn': 'SN-A',
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('已选中，正在读取内部档案…'), findsNothing);
+      expect(find.text('已选：本地器件'), findsOneWidget);
+      expect(tester.widget<FilledButton>(create).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('typing again drops a pick whose detail key changed', (
+      tester,
+    ) async {
+      api = FakeLabApi(
+        onCall: (path, params) async {
+          switch (path) {
+            case LabApiRoutes.pendingList:
+              return <String, dynamic>{'records': <Map<String, dynamic>>[]};
+            case LabApiRoutes.catalogSearch:
+              return <String, dynamic>{
+                'items': <Map<String, dynamic>>[
+                  itemJson(
+                    itemKey: 'lcsc:C100001',
+                    catalogCode: 'C100001',
+                    name: '本地器件',
+                  ),
+                ],
+                'total': 1,
+              };
+            case LabApiRoutes.catalogDetail:
+              // A supplier row resolves to a local archive with a different key.
+              return detailWith(<Map<String, dynamic>>[
+                <String, dynamic>{
+                  'product_template_id': 9,
+                  'name': '本地器件',
+                  'sn': 'SN-A',
+                },
+              ]);
+            default:
+              return <String, dynamic>{
+                'locations': <Map<String, dynamic>>[],
+              };
+          }
+        },
+      );
+      await tallView(tester);
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+
+      await searchAndPick(tester);
+      expect(find.text('已选：本地器件'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'C1000');
+      await tester.pump();
+      expect(
+        find.text('已选：本地器件'),
+        findsNothing,
+        reason:
+            'a keystroke must drop the pick even when the detail read changed '
+            'the item_key; otherwise bags are created for the old card',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'a pick commits and explains itself when the detail call fails',
+      (tester) async {
+        api = FakeLabApi(
+          onCall: (path, params) async {
+            switch (path) {
+              case LabApiRoutes.pendingList:
+                return <String, dynamic>{'records': <Map<String, dynamic>>[]};
+              case LabApiRoutes.catalogSearch:
+                return <String, dynamic>{
+                  'items': <Map<String, dynamic>>[
+                    itemJson(
+                      itemKey: 'lab:42',
+                      catalogCode: 'C100001',
+                      name: '本地器件',
+                    ),
+                  ],
+                  'total': 1,
+                };
+              case LabApiRoutes.catalogDetail:
+                throw const LabApiException(
+                  code: 'NOT_FOUND',
+                  message: '没有找到该器件。',
+                );
+              default:
+                return <String, dynamic>{
+                  'locations': <Map<String, dynamic>>[],
+                };
+            }
+          },
+        );
+        await tallView(tester);
+        await tester.pumpWidget(screen());
+        await tester.pumpAndSettle();
+
+        await searchAndPick(tester);
+
+        // The row already carries the item_key, so a failing detail read must
+        // not swallow the pick the operator just made: it commits and says why
+        // the archive list is empty.
+        expect(find.text('已选：本地器件'), findsOneWidget);
+        expect(find.textContaining('读取内部档案失败'), findsOneWidget);
+        expect(find.textContaining('没有找到该器件。'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );

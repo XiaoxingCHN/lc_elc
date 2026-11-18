@@ -242,6 +242,7 @@ function setup(options) {
     disabled: opts.disabled || function () { return false; },
     loadingText: '正在检索器件资料…',
     emptyText: '没有匹配的器件。',
+    emptyAction: opts.emptyAction,
     errorText: function (err) { return '检索失败：' + ((err && err.code) || 'NETWORK'); },
     viewAllLabel: opts.viewAllLabel,
     viewAllHref: opts.viewAllHref,
@@ -433,6 +434,50 @@ test('空结果：给出明确文案而不是"有结果"的空面板', async () 
   assert.equal(note.getAttribute('data-kind'), 'empty');
   assert.ok(note.textContent.indexOf('没有匹配') !== -1);
   assert.equal(options(pop).length, 0);
+  assert.equal(note.children.filter(function (node) { return node.tagName === 'BUTTON'; }).length,
+               0, '没有 emptyAction 时不该凭空出现按钮');
+});
+
+test('空结果的下一步：emptyAction 给出动作才出现按钮，点一下才执行且先关面板', async () => {
+  let acted = 0;
+  const { box, input, pop, queue } = setup({
+    debounceMs: 1,
+    emptyAction: function (text) {
+      if (text !== 'tlv77') return null;
+      return { label: '到立创商城查候选', onClick: function () { acted += 1; } };
+    }
+  });
+  queue.push([]);
+  type(input, 'tlv77');
+  await tick(15);
+  const note = pop.children[1];
+  assert.equal(note.getAttribute('data-kind'), 'empty');
+  const buttons = note.children.filter(function (node) { return node.tagName === 'BUTTON'; });
+  assert.equal(buttons.length, 1, '零结果时应该有一个下一步按钮');
+  assert.equal(buttons[0].textContent, '到立创商城查候选');
+  assert.equal(acted, 0, '只渲染按钮，不自动触发');
+
+  const event = fire(buttons[0], 'click');
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(acted, 1, '点一下执行一次');
+  assert.equal(box.isOpen(), false, '点了之后先关面板');
+});
+
+test('空结果的下一步只针对当前关键词：别的输入不出现按钮', async () => {
+  const { input, pop, queue } = setup({
+    debounceMs: 1,
+    emptyAction: function (text) {
+      return text === 'tlv77'
+        ? { label: '到立创商城查候选', onClick: function () {} }
+        : null;
+    }
+  });
+  queue.push([]);
+  type(input, 'stm32');
+  await tick(15);
+  const note = pop.children[1];
+  assert.equal(note.getAttribute('data-kind'), 'empty');
+  assert.equal(note.children.filter(function (node) { return node.tagName === 'BUTTON'; }).length, 0);
 });
 
 test('请求失败：显示错误文案（含错误码），不伪造结果', async () => {

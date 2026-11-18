@@ -1,0 +1,52 @@
+{
+  "file": "clients/windows/releases/1.3.1+9/LC_ELC-Windows-1.3.1+9-x64.zip",
+  "bytes": 18386856,
+  "sha256": "c0b2e2f01ec09ab1416a84f9f40b02c1c622b13a7243669b7bc91e702388df73",
+  "version": "1.3.1+9",
+  "source_manifest": "maintenance/registry/source-client-1.3.1-9-20261110.json",
+  "source_tree_sha256": "c8057727f4775d278c75254fa3d5817103ddf8fca89b86041353d282e5bd2160",
+  "validation": "built and tested on this machine; platform acceptance pending user install",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 9,
+  "files": 19,
+  "executable_sha256": "0e9a9bd8f98e1f056b15c3c4ca1d1070d35d95cba74833c2d257dca8ee6c62cf",
+  "client_install": {
+    "app_id": "com.example.lab_inventory_client",
+    "layout": 1,
+    "version": "1.3.1",
+    "build": 9,
+    "platform": "windows"
+  },
+  "build_environment": {
+    "flutter": "3.47.7 stable (abaf9c523780a608bd46686fd5e53740a07077f8), Dart 3.13.5",
+    "os": "Windows 11 10.0.26300 x64",
+    "pub_cache": "local/pub-cache-windows (offline, --enforce-lockfile)",
+    "dart_defines": {
+      "LAB_ODOO_URL": "http://192.168.31.105:8069",
+      "LAB_ODOO_DB": "LcHardwareHouse"
+    }
+  },
+  "build_command": "python -I tools/build_client.py --platform windows --flutter <dependencies/sdk/windows/flutter> --pub-cache local/pub-cache-windows --work-root C:/lcw --test (PDFIUM_LOCAL_ARCHIVE=dependencies/windows/pdfium-win-x64-5200.tgz)",
+  "test_results": {
+    "pub_get": 0,
+    "flutter_test": 0,
+    "flutter_build": 0,
+    "tests_passed": 334,
+    "tests_skipped": 5
+  },
+  "package_smoke": "process RUNNING after 6s, then STOPPED by script",
+  "feature_strings_in_app_so": [
+    "立即从立创商城抓取",
+    "刷新资料",
+    "选这个"
+  ],
+  "signature": "可执行文件未做 Authenticode 签名（Get-AuthenticodeSignature=NotSigned）；与既往 Windows 包一致",
+  "signed_release_manifest": "未生成：工作区源码尚未提交，缺失真实 source_commit",
+  "unverified": [
+    "登录/领用/入库真实网络",
+    "实体打印与扫码",
+    "Windows DPAPI 安全存储",
+    "长时间运行"
+  ]
+}

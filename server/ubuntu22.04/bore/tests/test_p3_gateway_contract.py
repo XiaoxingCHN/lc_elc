@@ -147,12 +147,15 @@ P3_NOT_PUBLIC_PATHS = (
     "/lab/labels/download",
 )
 
-#: 目录 API（lab_catalog，POST + 统一信封）。只读 4 + 写 2 = 6 条，与后端实际路由一一对应。
+#: 目录 API（lab_catalog，POST + 统一信封）。只读 6 + 写 2 = 8 条，与后端实际路由一一对应。
+#: fetch/fetch_status 是按需抓取：写只发生在服务端权限、限流与锁之内，网关只放行精确 POST。
 P3_CATALOG_READ_PATHS = (
     "/lab/api/catalog/search",
     "/lab/api/catalog/detail",
     "/lab/api/catalog/categories",
     "/lab/api/catalog/facets",
+    "/lab/api/catalog/fetch",
+    "/lab/api/catalog/fetch_status",
 )
 
 #: materials 页使用的目录**写**端点（Lead 决定放开；角色仍由后端 catalog 权限校验）。
@@ -321,9 +324,9 @@ class P3AllowlistTextTest(unittest.TestCase):
                 self.assertNotIn(path, line, line)
 
     def test_catalog_apis_are_exact_post_only(self):
-        """目录 6 条（只读 4 + 写 2）逐条精确 POST；角色由后端 catalog 权限校验。"""
-        self.assertEqual(len(P3_CATALOG_PATHS), 6)
-        self.assertEqual(len(set(P3_CATALOG_PATHS)), 6)
+        """目录 8 条（只读 6 + 写 2）逐条精确 POST；角色由后端 catalog 权限校验。"""
+        self.assertEqual(len(P3_CATALOG_PATHS), 8)
+        self.assertEqual(len(set(P3_CATALOG_PATHS)), 8)
         for path in P3_CATALOG_PATHS:
             with self.subTest(path=path):
                 line = location_for(path)
@@ -459,13 +462,13 @@ class P3AllowlistSourceSyncTest(unittest.TestCase):
         self.assertIn("return 303 %s$is_args$args;" % P3_REDIRECT_TARGET, redirect)
 
     def test_catalog_paths_match_catalog_controller(self):
-        """网关登记的 6 条目录端点必须恰好等于 catalog_api.py 的实际 POST 路由。"""
+        """网关登记的 8 条目录端点必须恰好等于 catalog_api.py 的实际 POST 路由。"""
         path = ODOO_ADDONS / "lab_catalog" / "controllers" / "catalog_api.py"
         if not path.is_file():
             self.skipTest("找不到 lab_catalog/controllers/catalog_api.py")
         text = path.read_text(encoding="utf-8")
         discovered = sorted(re.findall(
-            r"@http\.route\('(/lab/api/catalog/[^']+)',\s*type='jsonrpc'[^\n]*methods=\['POST'\]",
+            r"@http\.route\('(/lab/api/catalog/[^']+)',\s*[^)]*methods=\['POST'\]",
             text))
         self.assertEqual(discovered, sorted(P3_CATALOG_PATHS))
         # 每条都必须以"精确 POST"出现在网关里

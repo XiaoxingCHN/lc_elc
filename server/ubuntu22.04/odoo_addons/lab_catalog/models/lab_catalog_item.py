@@ -882,9 +882,27 @@ class LabCatalogItem(models.Model):
         return self._decorate(rows, qty_by_tmpl, avail_by_tmpl), next_cursor, total
 
     @api.model
+    def _template_ids_by_codes(self, codes):
+        """C 编号 → 本地档案 id（绑定表 ∪ 档案自身的归一化 C 码）。
+
+        网页采购入库按 ``lcsc:Cxxx`` 建的最小档案没有 binding 行；只查绑定表
+        会让这些档案在搜索/详情里"看不见自己的库存、袋与流水"。
+        """
+        wanted = sorted({c for c in (codes or []) if c})
+        if not wanted:
+            return {}
+        merged = {}
+        for code, tids in self.env['lab.catalog.binding'].binding_map(wanted).items():
+            merged.setdefault(code, set()).update(tids)
+        for code, tids in self.env['product.template'].lab_template_ids_for_codes(
+                wanted).items():
+            merged.setdefault(code, set()).update(tids)
+        return {code: sorted(tids) for code, tids in merged.items()}
+
+    @api.model
     def _decorate(self, rows, qty_by_tmpl, avail_by_tmpl):
         codes = [r['catalog_code'] for r in rows if r.get('catalog_code')]
-        bindings = self.env['lab.catalog.binding'].binding_map(codes) if codes else {}
+        bindings = self._template_ids_by_codes(codes) if codes else {}
         sn_by_tmpl = {}
         tids = sorted({t for lst in bindings.values() for t in lst})
         if tids:
@@ -1023,7 +1041,7 @@ class LabCatalogItem(models.Model):
         """索引内器件的详情：item 内含**合计**库存与 parameters（与 root 契约一致）。"""
         _st, qty_by_tmpl, avail_by_tmpl, _cq = self._live_state()
         code = item.catalog_code
-        tids = self.env['lab.catalog.binding'].binding_map([code]).get(code, [])
+        tids = self._template_ids_by_codes([code]).get(code, [])
         templates = self.env['product.template'].browse(tids)
         total_qty = sum(qty_by_tmpl.get(t, 0.0) for t in tids)
         total_avail = sum(avail_by_tmpl.get(t, 0.0) for t in tids)

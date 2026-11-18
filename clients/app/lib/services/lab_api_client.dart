@@ -129,13 +129,21 @@ class LabApiClient {
   ///
   /// [catalogCode] is only used after the operator picks one of the server's
   /// candidates; the server still re-validates everything.
+  ///
+  /// [refresh] re-fetches one code the library already has. It must always be a
+  /// single code - the server has no bulk refresh endpoint on purpose.
   Future<CatalogFetchStatus> requestCatalogFetch(
     String query, {
     String? catalogCode,
+    bool refresh = false,
   }) async {
     final data = await _invoke(
       LabApiRoutes.catalogFetch,
-      <String, dynamic>{'query': query, 'catalog_code': catalogCode},
+      <String, dynamic>{
+        'query': query,
+        'catalog_code': catalogCode,
+        'refresh': refresh ? true : null,
+      },
     );
     return CatalogFetchStatus.fromJson(data);
   }

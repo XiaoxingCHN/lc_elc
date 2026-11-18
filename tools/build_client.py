@@ -13,7 +13,7 @@ def plan(a):
  return host,flutter,cache,commands
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--gradle-cache');p.add_argument('--server',default='http://192.168.31.105:8069');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--gradle-cache');p.add_argument('--server',default='http://192.168.31.105:8069');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');p.add_argument('--work-root');a=p.parse_args()
  if a.test_only:a.test=True
  host,flutter,cache,commands=plan(a)
  print(json.dumps({'source':'clients/app','host':host,'platform':a.platform,'pub_cache':str(cache),'commands':commands,'writes':'new timestamp directory under local/build; no release overwrite'},ensure_ascii=False,indent=2))
@@ -22,7 +22,7 @@ def main():
  if a.platform=='linux' and platform.system()!='Linux':p.error('Linux native build must run on Linux/WSL; see clients/linux/README.md')
  if not flutter.is_file():p.error('Flutter missing; restore dependencies first, see dependencies/README.md')
  if host=='linux' and not a.flutter and (ROOT/'dependencies/sdk/linux/EXPANDED_ON_WINDOWS_INCOMPLETE.txt').exists():p.error('Restore the preserved Linux SDK tar or WSL tool archive onto a Linux filesystem and pass --flutter explicitly; the Windows-expanded Linux SDK is not a complete runtime.')
- stamp=datetime.datetime.now().strftime('%Y%m%dT%H%M%S%f');work=ROOT/'local/build'/('client-'+a.platform+'-'+stamp);work.mkdir(parents=True)
+ stamp=datetime.datetime.now().strftime('%Y%m%dT%H%M%S%f');base=(Path(a.work_root).resolve() if a.work_root else ROOT/'local/build');work=base/('client-'+a.platform+'-'+stamp);work.mkdir(parents=True)
  src=work/'source';shutil.copytree(ROOT/'clients/app',src,ignore=shutil.ignore_patterns('.dart_tool','build','ephemeral','.gradle','.cxx','.idea','local.properties','.flutter-plugins-dependencies','*.iml','GeneratedPluginRegistrant.java'))
  env=os.environ.copy();env['PUB_CACHE']=str(cache);env['CMAKE_BUILD_PARALLEL_LEVEL']='2';env['FLUTTER_SUPPRESS_ANALYTICS']='true';env['GRADLE_OPTS']='-Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false';env['GRADLE_USER_HOME']=str(Path(a.gradle_cache).resolve() if a.gradle_cache else ROOT/'dependencies/gradle-cache');env['PATH']=str(flutter.parent)+os.pathsep+env.get('PATH','')
  if a.platform=='android':
@@ -42,11 +42,12 @@ def main():
  for index,cmd in enumerate(commands):
   logfile=work/(str(index)+'-command.log')
   with logfile.open('wb') as output:r=subprocess.run(cmd,cwd=src,env=env,stdout=output,stderr=subprocess.STDOUT)
-  results.append({'command':cmd,'exit_code':r.returncode,'log':str(logfile.relative_to(ROOT))});(work/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8');print('exit='+str(r.returncode)+' log='+str(logfile))
+  results.append({'command':cmd,'exit_code':r.returncode,'log':str(logfile.relative_to(ROOT) if logfile.is_relative_to(ROOT) else logfile)});(work/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8');print('exit='+str(r.returncode)+' log='+str(logfile))
   if r.returncode:
    if os.name=='nt':print('If plugin symlink permissions caused failure, use dependencies/ensure_plugin_junctions.ps1 with -Project and -PubCache on THIS worktree, then rerun in it. Do not enable global developer settings automatically.')
    raise SystemExit(r.returncode)
  if not a.test_only and a.platform in ('windows','linux'):
+  sys.path.insert(0,str(ROOT/'tools'))
   from prepare_client_update import prepare
   if a.platform=='linux':bundle=src/'build/linux/x64/release/bundle'
   else:

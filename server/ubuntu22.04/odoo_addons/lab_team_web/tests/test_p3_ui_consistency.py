@@ -193,6 +193,108 @@ class NarrowScreenCssTest(unittest.TestCase):
         self.assertIn("@media (any-pointer: coarse)", text)
 
 
+class ReceiptSeamlessFetchTest(unittest.TestCase):
+    """采购入库"无感接续检索"的静态接线契约。
+
+    真实交互（去抖计时、取消、只打一次）仍要在浏览器验证；这里锁定的是
+    最容易在重构中丢失的几条：自动抓取只能在本地零结果且服务端给出建议时
+    排队、输入一变必须取消、同一关键词只自动打一次，以及已选物料上有详情入口。
+    """
+
+    def setUp(self):
+        self.js = read(JS / "receipts.js")
+        self.xml = read(VIEWS / "workflow_receipt.xml")
+
+    def test_auto_fetch_only_after_empty_local_search(self):
+        self.assertIn("if (!rows.length) scheduleAutoFetch(", self.js)
+        # 有本地结果时不得排队（scheduleAutoFetch 只在零结果分支调用一次）
+        self.assertEqual(self.js.count("scheduleAutoFetch("), 3)
+        # 真正的请求必须从计时器里发出，而不是在输入回调里同步打接口
+        self.assertIn("window.setTimeout(function ()", self.js)
+
+    def test_auto_fetch_is_quiet_and_cancelled_on_change(self):
+        match = re.search(r"AUTO_FETCH_DELAY_MS = (\d+);", self.js)
+        self.assertIsNotNone(match)
+        self.assertGreaterEqual(int(match.group(1)), 500)
+        self.assertIn("cancelAutoFetch();", self.js)
+        # onQuery 里必须取消，避免慢速打字在半截关键词上打接口
+        on_query = self.js.split("onQuery: function (text)", 1)[1]
+        self.assertIn("cancelAutoFetch();", on_query.split("});", 1)[0])
+
+    def test_auto_fetch_resumes_after_inflight_fetch(self):
+        # 用户在前一笔抓取还没结束时改了词，不能只剩手动按钮：
+        # 记下 pending，抓取结束补排一次
+        self.assertIn("state.autoFetchPending = key;", self.js)
+        completion = self.js.split("state.fetching = false;", 1)[1].split("});", 1)[0]
+        self.assertIn("resumeAutoFetch();", completion)
+        self.assertIn("function resumeAutoFetch()", self.js)
+
+    def test_stale_fetch_result_does_not_overwrite_input(self):
+        # 抓取可能十几秒；用户已改词时，旧结果不得覆盖输入或弹旧候选
+        self.assertIn("finishFetch(result, query);", self.js)
+        fn = self.js.split("function finishFetch(result, query)", 1)[1]
+        head = fn.split("var status", 1)[0]
+        self.assertIn("sameQuery(query, currentInputValue())", head)
+
+    def test_auto_fetch_runs_once_per_keyword(self):
+        self.assertIn("state.autoFetched[key]", self.js)
+        self.assertIn("state.autoFetched[key] = true", self.js)
+
+    def test_candidates_replace_the_empty_state(self):
+        # 已有候选时不能再同时显示"没有匹配的器件"和手动抓取按钮
+        fn = self.js.split("function renderCandidates(rows)", 1)[1]
+        head = fn.split("LC.clear(panel)", 1)[0]
+        self.assertIn("state.searchBox.close()", head)
+
+    def test_fetch_start_closes_the_stale_empty_state(self):
+        # 自动抓取开始时下拉可能还开着"没有匹配的器件 / 立即抓取"的空态，
+        # 与"正在抓取…"状态条矛盾：开始抓取就收起下拉。
+        fn = self.js.split("function startFetch(text, suggestion)", 1)[1]
+        head = fn.split("LC.status.show", 1)[0]
+        self.assertIn("state.searchBox.close()", head)
+
+    def test_selected_material_has_detail_link(self):
+        self.assertIn('data-slot="material-detail-link"', self.xml)
+        self.assertIn('target="_blank"', self.xml)
+        self.assertIn('rel="noopener noreferrer"', self.xml)
+        self.assertIn("LC.urls.item", self.js)
+        # 冒号必须保留（/lab/items/lcsc:C123），与 team.js itemHref 一致
+        self.assertIn("encodeURIComponent(detailKey).replace(/%3A/gi, ':')", self.js)
+
+    def test_query_comparison_matches_server_normalisation(self):
+        """"STM32 G437" 与服务端规范化后的 "STM32G437" 必须是同一个词。
+
+        服务端 normalize_mpn 去空白+大写；页面若只 trim+小写，建议会挂不上，
+        自动抓取永远不触发，用户只能看到手动按钮。
+        """
+        js = self.js
+        self.assertIn("function normQuery(text)", js)
+        self.assertIn("replace(/\\s+/g, '').toUpperCase()", js)
+        fn = js.split("function sameQuery(a, b)", 1)[1].split("}", 1)[0]
+        self.assertIn("normQuery(a) === normQuery(b)", fn)
+
+    def test_candidate_click_respects_create_lock(self):
+        """建袋锁定时不能点候选改输入，也不能继续抓资料。"""
+        block = self.js.split(
+            "button.addEventListener('click', function () {", 1)[1].split("});", 1)[0]
+        lock_at = block.find("state.locks.create")
+        self.assertGreaterEqual(lock_at, 0)
+        self.assertIn("return;", block[lock_at:])      # 锁定分支必须提前退出
+        self.assertIn("notify('上一次建袋结果未知", block)
+
+    def test_done_result_without_item_key_does_not_resolve_stale_input(self):
+        """抓取完成但拿不到 item_key 时，不能拿旧输入去解析。"""
+        fn = self.js.split("if (status === 'done') {", 1)[1].split("return;", 1)[0]
+        self.assertIn("!itemKey || !input || state.locks.create", fn)
+
+    def test_local_only_detail_explains_missing_catalogue(self):
+        """详情页只有本地档案时必须说明"资料还没抓"，而不是给一张空参数页。"""
+        pages = read(VIEWS / "pages.xml")
+        self.assertIn("lc_item.get('local_only')", pages)
+        self.assertIn("还没有从立创抓取资料", pages)
+        self.assertIn('data-lc-slot="local-only-note"', pages)
+
+
 if __name__ == "__main__":
     unittest.main()
 

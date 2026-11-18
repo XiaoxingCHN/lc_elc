@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_inventory_client/features/unified/models/catalog_query.dart';
 import 'package:lab_inventory_client/features/unified/models/unified_item.dart';
+import 'package:lab_inventory_client/features/unified/providers/catalog_fetch_controller.dart';
 import 'package:lab_inventory_client/features/unified/providers/catalog_providers.dart';
 import 'package:lab_inventory_client/services/lab_api_client.dart';
 
@@ -286,5 +287,157 @@ void main() {
     for (final state in <String>['queued', 'resolving', 'fetching']) {
       expect(CatalogFetchStatus.fromJson(statusJson(state)).isTerminal, isFalse);
     }
+  });
+
+  test('a keyword suggestion (>5 chars) fetches candidates for that keyword',
+      () async {
+    final api = FakeLabApi();
+    final payloads = <Map<String, dynamic>>[];
+    api.onCall = (path, params) async {
+      switch (path) {
+        case LabApiRoutes.catalogSearch:
+          return page(const <Map<String, dynamic>>[],
+              suggestion: <String, dynamic>{
+                'kind': 'keyword',
+                'query': 'STM32F103',
+                'can_fetch': true,
+                'message': '本地库尚未收录，可到立创商城查候选后选择。',
+              });
+        case LabApiRoutes.catalogFetch:
+          payloads.add(params);
+          return statusJson('candidates', candidates: <Map<String, dynamic>>[
+            {
+              'catalog_code': 'C8734',
+              'mpn': 'STM32F103C8T6',
+              'name': 'ST STM32F103C8T6',
+              'brand': 'ST',
+              'package': 'LQFP-48',
+            },
+          ]);
+        default:
+          throw StateError('unexpected path $path');
+      }
+    };
+
+    final notifier = CatalogNotifier(api: api.client);
+    await notifier.refresh();
+    expect(notifier.state.fetchSuggestion?.kind, 'keyword');
+    expect(notifier.state.fetchSuggestion?.isValid, isTrue);
+
+    await notifier.startFetch();
+
+    expect(payloads.single['query'], 'STM32F103');
+    // 关键词只拿候选：没有 catalog_code，也就不会打开详情页。
+    expect(payloads.single.containsKey('catalog_code'), isFalse);
+    final status = notifier.state.fetchStatus!;
+    expect(status.isCandidates, isTrue);
+    expect(status.candidates.single.label,
+        'ST STM32F103C8T6 · LQFP-48 (C8734)');
+  });
+
+  test('a candidate shows the LCSC display name before anything is fetched', () {
+    final withName = CatalogFetchCandidate.fromJson(<String, dynamic>{
+      'catalog_code': 'C398363',
+      'mpn': 'TLV9001IDBVR',
+      'name': 'TI TLV9001IDBVR',
+      'brand': 'TI',
+      'package': 'SOT-23-5',
+    });
+    expect(withName.label, 'TI TLV9001IDBVR · SOT-23-5 (C398363)');
+
+    // Older server payloads carry no name: fall back to brand + model.
+    final withoutName = CatalogFetchCandidate.fromJson(<String, dynamic>{
+      'catalog_code': 'C1',
+      'mpn': 'TLV9001IDBVR',
+      'brand': 'TI',
+      'package': '',
+    });
+    expect(withoutName.label, 'TI TLV9001IDBVR (C1)');
+  });
+
+  test('an explicit query and refresh flag reach the server unchanged', () async {
+    final api = FakeLabApi();
+    final payloads = <Map<String, dynamic>>[];
+    var completed = 0;
+    api.onCall = (path, params) async {
+      expect(path, LabApiRoutes.catalogFetch);
+      payloads.add(params);
+      return statusJson('done', message: '资料未变化，无需更新。');
+    };
+
+    final controller = CatalogFetchController(
+      api: api.client,
+      onDone: () async => completed++,
+    );
+    // A refresh carries exactly one code; no suggestion and no list state.
+    await controller.start(
+      query: 'C32445874',
+      catalogCode: 'C32445874',
+      refresh: true,
+    );
+
+    expect(payloads.single['query'], 'C32445874');
+    expect(payloads.single['catalog_code'], 'C32445874');
+    expect(payloads.single['refresh'], isTrue);
+    expect(controller.status?.isDone, isTrue);
+    expect(controller.busy, isFalse);
+    expect(completed, 1);
+    controller.dispose();
+  });
+
+  test('without refresh the flag is omitted and nothing is polled', () async {
+    final api = FakeLabApi();
+    final payloads = <Map<String, dynamic>>[];
+    api.onCall = (path, params) async {
+      expect(path, LabApiRoutes.catalogFetch);
+      payloads.add(params);
+      return statusJson('done');
+    };
+
+    final controller = CatalogFetchController(api: api.client);
+    await controller.start(query: 'TLV77733PDBVR');
+
+    expect(payloads.single.containsKey('refresh'), isFalse);
+    expect(payloads.single.containsKey('catalog_code'), isFalse);
+    expect(controller.status?.isDone, isTrue);
+    controller.dispose();
+  });
+
+  test('a screen can fetch its own query while the list shows another',
+      () async {
+    final api = FakeLabApi();
+    var searches = 0;
+    final payloads = <Map<String, dynamic>>[];
+    api.onCall = (path, params) async {
+      switch (path) {
+        case LabApiRoutes.catalogSearch:
+          searches++;
+          return page(const <Map<String, dynamic>>[]);
+        case LabApiRoutes.catalogFetch:
+          payloads.add(params);
+          return statusJson('queued', query: 'C32445874');
+        case LabApiRoutes.catalogFetchStatus:
+          return statusJson('done', query: 'C32445874');
+        default:
+          throw StateError('unexpected path $path');
+      }
+    };
+
+    final notifier = CatalogNotifier(
+      api: api.client,
+      fetchPollInterval: const Duration(milliseconds: 5),
+      maxFetchPolls: 5,
+    );
+    await notifier.updateQuery(const CatalogQuery(text: '电容'));
+
+    await notifier.startFetch(query: 'C32445874');
+    expect(payloads.single['query'], 'C32445874');
+
+    await waitUntil(
+      () => notifier.state.fetchStatus?.isDone == true,
+      reason: 'the receipt/detail screen fetch finishes',
+    );
+    expect(searches, 2, reason: 'the list refreshes its own query on done');
+    notifier.dispose();
   });
 }

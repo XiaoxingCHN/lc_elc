@@ -12,9 +12,11 @@ import '../models/detail_models.dart';
 import '../models/json_read.dart';
 import '../models/pending_receipt.dart';
 import '../models/unified_item.dart';
+import '../providers/catalog_fetch_controller.dart';
 import '../providers/inventory_providers.dart';
 import '../providers/unified_providers.dart';
 import '../unified_routes.dart';
+import '../widgets/catalog_fetch_panel.dart';
 import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
@@ -109,15 +111,39 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   /// keystroke can drop that selection instead of keeping it armed.
   String? _suggestPicked;
 
+  /// True while [_item] came from a suggestion pick. The detail read may swap
+  /// in an item with a DIFFERENT item_key (a supplier row resolves to a local
+  /// archive), so "is the current card the picked one" cannot be decided by
+  /// comparing keys; a later keystroke must still drop this selection.
+  bool _selectionFromSuggestion = false;
+
+  /// Handle on the suggestion field, so a finished fetch can re-run its search.
+  final GlobalKey<CatalogSuggestFieldState> _suggestKey =
+      GlobalKey<CatalogSuggestFieldState>();
+
+  /// The ONE on-demand fetch this form can start (single exact C code / MPN).
+  late final CatalogFetchController _fetch;
+
   /// Bumped on every keystroke / clear so an in-flight archive lookup cannot
   /// resurrect a selection the operator already replaced.
   int _selectionSeq = 0;
+
+  /// True while the just-picked card's archives are being re-read. The pick is
+  /// already committed; this only keeps create blocked until the archive list
+  /// is known.
+  bool _loadingArchives = false;
 
   LabApiClient get _api => ref.read(labApiProvider);
 
   @override
   void initState() {
     super.initState();
+    _fetch = CatalogFetchController(
+      api: _api,
+      onDone: () async {
+        _suggestKey.currentState?.research();
+      },
+    )..addListener(_onFetchChanged);
     Future.microtask(
       () => _run(() async {
         await _reload();
@@ -136,8 +162,17 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     );
   }
 
+  void _onFetchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _startFetch(CatalogFetchSuggestion suggestion) {
+    unawaited(_fetch.start(query: suggestion.query));
+  }
+
   @override
   void dispose() {
+    _fetch.dispose();
     _queueDebounce?.cancel();
     for (final c in [_quantity, _count, _note, _scan, _actual, _queueSearch]) {
       c.dispose();
@@ -215,6 +250,8 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
       if (!mounted) return;
       setState(() {
         _item = item;
+        _selectionFromSuggestion = false;
+        _suggestPicked = null;
         _newMaterial = null;
         _materials = detail.materials;
         _templateId = _materials.length == 1
@@ -237,6 +274,8 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     setState(() {
       _newMaterial = material;
       _item = null;
+      _selectionFromSuggestion = false;
+      _suggestPicked = null;
       _materials = [];
       _templateId = null;
       _createAttempt = null;
@@ -252,26 +291,43 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   Future<void> _selectSuggestion(UnifiedItem item) async {
     final token = ++_selectionSeq;
     _suggestPicked = item.itemKey;
-    await _run(() async {
-      final CatalogDetail detail;
-      try {
-        detail = await _api.detail(item.itemKey);
-      } catch (_) {
-        if (!mounted || token != _selectionSeq) return;
-        rethrow;
-      }
+    // Commit the pick in this frame. The suggestion row already carries the
+    // identity, name and archive ids the create call needs, and waiting for the
+    // archive read before showing anything made a tap look like nothing
+    // happened (worse: a failed read used to discard the pick entirely). The
+    // archive list is re-read from the service below and replaces this state.
+    setState(() {
+      _item = item;
+      _selectionFromSuggestion = true;
+      _newMaterial = null;
+      _materials = const <LabMaterial>[];
+      _templateId = null;
+      _createAttempt = null;
+      _confirmAttempt = null;
+      _error = null;
+      _notice = null;
+      _loadingArchives = true;
+    });
+    try {
+      final detail = await _api.detail(item.itemKey);
       if (!mounted || token != _selectionSeq) return;
       setState(() {
-        _item = item;
-        _newMaterial = null;
+        _item = detail.item ?? item;
         _materials = detail.materials;
-        _templateId = _materials.length == 1
-            ? _materials.single.templateId
+        _templateId = detail.materials.length == 1
+            ? detail.materials.single.templateId
             : null;
-        _createAttempt = null;
-        _error = null;
+        _loadingArchives = false;
       });
-    });
+    } catch (error) {
+      if (!mounted || token != _selectionSeq) return;
+      setState(() {
+        _loadingArchives = false;
+        _notice = '已选择“${item.title}”，但读取内部档案失败：'
+            '${describeLabError(error)}。可以先按当前资料制袋；'
+            '需要选内部档案时请重新选择。';
+      });
+    }
   }
 
   /// Drops the selection while the operator edits the query again.
@@ -280,20 +336,18 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   /// create bags for a component the field no longer names. Picks that were
   /// replaced by the picker / scan / reset are left alone.
   void _releaseSuggestion(String _) {
-    final picked = _suggestPicked;
-    if (picked == null) {
-      _selectionSeq++;
-      return;
-    }
     _selectionSeq++;
+    if (_suggestPicked == null) return;
     _suggestPicked = null;
-    if (_item?.itemKey != picked) return;
+    if (!_selectionFromSuggestion) return;
+    _selectionFromSuggestion = false;
     setState(() {
       _item = null;
       _materials = [];
       _templateId = null;
       _createAttempt = null;
       _error = null;
+      _loadingArchives = false;
     });
   }
 
@@ -303,9 +357,11 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     setState(() {
       _item = null;
       _newMaterial = null;
+      _loadingArchives = false;
       _materials = [];
       _templateId = null;
       _suggestPicked = null;
+      _selectionFromSuggestion = false;
       _createAttempt = null;
       _error = null;
     });
@@ -353,6 +409,8 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
       });
       _templateId = firstInt(first, const ['product_template_id']);
       _newMaterial = null;
+      _selectionFromSuggestion = false;
+      _suggestPicked = null;
     }
     _quantity.clear();
     _note.clear();
@@ -608,6 +666,7 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                 if (_tab == 0) ...[
                   _section([
                     CatalogSuggestField(
+                      key: _suggestKey,
                       enabled: !_busy && attempt == null,
                       label: '搜索并选择元器件',
                       helperText: _item != null
@@ -615,7 +674,20 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                           : '支持 C 编号（可带 lcsc:）、型号、名称或参数；也可用扫码或器件库选择。',
                       onSelected: _selectSuggestion,
                       onQueryChanged: _releaseSuggestion,
+                      onFetchRequested: _startFetch,
                     ),
+                    if (_fetch.busy || _fetch.status != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _fetch.status == null
+                            ? const CatalogFetchRunning()
+                            : CatalogFetchPanel(
+                                status: _fetch.status!,
+                                onChoose: (candidate) => unawaited(
+                                  _fetch.chooseCandidate(candidate),
+                                ),
+                              ),
+                      ),
                     if (_item != null || _newMaterial != null)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -628,7 +700,11 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                               '已选元器件',
                         ),
                         subtitle: Text(
-                          _item != null ? '核对型号和规格后制袋' : '新建器件资料（随袋码一起创建）',
+                          _loadingArchives
+                              ? '已选中，正在读取内部档案…'
+                              : _item != null
+                              ? '核对型号和规格后制袋'
+                              : '新建器件资料（随袋码一起创建）',
                         ),
                         trailing: IconButton(
                           tooltip: '清除选择',
@@ -716,7 +792,9 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: _busy || _ambiguousArchive ? null : _create,
+                      onPressed: _busy || _ambiguousArchive || _loadingArchives
+                          ? null
+                          : _create,
                       icon: const Icon(Icons.add),
                       label: Text(attempt == null ? '生成袋码并加入待打印' : '重试生成袋码'),
                     ),
