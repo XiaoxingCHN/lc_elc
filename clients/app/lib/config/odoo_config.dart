@@ -112,6 +112,31 @@ class OdooConfig {
     return value.startsWith('http://') || value.startsWith('https://');
   }
 
+  /// Ports the intranet Odoo deployment listens on with PLAIN HTTP.
+  ///
+  /// 8069 is Odoo's own HTTP port; 18443 is the gateway's, which terminates
+  /// TLS itself and is therefore the one place `https://` IS right on a
+  /// private host. Kept as a set so the hint below stays a pure function.
+  static const Set<int> intranetPlainHttpPorts = <int>{8069};
+
+  /// An operator-facing sentence when [raw] pairs a private host with a scheme
+  /// that host cannot serve, or null when the address looks right.
+  ///
+  /// Observed in the field: `https://192.168.31.105:8069`. The intranet Odoo
+  /// has no certificate on 8069, so the request dies in the TLS handshake and
+  /// the operator sees "无法连接 <address>" - which reads like the server is
+  /// down. Catching it here turns that into a fixable typo.
+  static String? intranetSchemeHint(String raw) {
+    final normalized = normalizeBaseUrl(raw);
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || !isPrivateNetworkHost(uri.host)) return null;
+    if (uri.scheme == 'https' && intranetPlainHttpPorts.contains(uri.port)) {
+      final fixed = uri.replace(scheme: 'http');
+      return '内网 ${uri.port} 端口是明文 HTTP，没有证书。请把地址改成 $fixed';
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Cleartext (HTTP) policy for the LAN acceleration path
   // ---------------------------------------------------------------------------

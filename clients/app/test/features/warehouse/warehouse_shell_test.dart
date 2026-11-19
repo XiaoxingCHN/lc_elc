@@ -126,6 +126,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+      'in a bottom bar it stays a thin strip, not a full-screen pill', (
+    tester,
+  ) async {
+    // A phone `Scaffold.bottomNavigationBar` gives its child a BOUNDED height.
+    // A plain `Center` inside a segment expands to fill that, which made the
+    // switcher render as one giant pill covering the screen (reported from a
+    // real Android device). It must stay a bar.
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: LabTheme.dark,
+        home: Scaffold(
+          body: const Center(child: Text('BODY')),
+          bottomNavigationBar: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 4, 0, 4),
+              child: WarehouseSectionSwitcher(
+                value: WarehouseSection.catalog,
+                onChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final size = tester.getSize(find.byType(WarehouseSectionSwitcher));
+    expect(size.height, lessThan(120),
+        reason: 'the switcher must not expand to fill the bottom-bar slot');
+    // And the body must still be visible above it.
+    expect(find.text('BODY'), findsOneWidget);
+  });
+
   testWidgets('large text swaps the segmented control for a dropdown', (
     tester,
   ) async {

@@ -173,6 +173,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!OdooConfig.isValidBaseUrl(url)) {
       return '服务器地址必须以 http:// 或 https:// 开头';
     }
+    // `https://` on the intranet port is a typo every time it has been seen:
+    // 8069 speaks plain HTTP, and the LAN deployment has no certificate. Saying
+    // so BEFORE the request saves the operator from reading
+    // "无法连接 https://192.168.31.105:8069" and wondering whether the server
+    // is down.
+    final schemeIssue = OdooConfig.intranetSchemeHint(url);
+    if (schemeIssue != null) return schemeIssue;
     if (_dbController.text.trim().isEmpty) {
       return '请填写 Odoo 数据库名';
     }

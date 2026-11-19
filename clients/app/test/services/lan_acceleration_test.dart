@@ -304,6 +304,37 @@ void main() {
     });
   });
 
+  group('intranetSchemeHint', () {
+    test('flags https on the plain-HTTP intranet port', () {
+      // The exact address seen in the field. Without this the operator reads
+      // "无法连接 https://192.168.31.105:8069" and blames the server.
+      final hint = OdooConfig.intranetSchemeHint('https://192.168.31.105:8069');
+      expect(hint, isNotNull);
+      expect(hint, contains('http://192.168.31.105:8069'));
+      expect(hint, contains('明文'));
+    });
+
+    test('says nothing about the correct spelling', () {
+      expect(OdooConfig.intranetSchemeHint('http://192.168.31.105:8069'), isNull);
+      expect(OdooConfig.intranetSchemeHint('http://192.168.1.20:8069'), isNull);
+    });
+
+    test('leaves https on the TLS gateway alone', () {
+      // 18443 terminates TLS itself, so https there is correct.
+      expect(
+        OdooConfig.intranetSchemeHint('https://192.168.31.105:18443'),
+        isNull,
+      );
+    });
+
+    test('never applies to a public host', () {
+      expect(OdooConfig.intranetSchemeHint('https://team.l-creation.club'),
+          isNull);
+      expect(OdooConfig.intranetSchemeHint(''), isNull);
+      expect(OdooConfig.intranetSchemeHint('not a url'), isNull);
+    });
+  });
+
   group('cleartext (HTTP) policy', () {
     tearDown(() => OdooConfig.setRuntimeLanBaseUrl(null));
 
