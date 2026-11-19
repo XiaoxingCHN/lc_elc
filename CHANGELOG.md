@@ -1,5 +1,29 @@
 # 变更记录
 
+## 2026.11.19 EDA 插件 3.1.0 发布（画图助手）
+
+- 版本：`plugins/jlc-eda` `3.0.3 → 3.1.0`。这是 3.1.0 源码完成后的**首次发布**——
+  此前 `package.json` 已是 3.1.0，但 `releases/` 里只有 3.0.3，发布索引也停在 3.0.3。
+- **定位**：画图助手。只在画原理图/PCB 时提供价值——查器件有没有库存、在哪个库位与袋、
+  整张 BOM 一键出库。
+- **移除**：入库 / 手动领用 / 归还 / 袋追溯四个页签与菜单。这些在 Odoo 网页端与 Flutter
+  客户端已完整存在，在 EDA 里重复实现等于维护三套写库存状态机，也是误报成功与重复领用的来源。
+- **改名**：「BOM 对比」→「原理图库存」，默认范围从「当前工程 BOM」改为「选中器件」。
+- **新增**：对比结果加「袋」列（库位之后，最多 3 个，超出 `+N`），复制 TSV 与导出 CSV 同步。
+- 保留「器件库 / 原理图库存 / 连接账户 / 诊断」四个页签；一键出库行为不变。
+- **验证**：单元测试 **123 pass / 0 fail**；打包测试 **15 pass / 0 fail**；
+  `npm run verify` → **PACKAGE VERIFY OK**。构建产物时间戳（02:04）晚于全部源码，
+  `node.exe` SHA256 与 bundle-manifest 一致。
+- **产物**（`plugins/jlc-eda/releases/3.1.0/`，Git 排除）：
+  - `lab-inventory-odoo_v3.1.0.eext`，98,616 B，sha256 `fa20561d…14aed3c`，11 文件
+  - `lab-inventory-odoo_v3.1.0-bundle.zip`，92,965,355 B，sha256 `2376e4c4…b20da2`，
+    10 文件（含 `node.exe` 运行时与中文安装说明）
+  - `release-manifest.json`、`SHA256.txt`、`bundle-manifest.json`
+- 登记 `maintenance/registry/releases.json` 的 `eda-eext` / `eda-bundle` 指向 3.1.0；
+  3.0.3 成品保留不覆盖。发布索引 `releases/README.md` 同步。
+- **未验证**：真实 EDA 专业版客户端安装与菜单出现、真实原理图选中器件查库存、
+  真实整张 BOM 一键出库（会产生真实领用单）。
+
 ## 2026.11.19 追查 is_storable 根因；全库 8 个物料修复；Odoo 测试实跑
 
 - **根因**：Odoo 19 的 `is_storable` 默认是 **`False`**

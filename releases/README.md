@@ -9,7 +9,7 @@
 | Windows客户端 | 1.3.5+22（四分区 + 精臣 B1 Pro USB 直打） | ../clients/windows/releases/1.3.5+22/ | ../clients/app/ |
 | Android客户端 | 1.3.5+22（四分区 + 精臣 B1 Pro 蓝牙直打，仅 ARM） | ../clients/android/releases/1.3.5+22/ | ../clients/app/ |
 | Linux客户端 | 1.3.2+10（1.3.3 起未构建；无精臣 Linux SDK） | ../clients/linux/releases/1.3.2+10/ | ../clients/app/ |
-| 嘉立创EDA专业版 | 3.0.3 | ../plugins/jlc-eda/releases/3.0.3/ | ../plugins/jlc-eda/ |
+| 嘉立创EDA专业版 | 3.1.0（画图助手） | ../plugins/jlc-eda/releases/3.1.0/ | ../plugins/jlc-eda/ |
 | Odoo模块当前修复包 | 2026-10-18 | ../server/releases/2026-10-18/ | ../server/ubuntu22.04/odoo_addons/ |
 
 实际文件名、大小、SHA256、来源和已知验收限制见maintenance/registry/releases.json。旧版全部在local/archive/packages和local/archive/eda，不能用于覆盖当前服务器或客户端。
