@@ -232,12 +232,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       login: scope.login,
       password: _passwordController.text,
       rememberLogin: _rememberLogin,
-      ephemeral: _typedLanAddress,
+      // NOT `ephemeral: _typedLanAddress` - see the note on that getter. A LAN
+      // address is the lab's actual server and must be rememberable like any
+      // other, or every restart asks for the password again.
+      ephemeral: false,
     );
   }
 
-  /// A private HTTP address is the LAN acceleration case: the form switches
-  /// itself to session-only so such a login can never be written to disk.
+  /// A private HTTP address used to force a session-only login, on the
+  /// assumption that the intranet was a temporary accelerator and the public
+  /// server was the real one.
+  ///
+  /// That assumption is wrong for the way the lab actually runs: the intranet
+  /// address IS the server, it speaks plain HTTP only, and the operator signs
+  /// in there every day. Forcing `ephemeral` on it meant the password was never
+  /// written to the key store, so every restart asked for it again - reported
+  /// as "登陆没办法保持".
+  ///
+  /// What the session-only path was protecting is still protected, by the
+  /// "记住登录" switch and by the key store: a LAN password goes through the
+  /// SAME OS credential storage as any other, and the offline cache stays keyed
+  /// per session. So the LAN address is now an ordinary, rememberable account.
+  ///
+  /// Only the explicit LAN-acceleration switch (the settings sheet, which
+  /// re-authenticates an already-signed-in operator) stays session-only.
   bool get _typedLanAddress {
     final url = OdooConfig.normalizeBaseUrl(_urlController.text);
     if (!url.startsWith('http://')) return false;
@@ -446,14 +464,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    // A private HTTP address is a LAN acceleration login: it is
-                    // session-only, so the "记住登录" switch cannot apply.
+                    // A private HTTP address is the lab's own server. It used to
+                    // be announced as a one-off "加速会话"; that is no longer
+                    // true (the account is remembered like any other), so the
+                    // banner now states what actually differs: the transport.
                     if (_typedLanAddress) ...[
                       _Banner(
-                        icon: Icons.speed,
+                        icon: Icons.lan,
                         color: Theme.of(context).colorScheme.primary,
-                        text: '这是内网明文地址：本次为内网加速会话，仅本次运行有效，'
-                            '退出即清除，不保存账号与离线缓存。',
+                        text: '这是内网明文地址（HTTP）。账号可以像公网一样记住登录；'
+                            '密码保存在系统凭据存储中，不写入明文文件。',
                       ),
                       const SizedBox(height: 12),
                     ],

@@ -835,6 +835,38 @@ void main() {
       expect(storeOf(container).accounts, isEmpty);
       expect(await rawPreferenceDocument(), isEmpty);
     });
+
+    test('the LAN server is rememberable like any other (not session-only)',
+        () async {
+      // The intranet address IS the lab's server and speaks plain HTTP only, so
+      // treating every LAN login as session-only meant the password was never
+      // stored and every restart asked for it again. The login screen therefore
+      // signs in with `ephemeral: false`; this pins that a LAN account is
+      // remembered, auto-signed-in after a restart, and its password lives in
+      // the key store rather than in the preference document.
+      await notifierOf(container).login(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+        rememberLogin: true,
+        ephemeral: false,
+      );
+
+      expect(container.read(authProvider).ephemeral, isFalse);
+      expect(storeOf(container).accountFor(scopeA()), isNotNull);
+
+      final restarted = newContainer();
+      await notifierOf(restarted).bootstrap();
+
+      final state = restarted.read(authProvider);
+      expect(state.isAuthenticated, isTrue,
+          reason: 'a restart must sign back in to the LAN server');
+      expect(gateway.calls, hasLength(2), reason: 'login + the one auto attempt');
+      // The password is in the key store, never in the plaintext document.
+      expect(await backend.read(scopeA().secretKey), passwordA);
+      expect(await rawPreferenceDocument(), isNot(contains(passwordA)));
+    });
   });
 
   // ---------------------------------------------------------------------------

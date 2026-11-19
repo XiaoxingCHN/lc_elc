@@ -1,0 +1,23 @@
+{
+  "file": "clients/windows/releases/1.3.5+23/LC_ELC-Windows-1.3.5+23-x64.zip",
+  "bytes": 37739477,
+  "sha256": "9870689da3d0165b81a6d313cebe9ffafc33b05f05c92474ce887c21e4c88318",
+  "version": "1.3.5+23",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-23-20261120.json",
+  "source_tree_sha256": "a394f0c90cf88f89b2c861bd09a24bdb078fe6efac196038047015b804bc75ac",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 512 passed / 5 skipped",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 23,
+  "files": 30,
+  "executable_sha256": "fb7459a471d8d7afb0f7ca19fb73dbb37298a32e73adbbecd49d1a492fc6dc8f",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "changes_in_this_build": [
+    "内网地址也能记住登录：登录页不再把 http://<私有网段> 当成一次性会话（此前每次启动都要重输密码）",
+    "登录页横幅文案同步更正，说明密码进系统凭据存储而非明文文件"
+  ],
+  "unverified": [
+    "真机冷启动自动登录",
+    "Android 实机"
+  ]
+}

@@ -269,6 +269,54 @@ void main() {
     },
   );
 
+  testWidgets('the session survives moving between sections', (tester) async {
+    // Reported: "登陆没办法保持，切换页面显示未登录". Whatever the cause, moving
+    // between the four sections must never sign the operator out - so this
+    // walks every section and asserts the session is still there afterwards.
+    useDesktopSurface(tester);
+    final container = buildAuthContainer(
+      backend: backend,
+      gateway: gateway,
+      now: now,
+      apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+    );
+    addTearDown(container.dispose);
+
+    await seedRememberedLogin(
+      store: container.read(loginMemoryStoreProvider),
+      lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+      password: password,
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await pumpUntil(tester, find.byType(StockOverviewScreen));
+    await settleRoute(tester);
+
+    expect(container.read(authProvider).isAuthenticated, isTrue,
+        reason: 'signed in after the automatic login');
+
+    final router = container.read(appRouterProvider);
+    for (final route in <String>[
+      '/catalog',
+      '/stock',
+      '/stock/manage',
+      '/stock/locations',
+      '/stock',
+    ]) {
+      router.go(route);
+      await settleRoute(tester);
+
+      final auth = container.read(authProvider);
+      expect(auth.isAuthenticated, isTrue,
+          reason: '$route signed the operator out '
+              '(status=${auth.status}, reason=${auth.manualLoginReason}, '
+              'error=${auth.errorMessage})');
+      expect(find.byType(LoginScreen), findsNothing, reason: route);
+    }
+  });
+
   testWidgets('the library is one tap away and still renders captured rows', (
     tester,
   ) async {
