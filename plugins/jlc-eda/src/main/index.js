@@ -1,5 +1,5 @@
 /**
- * lab-inventory 3.0.1 — EDA Pro extension entry.
+ * lab-inventory 3.1.0 — EDA Pro extension entry (画图助手).
  *
  * Default network path:
  *   EDA sys_ClientUrl -> loopback relay (127.0.0.1:49621) -> Odoo
@@ -24,13 +24,12 @@ import { createSdkTransport } from './transport.js';
 import { createOdooClient } from './odoo.js';
 import { createRelayClient } from './relay.js';
 import { createLabApi } from './api.js';
-import { allocateBags } from '../shared/bom.js';
-import { positiveQuantity, requireItemKey } from '../shared/validate.js';
+import { handleOutbound } from '../shared/outbound.js';
 import { createImageLoader } from './images.js';
 import { getEda, resolveEda, scanProjectBom, scanSchematic, toast } from './eda.js';
 import { installBridge, makeNonce, openOdooAction, openPanel } from './panel.js';
 
-export const VERSION = '3.0.3';
+export const VERSION = '3.1.0';
 
 /**
  * The host re-executes the whole bundle on every menu click, so module state is
@@ -309,72 +308,11 @@ async function dispatch(method, params) {
     }
 
     case 'inventory.outbound': {
-      const lab = requireApi();
-      const requested = Array.isArray(params && params.lines) ? params.lines : [];
-      if (!requested.length) {
-        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '一键出库明细不能为空。');
-      }
-      if (requested.length > 60) {
-        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '一次一键出库最多 60 个器件型号。');
-      }
-      const plan = [];
-      const shortage = [];
-      for (const raw of requested) {
-        const itemKey = requireItemKey(raw && raw.item_key);
-        const need = positiveQuantity(raw && raw.quantity, 'lines[].quantity');
-        let detail = null;
-        let detailError = null;
-        try {
-          detail = await lab.detail(itemKey);
-        } catch (error) {
-          detailError = error;
-        }
-        if (!detail || !detail.item) {
-          shortage.push({
-            item_key: itemKey,
-            need,
-            available: null,
-            reason: detailError ? String(detailError.message || detailError.code || detailError) : '不在资料库中',
-          });
-          continue;
-        }
-        const allocation = allocateBags(detail.bags, need);
-        const available = Number(detail.item.lab_available_quantity);
-        plan.push({
-          item_key: itemKey,
-          name: detail.item.name || '',
-          need,
-          available: Number.isFinite(available) ? available : null,
-          bags: allocation.lines,
-          shortfall: allocation.shortfall,
-        });
-        if (allocation.shortfall > 0) {
-          shortage.push({
-            item_key: itemKey,
-            need,
-            available: Number.isFinite(available) ? available : null,
-            shortfall: allocation.shortfall,
-            reason: '库存不足',
-          });
-        }
-      }
-      if (shortage.length) {
-        return { ok: false, code: 'SHORT', shortage, plan };
-      }
-      if (params && params.dry_run) {
-        return { ok: true, dryRun: true, plan };
-      }
-      const issueLines = [];
-      for (const entry of plan) for (const bag of entry.bags) issueLines.push(bag);
-      const result = await lab.issue({
-        request_key: params && params.request_key,
-        borrower_id: params && params.borrower_id,
-        project: params && params.project,
-        note: params && params.note,
-        lines: issueLines,
+      // Legacy vs frozen behaviour lives in the shared handler so it can be
+      // unit-tested without the EDA host. Odoo endpoint signatures unchanged.
+      return handleOutbound(requireApi(), params || {}, {
+        log: (event, fields) => logger.info(event, fields),
       });
-      logger.info('inventory.outbound', { lines: plan.length, bags: issueLines.length });
-      return { ok: true, plan, result };
     }
 
     case 'ui.open':
@@ -459,10 +397,6 @@ export function activate() {
 }
 
 export const showInventoryPanel = menuAction('器件库与库存', 'inventory', '器件库与库存', 1160, 800);
-export const bomCompare = menuAction('BOM 数量对比', 'bom', 'BOM 数量对比（只读）', 1160, 800);
-export const openReceipt = menuAction('入库登记', 'receipt', '入库登记', 1040, 780);
-export const openIssue = menuAction('领用出库', 'issue', '领用出库', 1100, 800);
-export const openReturn = menuAction('归还', 'return', '按原领用单归还', 1080, 780);
-export const openTrace = menuAction('袋/库位追溯', 'trace', '袋/库位追溯', 980, 760);
+export const bomCompare = menuAction('原理图库存', 'bom', '原理图库存', 1160, 800);
 export const openSettings = menuAction('连接与账户', 'settings', '连接与账户', 860, 720);
 export const showDebugLog = menuAction('诊断日志', 'diagnostics', '诊断日志', 980, 760);

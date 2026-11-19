@@ -24,6 +24,7 @@ class LabSessionScope {
     this.database = '',
     this.uid,
     this.company = '',
+    this.ephemeral = false,
   });
 
   /// Normalized server URL (trailing slashes removed).
@@ -37,11 +38,19 @@ class LabSessionScope {
   /// Active company context, when the app knows it.
   final String company;
 
+  /// True for a session-only (LAN acceleration) login.
+  ///
+  /// Such a session lives in memory only: nothing about its server, account or
+  /// business data may reach the disk. The asset cache therefore keeps files
+  /// and pins in memory instead of writing them.
+  final bool ephemeral;
+
   /// Nothing is cached while signed out: an anonymous session has no business
   /// data to show, and a shared "anonymous" cache directory would leak.
   bool get isSignedIn => uid != null;
 
-  bool get canPersistBusinessData => isSignedIn;
+  /// False while signed out AND for an ephemeral session.
+  bool get canPersistBusinessData => isSignedIn && !ephemeral;
 
   static const LabSessionScope anonymous = LabSessionScope();
 
@@ -52,6 +61,7 @@ class LabSessionScope {
       database: database,
       uid: uid,
       company: company,
+      ephemeral: ephemeral,
     );
   }
 
@@ -60,6 +70,7 @@ class LabSessionScope {
         database: database,
         uid: uid,
         company: company,
+        ephemeral: ephemeral,
       );
 
   /// Stable, filesystem-safe hash of the whole scope.
@@ -68,7 +79,9 @@ class LabSessionScope {
   /// scopes can never read each other's files.
   String get key {
     final normalized = normalizeBaseUrl(baseUrl);
-    final material = '$normalized\u0000$database\u0000${uid ?? ''}\u0000$company';
+    final material =
+        '$normalized\u0000$database\u0000${uid ?? ''}\u0000$company'
+        '\u0000${ephemeral ? 'ephemeral' : 'persistent'}';
     return sha256.convert(utf8.encode(material)).toString().substring(0, 32);
   }
 
@@ -94,7 +107,8 @@ class LabSessionScope {
         normalizeBaseUrl(other.baseUrl) == normalizeBaseUrl(baseUrl) &&
         other.database == database &&
         other.uid == uid &&
-        other.company == company;
+        other.company == company &&
+        other.ephemeral == ephemeral;
   }
 
   @override
@@ -103,6 +117,7 @@ class LabSessionScope {
         database,
         uid,
         company,
+        ephemeral,
       );
 
   @override

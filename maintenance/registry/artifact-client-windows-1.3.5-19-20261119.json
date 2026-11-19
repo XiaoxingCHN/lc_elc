@@ -1,0 +1,30 @@
+{
+  "file": "clients/windows/releases/1.3.5+19/LC_ELC-Windows-1.3.5+19-x64.zip",
+  "bytes": 37734213,
+  "sha256": "249c90e888c4dfc2ce7f070a5835acc06619b1b0110ecb2aac3cb706891a5e89",
+  "version": "1.3.5+19",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-19-20261119.json",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 19,
+  "files": 30,
+  "executable_sha256": "aa50f5b616cc22217357c0f92a1257f69b7eb38490c85fb0adb99e91378ccee3",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 504 passed / 5 skipped; launched the built exe and screenshotted the 库存管理 section to confirm text is readable",
+  "changes_in_this_build": [
+    "库存管理卡片不再整张铺荧光绿（对比度 1.2:1 不可读），改为中性玻璃面板 + 强调色图标",
+    "新增 WCAG 对比度测试，钉住正文/次要文字 ≥4.5:1，并钉住「onSurface 压在 accent 上不可读」这条错误组合",
+    "桌面分区切换器改为左侧紧凑胶囊，不再拉满整行",
+    "库位标签：库码移到二维码正下方（6 pt，落在码列内），名称在右侧放大到 17 pt",
+    "库位标签的名称取自「名称：」行而非 title（服务端 title 是库码）",
+    "库码取自 payload，保证打出来的与扫出来的是同一个串",
+    "器件袋标签版式完全不变"
+  ],
+  "unverified": [
+    "真实打印库位标签的观感与扫码",
+    "真实登录后的四区切换手感",
+    "仓位内容页在 >100 袋时的分页",
+    "Android 实机布局与蓝牙出纸",
+    "应用内更新"
+  ]
+}

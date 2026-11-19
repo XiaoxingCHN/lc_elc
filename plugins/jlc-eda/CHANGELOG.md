@@ -1,5 +1,41 @@
 # 变更日志
 
+## 3.1.0
+
+### 定位调整：画图助手
+
+插件只在画原理图/PCB 时提供价值：查这个器件有没有库存、有的话在哪个库位和袋、整张 BOM 一键出库。
+
+### 移除
+
+- **入库（receipt）、手动领用（issue）、归还（return）、袋/库位追溯（trace）四个页签与菜单。**
+  这些能力在 Odoo 网页端和 Flutter 客户端已经完整存在，在 EDA 里重复实现等于维护三套
+  写库存状态机，也是误报成功与重复领用的来源。
+- 移除对应 `renderReceipt` / `renderReceiptSuccess` / `queryReceiptItem` /
+  `buildReceiptPayload` / `submitReceipt`、`renderIssue` / `renderIssueSuccess` /
+  `prefillIssueBag` / `resolveIssueBag` / `buildIssuePayload` / `submitIssue`、
+  `renderReturn` / `renderReturnSuccess` / `loadReturnIssues` / `buildReturnPayload` /
+  `submitReturn`、`renderTrace` / `resolveTrace`，以及 `state.receipt` / `state.issue` /
+  `state.return` / `state.trace`。
+- `extension.json` 删除 `openReceipt`、`openIssue`、`openReturn`、`openTrace` 菜单
+  （含 PCB 菜单的 `openTrace`）；`src/main/index.js` 删除同名导出。
+
+### 变更
+
+- **「BOM 对比」改名「原理图库存」**：菜单标题、页签、页面标题同步；说明改为
+  “选中器件后可直接查看库存与库位”。
+- **默认范围改为「选中器件」**（原为「当前工程 BOM」），仍保留工程 BOM / 当前图页 /
+  已加载图页三个选项。
+- **对比结果新增「袋」列**：在「库位」之后显示该行袋追溯码，最多 3 个，超出显示
+  `+N`；复制对比表（TSV）与导出 CSV 同步增加该列。
+- 保留「器件库」「原理图库存」「连接/账户」「诊断」四个页签；「一键出库」仍在
+  原理图库存页内，行为不变。
+- 器件详情页移除「入库此器件」按钮与袋列表的「领用」按钮，改为提示到网页端/客户端办理。
+
+### 版本
+
+- `package.json`、`extension.json`、`src/iframe/app.js` 的 VERSION 统一为 3.1.0。
+
 ## 3.0.3
 
 ### 修复

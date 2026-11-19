@@ -122,7 +122,17 @@ class LabWorkflowTransactionTest(TransactionCase):
         self.assertEqual(first, second)
         templates = {r['product_template_id'] for r in first['records']}
         self.assertEqual(len(templates), 1)
-        self.assertEqual(self.env['product.template'].browse(templates.pop())._lab_quantity(), 0)
+        template = self.env['product.template'].browse(templates.pop())
+        self.assertEqual(template._lab_quantity(), 0)
+        # A hand-created material must be receivable. Without `is_storable` the
+        # bag code could be created but never put away, and the operator only
+        # found out at the shelf with "未开启库存管理（is_storable=False）".
+        self.assertTrue(template.is_storable)
+        self.assertEqual(template.tracking, 'lot')
+        common.lab_pending_confirm({
+            'request_key': _key('confirm'), 'pending_id': first['records'][0]['id'],
+            'location_id': self.location_a.id, 'quantity': 20})
+        self.assertEqual(template._lab_quantity(), 20)
 
     def test_pending_confirm_once_keeps_printed_code(self):
         record = self._pending()[0]
@@ -827,6 +837,42 @@ class LabWorkflowTransactionTest(TransactionCase):
         self.assertTrue(pdf.startswith(b'%PDF'))
         self.assertEqual(self.template._lab_quantity(), before)
         self.assertEqual(bag.quantity, 20)
+
+    def test_70b_label_preview_structured_content_for_direct_printing(self):
+        """include_content=True 时返回每张标签的结构化内容，且与 PDF 同源。
+
+        客户端用热敏打印机直打时需要「标题 + 逐行文字 + 唯一二维码载荷」，
+        不能再从 PDF 里反解；默认 False 保证旧客户端契约不变。
+        """
+        receipt = self._receipt(5)
+        bag = self.env['lab.bag'].browse(receipt['bag']['id'])
+        before = self.template._lab_quantity()
+        data = self.common.lab_labels_preview(
+            kind='bag', ids=[bag.id], copies=1, width_mm=40, height_mm=20,
+            margin_mm=2, gap_mm=2,
+            fields=['trace_code', 'name', 'mpn', 'package'],
+            include_content=True)
+        labels = data.get('labels')
+        self.assertIsInstance(labels, list)
+        self.assertEqual(len(labels), 1)
+        label = labels[0]
+        self.assertEqual(label['kind'], 'bag')
+        self.assertTrue(label['payload'].startswith('LABB:'))
+        self.assertEqual(label['trace_code'], bag.trace_code)
+        self.assertTrue(label['title'])
+        self.assertTrue(label['lines'])
+        self.assertTrue(any('追溯码' in line for line in label['lines']))
+        # 直打不能改变库存
+        self.assertEqual(self.template._lab_quantity(), before)
+        self.assertEqual(bag.quantity, 5)
+
+    def test_70c_label_preview_omits_content_by_default(self):
+        receipt = self._receipt(1)
+        bag = self.env['lab.bag'].browse(receipt['bag']['id'])
+        data = self.common.lab_labels_preview(
+            kind='bag', ids=[bag.id], width_mm=40, height_mm=20,
+            margin_mm=2, gap_mm=2, fields=['trace_code'])
+        self.assertNotIn('labels', data)
 
     def test_71_label_location_kind(self):
         payload = self.location_a._lab_label_payload()

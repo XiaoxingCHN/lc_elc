@@ -116,3 +116,50 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# ---------------------------------------------------------------------------
+# NIIMBOT (精臣) thermal label printer SDK (x64, PC C++ SDK 4.0.6).
+#
+# The runtime files are NOT committed to Git (vendor DLLs and fonts are binary
+# payloads, and the repo's Git boundary refuses *.dll). They live in
+# windows/niimbot/runtime/ on a prepared machine and are copied beside the
+# executable by the install step:
+#
+#   jcPrinterApi.dll + 7 dependencies + icudtl.dat  ->  <exe dir>/
+#   ZT001.ttf + language.json                       ->  <exe dir>/font/
+#
+# Restore them with:
+#   python tools/restore_niimbot_runtime.py
+# See clients/app/windows/niimbot/README.md for the source archive and hashes.
+#
+# NOTE: this block must stay in the TOP-LEVEL CMakeLists.txt. The runner
+# subdirectory is added (add_subdirectory("runner")) before
+# INSTALL_BUNDLE_LIB_DIR is defined, so an install() rule placed there would
+# receive an empty DESTINATION and fail the build with
+# "file INSTALL given no DESTINATION".
+#
+# When the runtime directory is absent (e.g. a clean clone without the
+# payload) the build still succeeds and the client hides the direct-print
+# button instead of showing a dead one.
+# ---------------------------------------------------------------------------
+set(NIIMBOT_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/niimbot/runtime")
+if(EXISTS "${NIIMBOT_RUNTIME_DIR}/jcPrinterApi.dll")
+  install(DIRECTORY "${NIIMBOT_RUNTIME_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime
+    PATTERN "font" EXCLUDE
+    PATTERN "README.md" EXCLUDE
+    PATTERN ".gitignore" EXCLUDE
+  )
+  install(DIRECTORY "${NIIMBOT_RUNTIME_DIR}/font/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/font"
+    COMPONENT Runtime
+  )
+  install(CODE "
+    message(STATUS \"NIIMBOT: installing jcPrinterApi.dll and fonts beside the executable\")
+    " COMPONENT Runtime)
+else()
+  install(CODE "
+    message(WARNING \"NIIMBOT runtime missing: direct thermal printing will be unavailable. Run: python tools/restore_niimbot_runtime.py\")
+    " COMPONENT Runtime)
+endif()

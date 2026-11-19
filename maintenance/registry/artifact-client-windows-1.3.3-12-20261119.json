@@ -1,0 +1,26 @@
+{
+  "file": "clients/windows/releases/1.3.3+12/LC_ELC-Windows-1.3.3+12-x64.zip",
+  "bytes": 36620963,
+  "sha256": "b5443e6698a1886c1e67583fae3cb134b1f0f555d717bda4acdfbe24134175b3",
+  "version": "1.3.3+12",
+  "source_manifest": "maintenance/registry/source-client-1.3.3-12-20261119.json",
+  "source_tree_sha256": "06b9cfd05bf3715d14d9a4e24b4724bfe66869be9dc60c14df7752a7cddb6e0f",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 12,
+  "files": 30,
+  "executable_sha256": "3013faab16aa54f1",
+  "validation": "built and tested on this machine; printer acceptance pending",
+  "fixes_in_this_build": [
+    "制袋贴标：建议行改为 onTapDown 提交（列表重建时点击不再丢失）",
+    "建议行 key 按料号稳定复用，避免重建销毁行",
+    "精臣 B1 Pro USB 直打（含 8 个 x64 DLL + ZT001 字体）"
+  ],
+  "server_dependency": "lab_workflow 19.0.2.0.3（/lab/api/labels/preview 的 include_content）已部署生产",
+  "unverified": [
+    "真实 USB 打印",
+    "真实登录与入库/领用",
+    "实体扫码",
+    "DPAPI"
+  ]
+}

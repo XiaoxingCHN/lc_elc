@@ -317,8 +317,20 @@ export function allocateBags(bags, need) {
   };
 }
 
+/** Bag trace codes for one BOM row: up to 3 shown, the rest collapsed to +N. */
+export const BAG_PREVIEW_LIMIT = 3;
+
+export function bagTraceSummary(bags) {
+  const codes = (Array.isArray(bags) ? bags : [])
+    .map((bag) => String((bag && bag.trace_code) || '').trim())
+    .filter(Boolean);
+  if (!codes.length) return '—';
+  const shown = codes.slice(0, BAG_PREVIEW_LIMIT).join(' ');
+  return codes.length > BAG_PREVIEW_LIMIT ? shown + ' +' + (codes.length - BAG_PREVIEW_LIMIT) : shown;
+}
+
 export function bomTsv(rows) {
-  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位'];
+  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位', '袋'];
   const body = rows.map((row) => {
     const locations = (row.locations || [])
       .map((location) => {
@@ -337,6 +349,7 @@ export function bomTsv(rows) {
       row.available === null ? '未知' : row.available,
       row.gap === null ? '未知' : row.gap,
       locations,
+      bagTraceSummary(row.bags),
     ]
       .map((value) => String(value).replace(/[\t\r\n]+/g, ' '))
       .join('\t');

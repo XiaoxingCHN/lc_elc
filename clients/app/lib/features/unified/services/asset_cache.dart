@@ -98,6 +98,7 @@ class AssetCacheStore {
     Future<SharedPreferences> Function()? preferences,
     this.scopeKey = '',
     this.persistBusinessData = true,
+    this.memoryOnly = false,
     this.cacheOnly = false,
     this.policy = const AssetFetchPolicy(),
     this.maxCacheBytes = 256 * 1024 * 1024,
@@ -123,6 +124,10 @@ class AssetCacheStore {
   /// False for a signed-out scope: a hash alone cannot tell whether a session
   /// exists, and business data must not be written without one.
   final bool persistBusinessData;
+
+  /// True for a session-only (LAN acceleration) login: files and pins stay in
+  /// memory, NOTHING is written to the disk cache or to SharedPreferences.
+  final bool memoryOnly;
 
   /// True only when there is a session AND a scope hash to isolate its files.
   bool get canPersistScoped => persistBusinessData && scopeKey.trim().isNotEmpty;
@@ -251,6 +256,9 @@ class AssetCacheStore {
     final memory = _memory[key];
     if (memory != null) return memory;
 
+    // An ephemeral session never reads a file it could not have written.
+    if (memoryOnly) return null;
+
     final file = await fileForUri(uri, kind: kind);
     if (!file.existsSync()) return null;
     try {
@@ -363,7 +371,7 @@ class AssetCacheStore {
       }
     }
 
-    if (changed) {
+    if (changed && !memoryOnly) {
       final preferences = await _preferences();
       await preferences.setStringList(_pinsKey, pins.toList());
     }
@@ -377,6 +385,10 @@ class AssetCacheStore {
   Future<Set<String>> _loadPins() async {
     final cached = _pinned;
     if (cached != null) return cached;
+    if (memoryOnly) {
+      _pinned = <String>{};
+      return _pinned!;
+    }
     try {
       final preferences = await _preferences();
       _pinned =
@@ -406,6 +418,7 @@ class AssetCacheStore {
   /// A directory that disappears while it is being measured (another process, a
   /// cleanup) is reported as far as it could be read instead of throwing.
   Future<int> sizeBytes() async {
+    if (memoryOnly) return 0;
     try {
       final dir = await directory();
       var total = 0;
@@ -424,6 +437,7 @@ class AssetCacheStore {
   /// Offline detail metadata (`/details/`) is left alone: it is small, and
   /// dropping it would break the offline detail page this cache exists for.
   Future<int> evictIfNeeded() async {
+    if (memoryOnly) return 0;
     final total = await sizeBytes();
     if (total <= maxCacheBytes) return 0;
 
@@ -476,6 +490,9 @@ class AssetCacheStore {
     _memory.clear();
     _memoryBytes = 0;
     _pinned = <String>{};
+    // An ephemeral store owns no files on disk and must not delete the shared
+    // public cache either.
+    if (memoryOnly) return;
     try {
       final preferences = await _preferences();
       await preferences.remove(_pinsKey);
@@ -507,7 +524,7 @@ class AssetCacheStore {
   /// Refused without a session scope: business metadata must never be written to
   /// a directory that another (or no) account could read.
   Future<void> saveDetail(String itemKey, Map<String, dynamic> data) async {
-    if (!canPersistScoped) return;
+    if (memoryOnly || !canPersistScoped) return;
     if (itemKey.trim().isEmpty || data.isEmpty) return;
     try {
       final dir = await metaDirectory();
@@ -532,7 +549,7 @@ class AssetCacheStore {
   Future<({Map<String, dynamic> data, DateTime? savedAt})?> readDetail(
     String itemKey,
   ) async {
-    if (!canPersistScoped) return null;
+    if (memoryOnly || !canPersistScoped) return null;
     try {
       final dir = await metaDirectory();
       final file = File('${dir.path}/${_hash(itemKey)}.json');
@@ -587,6 +604,13 @@ class AssetCacheStore {
     }
 
     _validate(uri, bytes, kind: kind, contentType: contentType, declaredLength: declaredLength);
+
+    // An ephemeral session keeps bytes in memory for the rest of the process
+    // but writes nothing to disk (no scope directory, no sidecar, no pins).
+    if (memoryOnly) {
+      _remember(uri.toString(), bytes);
+      return bytes;
+    }
 
     // A same-origin file may carry account-specific bytes. Without a session
     // scope there is no directory that is guaranteed private, so the bytes are

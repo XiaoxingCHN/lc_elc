@@ -35,8 +35,11 @@ final loginMemoryStoreProvider = Provider<LoginMemoryStore>((ref) {
 /// providers call the full ORM surface (`search_read`, `read`, ...) on it.
 final odooClientProvider = Provider<OdooClient>((ref) {
   return OdooClient(
-    baseUrl: OdooConfig.defaultBaseUrl,
-    database: OdooConfig.defaultDatabase,
+    // Public server by default (https). A build can still override it with
+    // --dart-define=LAB_ODOO_URL=...; an empty define falls back to the public
+    // deployment instead of leaving the form blank.
+    baseUrl: OdooConfig.fallbackBaseUrl,
+    database: OdooConfig.fallbackDatabase,
   );
 });
 
@@ -111,6 +114,9 @@ enum ManualLoginReason {
   /// This machine has no usable key store, so a password cannot be remembered.
   storageUnavailable,
 
+  /// The build/config supplies no server: the login form starts blank.
+  noServer,
+
   /// The account is remembered but no password is stored for it.
   noStoredPassword,
 
@@ -133,6 +139,8 @@ class AuthState {
     this.rememberLogin = OdooConfig.rememberLoginDefault,
     this.secureStorageStatus = SecureStorageStatus.unknown,
     this.manualLoginReason = ManualLoginReason.none,
+    this.ephemeral = false,
+    this.switching = false,
   });
 
   final AuthStatus status;
@@ -165,6 +173,16 @@ class AuthState {
 
   final ManualLoginReason manualLoginReason;
 
+  /// True when the live session is session-only (LAN acceleration).
+  ///
+  /// Nothing about such a session is persisted: no account entry, no password,
+  /// no last-used mark, and the unified UI keeps its business cache in memory.
+  final bool ephemeral;
+
+  /// True while [AuthStateNotifier.switchServer] is contacting the other
+  /// server. The old session stays usable until the new one is accepted.
+  final bool switching;
+
   bool get isAuthenticated => status == AuthStatus.authenticated;
   bool get isLoading => status == AuthStatus.authenticating;
   bool get isInitializing => status == AuthStatus.initializing;
@@ -194,6 +212,8 @@ class AuthState {
     bool? rememberLogin,
     SecureStorageStatus? secureStorageStatus,
     ManualLoginReason? manualLoginReason,
+    bool? ephemeral,
+    bool? switching,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -216,6 +236,8 @@ class AuthState {
       rememberLogin: rememberLogin ?? this.rememberLogin,
       secureStorageStatus: secureStorageStatus ?? this.secureStorageStatus,
       manualLoginReason: manualLoginReason ?? this.manualLoginReason,
+      ephemeral: ephemeral ?? this.ephemeral,
+      switching: switching ?? this.switching,
     );
   }
 }
@@ -253,6 +275,13 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   bool _bootstrapStarted = false;
   bool _autoLoginAttempted = false;
   LoginScope? _activeScope;
+
+  /// Gateway generation recorded when the live session was established.
+  ///
+  /// A session-invalid notification whose generation differs belongs to a
+  /// session that has already been replaced (a server switch, a local reset),
+  /// so it must not send the operator back to the login screen.
+  int _activeGeneration = 0;
 
   /// True once [bootstrap] has been started (guards a second splash build).
   bool get bootstrapStarted => _bootstrapStarted;
@@ -374,12 +403,16 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   /// password is written to the platform key store - but only after
   /// authentication succeeded. When it is off, any password stored for this
   /// exact account is deleted.
+  /// [ephemeral] true is the session-only path (LAN acceleration): the server
+  /// accepts the credentials, but nothing about the account is written to the
+  /// disk and it never becomes the last-used account.
   Future<bool> login({
     required String baseUrl,
     required String database,
     required String login,
     required String password,
     required bool rememberLogin,
+    bool ephemeral = false,
   }) {
     final scope = LoginScope.fromInput(
       baseUrl: baseUrl,
@@ -389,9 +422,130 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     return _signIn(
       scope: scope,
       password: password,
-      rememberLogin: rememberLogin,
+      rememberLogin: ephemeral ? false : rememberLogin,
       automatic: false,
+      ephemeral: ephemeral,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Atomic server switch (public <-> LAN)
+  // ---------------------------------------------------------------------------
+
+  /// Moves the LIVE session to another server/database without a logout.
+  ///
+  /// Semantics (pinned by test/providers/auth_provider_test.dart):
+  ///   * in-flight requests of the old session are cancelled first;
+  ///   * the new server is authenticated on a throw-away session, so a
+  ///     rejection or a network failure keeps the old session AND the old
+  ///     account exactly as they were;
+  ///   * only on success are baseUrl/database/uid committed atomically, and
+  ///     the session-invalid generation is advanced so a late 401 from the old
+  ///     session cannot tear down the new one;
+  ///   * switching INTO the LAN is ephemeral; switching BACK to the public
+  ///     server stays ephemeral too (the session was started without a stored
+  ///     account and must not silently create one).
+  ///
+  /// [password] is the password of [login] (the operator re-enters it: a
+  /// session-only login has no stored secret to reuse).
+  ///
+  /// The new session is ALWAYS ephemeral: the switch itself may not create a
+  /// remembered account, so a LAN session can never become `lastUsedAccount`.
+  Future<bool> switchServer({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    if (!state.isAuthenticated || _activeScope == null) {
+      state = state.copyWith(
+        errorMessage: '当前没有可切换的登录会话，请重新登录。',
+      );
+      return false;
+    }
+
+    final scope = LoginScope.fromInput(
+      baseUrl: baseUrl,
+      database: database,
+      login: login,
+    );
+    final previous = state;
+
+    state = state.copyWith(
+      switching: true,
+      errorMessage: null,
+      noticeMessage: null,
+    );
+
+    // 1. Stop the old session's traffic; anything that answers late is ignored.
+    _gateway.cancelInFlightRequests();
+
+    // 2. Authenticate on the new server WITHOUT touching the live session.
+    final int uid;
+    try {
+      uid = await _gateway.authenticateAt(
+        baseUrl: scope.baseUrl,
+        database: scope.database,
+        login: scope.login,
+        password: password,
+      );
+    } catch (e) {
+      // Nothing was committed: the old session and account survive.
+      state = previous.copyWith(
+        switching: false,
+        errorMessage: '切换失败：${_failureDetail(e)}'
+            '当前仍连接原服务器，会话保持不变。',
+      );
+      return false;
+    }
+
+    // 3. Commit. authenticateAt already replaced the uid + cookie jar on the
+    // live client, so nothing else has to be reset here.
+    _activeScope = scope;
+    _activeGeneration = _gateway.sessionGeneration;
+    // Switching INTO the LAN records the in-memory address; switching back to
+    // the public server clears it (see [switchToPublic]).
+    if (OdooConfig.isPrivateNetworkHost(Uri.parse(scope.baseUrl).host)) {
+      OdooConfig.setRuntimeLanBaseUrl(scope.baseUrl);
+    }
+
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      uid: uid,
+      activeLogin: scope.login,
+      baseUrl: _gateway.baseUrl,
+      database: _gateway.database,
+      // Session-only: never a remembered account.
+      savedAccount: null,
+      rememberLogin: false,
+      secureStorageStatus: _store.storageStatus,
+      ephemeral: true,
+      noticeMessage: '已切换到 ${scope.baseUrl}（本次运行有效，退出即清除）。',
+    );
+    return true;
+  }
+
+  /// Leaves the LAN acceleration session and returns to the public server.
+  ///
+  /// This is [switchServer] plus clearing the in-memory LAN address. It does
+  /// NOT log the operator out: a failed switch keeps the LAN session.
+  Future<bool> switchToPublic({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    final ok = await switchServer(
+      baseUrl: baseUrl,
+      database: database,
+      login: login,
+      password: password,
+    );
+    if (ok) {
+      // Leaving the LAN: the address exists only for this process anyway.
+      OdooConfig.setRuntimeLanBaseUrl(null);
+    }
+    return ok;
   }
 
   /// Explicit sign-out.
@@ -400,7 +554,9 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   /// successful manual login. The account (server / database / user) and the
   /// operator's "记住登录" preference are kept.
   Future<void> logout() async {
-    final scope = _activeScope ?? _store.lastUsedAccount?.scope;
+    final wasEphemeral = state.ephemeral;
+    final scope = _activeScope ??
+        (wasEphemeral ? null : _store.lastUsedAccount?.scope);
 
     try {
       await _gateway.logout();
@@ -410,13 +566,21 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     } finally {
       _gateway.resetLocalSession();
       _activeScope = null;
+      // The LAN address only ever lived in memory; sign-out clears it too.
+      OdooConfig.setRuntimeLanBaseUrl(null);
 
+      // A session-only account was never remembered, so there is no stored
+      // password or sign-out block to write. Deleting anyway is a no-op and
+      // covers a switch that made a previously stored account ephemeral.
       if (scope != null) {
         await _store.deletePassword(scope);
-        await _store.setAutoLoginBlocked(scope, true);
+        if (!wasEphemeral) {
+          await _store.setAutoLoginBlocked(scope, true);
+        }
       }
 
-      final account = scope == null ? null : _store.accountFor(scope);
+      final account =
+          wasEphemeral || scope == null ? null : _store.accountFor(scope);
       state = AuthState(
         status: AuthStatus.unauthenticated,
         savedAccount: account,
@@ -425,8 +589,10 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         rememberLogin: account?.rememberLogin ?? OdooConfig.rememberLoginDefault,
         secureStorageStatus: _store.storageStatus,
         manualLoginReason: ManualLoginReason.signedOut,
-        noticeMessage: '已退出登录：本机保存的密码已清除，自动登录已关闭；'
-            '服务器、数据库和用户名仍然保留。',
+        noticeMessage: wasEphemeral
+            ? '已退出内网加速会话：本次运行的服务器与 WiFi 信息已清除。'
+            : '已退出登录：本机保存的密码已清除，自动登录已关闭；'
+                '服务器、数据库和用户名仍然保留。',
       );
     }
   }
@@ -537,22 +703,36 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       return;
     }
 
+    // A 401 that belongs to a session which has already been replaced (server
+    // switch, local reset, sign-out) must not sign the NEW session out.
+    if (state.isAuthenticated && _gateway.sessionGeneration != _activeGeneration) {
+      return;
+    }
+
+    final wasEphemeral = state.ephemeral;
     final scope = _activeScope;
     _gateway.resetLocalSession();
     _activeScope = null;
+    if (wasEphemeral) OdooConfig.setRuntimeLanBaseUrl(null);
 
-    final account =
-        (scope == null ? null : _store.accountFor(scope)) ?? state.savedAccount;
+    final account = wasEphemeral
+        ? null
+        : (scope == null ? null : _store.accountFor(scope)) ?? state.savedAccount;
 
     state = AuthState(
       status: AuthStatus.unauthenticated,
       savedAccount: account,
-      baseUrl: account?.baseUrl ?? state.baseUrl,
-      database: account?.database ?? state.database,
-      rememberLogin: account?.rememberLogin ?? state.rememberLogin,
+      baseUrl: wasEphemeral ? null : account?.baseUrl ?? state.baseUrl,
+      database: wasEphemeral ? null : account?.database ?? state.database,
+      rememberLogin: wasEphemeral
+          ? OdooConfig.rememberLoginDefault
+          : account?.rememberLogin ?? state.rememberLogin,
       secureStorageStatus: _store.storageStatus,
       manualLoginReason: ManualLoginReason.sessionExpired,
-      noticeMessage: '登录状态已失效，请重新登录。账号与已保存的登录信息仍然保留。',
+      ephemeral: wasEphemeral,
+      noticeMessage: wasEphemeral
+          ? '内网加速会话已失效，请重新登录（本次运行的服务器信息已清除）。'
+          : '登录状态已失效，请重新登录。账号与已保存的登录信息仍然保留。',
     );
   }
 
@@ -560,12 +740,41 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
   // Internals
   // ---------------------------------------------------------------------------
 
+  /// Checks credentials without establishing or disturbing a session.
+  ///
+  /// Used by the "测试连接" button of "服务器与内网加速". The live session is
+  /// untouched whether the probe succeeds or fails.
+  Future<bool> testConnection({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    final scope = LoginScope.fromInput(
+      baseUrl: baseUrl,
+      database: database,
+      login: login,
+    );
+    try {
+      await _gateway.probe(
+        baseUrl: scope.baseUrl,
+        database: scope.database,
+        login: scope.login,
+        password: password,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// The one and only sign-in path, used by both the form and automatic login.
   Future<bool> _signIn({
     required LoginScope scope,
     required String password,
     required bool rememberLogin,
     required bool automatic,
+    bool ephemeral = false,
   }) async {
     state = state.copyWith(
       status: AuthStatus.authenticating,
@@ -596,42 +805,52 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     }
 
     // ---------------------------------------------------------------------
-    // Step 2: persist. A local storage hiccup must not turn a valid session
-    // into a failed login, so it is reported as a notice instead.
+    // Step 2: persist - EXCEPT for a session-only (LAN) login, which must not
+    // leave anything on disk: no account entry, no password, no last-used
+    // mark, and therefore no pre-fill or auto-login after a restart.
     // ---------------------------------------------------------------------
     final now = _clock();
     String? storageNotice;
-    try {
-      await _store.rememberAccount(scope, rememberLogin: rememberLogin, at: now);
+    if (!ephemeral) {
+      try {
+        await _store.rememberAccount(scope, rememberLogin: rememberLogin, at: now);
 
-      if (rememberLogin) {
-        try {
-          await _store.savePassword(scope, password);
-        } on SecretStorageUnavailableException catch (e) {
-          storageNotice = '${e.message}密码未保存，本次登录仍然有效；'
-              '下次打开需要重新输入密码。';
+        if (rememberLogin) {
+          try {
+            await _store.savePassword(scope, password);
+          } on SecretStorageUnavailableException catch (e) {
+            storageNotice = '${e.message}密码未保存，本次登录仍然有效；'
+                '下次打开需要重新输入密码。';
+          }
+        } else {
+          // "记住登录" off means nothing may stay behind for this account.
+          await _store.deletePassword(scope);
         }
-      } else {
-        // "记住登录" off means nothing may stay behind for this account.
-        await _store.deletePassword(scope);
-      }
 
-      await _store.markSuccessfulLogin(scope, at: now);
-    } catch (e) {
-      storageNotice = '登录成功，但本机登录记录写入失败：${_safe(e.toString())}';
+        await _store.markSuccessfulLogin(scope, at: now);
+      } catch (e) {
+        storageNotice = '登录成功，但本机登录记录写入失败：${_safe(e.toString())}';
+      }
+    } else {
+      OdooConfig.setRuntimeLanBaseUrl(scope.baseUrl);
     }
 
     _activeScope = scope;
+    _activeGeneration = _gateway.sessionGeneration;
     state = AuthState(
       status: AuthStatus.authenticated,
       uid: uid,
       activeLogin: scope.login,
       baseUrl: _gateway.baseUrl,
       database: _gateway.database,
-      savedAccount: _store.accountFor(scope),
-      rememberLogin: rememberLogin,
+      // A session-only login is never a remembered account.
+      savedAccount: ephemeral ? null : _store.accountFor(scope),
+      rememberLogin: ephemeral ? false : rememberLogin,
       secureStorageStatus: _store.storageStatus,
-      noticeMessage: storageNotice,
+      ephemeral: ephemeral,
+      noticeMessage: ephemeral
+          ? '内网加速会话：仅本次运行有效，退出即清除；不保留离线缓存。'
+          : storageNotice,
     );
     return true;
   }
@@ -695,6 +914,20 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
       return '$prefix：${_safe(error.message)}';
     }
     return '$prefix：${_safe(error.toString())}';
+  }
+
+  /// Operator-facing sentence for a failed server switch.
+  String _failureDetail(Object error) {
+    if (error is OdooAuthException) {
+      return '服务器拒绝了用户名或密码（${_safe(error.message)}）。';
+    }
+    if (error is OdooNetworkException) {
+      return '无法连接新服务器。${_safe(error.message)}';
+    }
+    if (error is OdooException) {
+      return '${_safe(error.message)}。';
+    }
+    return '${_safe(error.toString())}。';
   }
 
   /// Last line of defence: exception text can quote a URL or a payload.

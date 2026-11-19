@@ -2,6 +2,7 @@ import 'package:lab_inventory_client/widgets/lab_ui.dart';
 
 import 'dart:async';
 
+import '../../../screens/lan_acceleration_sheet.dart';
 import '../../../updates/update_ui.dart';
 
 import 'package:flutter/material.dart';
@@ -161,6 +162,7 @@ class _UnifiedCatalogScreenState extends ConsumerState<UnifiedCatalogScreen> {
           appBar: LabAppBar(
             title: const Text('仓库'),
             actions: <Widget>[
+              const LanAccelerationButton(),
               const ClientUpdateButton(),
               IconButton(
                 tooltip: _grid ? '切换为列表' : '切换为网格',
@@ -303,6 +305,20 @@ class _CatalogBody extends ConsumerWidget {
             ],
           ),
         ),
+        // A fetch task this client stopped waiting for is still queryable even
+        // when the new query has rows, so keep it visible with its own action.
+        if (state.fetchStatus?.isStillRunning == true)
+          StatusBanner(
+            message: '抓取任务仍在后台处理，可重新查询结果。',
+            tone: StatusTone.info,
+            dense: true,
+            action: TextButton(
+              onPressed: () => unawaited(
+                ref.read(catalogProvider.notifier).resumeFetch(),
+              ),
+              child: const Text('重新查询'),
+            ),
+          ),
         if (state.error != null)
           StatusBanner(
             message: '加载下一页失败：${state.error}',
@@ -419,7 +435,9 @@ class _CatalogBody extends ConsumerWidget {
     final notifier = ref.read(catalogProvider.notifier);
     final suggestion = state.fetchSuggestion;
     final status = state.fetchStatus;
-    final running = status != null && !status.isTerminal;
+    // A task this client stopped waiting for is NOT running here: the operator
+    // may ask about it again or start a new search.
+    final running = status != null && status.isActive;
     final canFetch = suggestion != null && suggestion.isValid && !running;
 
     final actions = <Widget>[
@@ -484,6 +502,9 @@ class _CatalogBody extends ConsumerWidget {
                 status: status,
                 onChoose: (candidate) =>
                     unawaited(notifier.chooseFetchCandidate(candidate)),
+                onQueryAgain: status.isQueryable
+                    ? () => unawaited(notifier.resumeFetch())
+                    : null,
               ),
             ),
         ],

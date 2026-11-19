@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
 import '../models/labels.dart';
+import '../providers/label_providers.dart';
 import '../providers/unified_providers.dart';
 import '../services/pdf_output.dart';
 
@@ -59,6 +60,24 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
   void _tell(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Direct thermal print of the SAME labels, from the dialog.
+  ///
+  /// It re-requests the structured content (the dialog only holds the PDF), so
+  /// both output paths share one source of truth on the server.
+  Future<void> _printDirect() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final result = await ref
+          .read(labelDesignerProvider.notifier)
+          .printDirect(printer: ref.read(niimbotLabelPrinterProvider));
+      if (!mounted) return;
+      _tell(result.summary);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -140,6 +159,12 @@ class _LabelPdfDialogState extends ConsumerState<LabelPdfDialog> {
                                 icon: const Icon(Icons.open_in_new),
                                 label: const Text('保存并打开'),
                               ),
+                              if (ref.watch(niimbotAvailableProvider))
+                                FilledButton.icon(
+                                  onPressed: _busy ? null : _printDirect,
+                                  icon: const Icon(Icons.local_print_shop),
+                                  label: const Text('精臣打印机直打'),
+                                ),
                               if (capabilities == null || capabilities.canPrint)
                                 FilledButton.icon(
                                   onPressed: _busy

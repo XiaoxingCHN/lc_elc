@@ -32,6 +32,23 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 精臣 Android SDK (4.1.1-release.aar) 只提供 arm64-v8a 与 armeabi-v7a
+        // 的 JNI 库；保留 x86_64 会让模拟器装得上却在打印时找不到 libminilzo.so。
+        // 真机均为 ARM，因此这里显式限定 ABI，与 SDK 保持一致。
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    // Prebuilt JNI libraries inside plugin AARs (ML Kit barcode, Flutter's own
+    // util libs) ignore ndk.abiFilters, so a few x86_64 .so files still leaked
+    // into the APK. The app cannot run on x86_64 at all (the NIIMBOT SDK has no
+    // x86_64 slice and libflutter.so/libapp.so are not built for it), so those
+    // files are dead weight - drop them explicitly.
+    packaging {
+        jniLibs {
+            excludes += listOf("lib/x86_64/**")
+        }
     }
 
     buildTypes {
@@ -47,6 +64,20 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // 精臣 (NIIMBOT) Android SDK 4.1.1 与图像库 1.9.5，来源与 SHA256 见
+    // app/libs/README.md。文档 V4.1.1 第 1.1.2.2 节：API 31 及以上直接
+    // fileTree 引入 *.jar/*.aar（不再需要 flatDir）。B1 Pro 在 V4.1.1
+    // 更新记录中明确“SDK 支持 B1_Pro”。
+    //
+    // image-1.9.5.aar 不能省略：4.1.1-release.aar 的 JCPrintApi 全部绘图
+    // 方法（drawEmptyLabel / drawLabelText / drawLabelQrCode /
+    // generateLabelJson …）都是对 com.niimbot.canvas.image.NBCanvasImageApiSzwy
+    // 的 native 转发，该类与 libniimbot_canvas_image.so / libskia.so 只在
+    // image AAR 里；只有 LPAPI（B50/B11/T6/T7/T8 系列）才是可选的。
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
 }
 
 flutter {

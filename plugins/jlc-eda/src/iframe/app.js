@@ -1,14 +1,15 @@
 import { createBridge, readPanelPayload } from './bridge-client.js';
-import { parseItemKey, normalizeCatalogCode } from '../shared/codes.js';
+import { beginSubmit, markSuccess, markFailure } from '../shared/idempotency.js';
+import { groupBom, compareLine, summarize, bomTsv, bagTraceSummary, BOM_STATUS } from '../shared/bom.js';
 import {
-  createDraft,
-  withPayload,
-  beginSubmit,
-  markSuccess,
-  markFailure,
-  defaultKeyFactory,
-} from '../shared/idempotency.js';
-import { groupBom, compareLine, summarize, bomTsv, BOM_STATUS } from '../shared/bom.js';
+  OUTBOUND_OUTCOME,
+  freezeOutboundAttempt,
+  outboundRequestParams,
+  classifyOutboundResponse,
+  classifyOutboundError,
+  outboundNotice,
+  outboundToast,
+} from '../shared/outbound.js';
 import {
   bagAvailableQuantity,
   bagLocationName,
@@ -18,15 +19,11 @@ import {
   locationSummary,
 } from '../shared/detail.js';
 
-const VERSION = '3.0.3';
+const VERSION = '3.1.0';
 
 const TABS = [
   { id: 'inventory', label: '器件库' },
-  { id: 'bom', label: 'BOM 对比' },
-  { id: 'receipt', label: '入库' },
-  { id: 'issue', label: '领用' },
-  { id: 'return', label: '归还' },
-  { id: 'trace', label: '追溯' },
+  { id: 'bom', label: '原理图库存' },
   { id: 'settings', label: '连接/账户' },
   { id: 'diagnostics', label: '诊断' },
 ];
@@ -57,6 +54,26 @@ const ERROR_HINTS = {
   EDA_CONTEXT: '当前 EDA 环境不支持该操作，请在原理图编辑器中重试。',
 };
 
+/**
+ * BOM one-click outbound state. `attempt` is the immutable, key-bound action
+ * (confirmed bags + borrower + project); it survives an UNKNOWN result so the
+ * operator can retry with the SAME request key.
+ */
+function emptyBomOutbound() {
+  return {
+    computing: false,
+    submitting: false,
+    plan: null,
+    sourceLines: null,
+    shortage: null,
+    error: null,
+    attempt: null,
+    result: null,
+    outcome: null,
+    notice: null,
+  };
+}
+
 const state = {
   bridge: null,
   payload: null,
@@ -84,7 +101,7 @@ const state = {
     detailLoading: false,
   },
   bom: {
-    scope: 'project',
+    scope: 'selected',
     loading: false,
     refreshing: false,
     scan: null,
@@ -93,52 +110,8 @@ const state = {
     summary: null,
     unmapped: [],
     error: null,
-    outbound: { computing: false, submitting: false, plan: null, shortage: null, error: null, result: null },
+    outbound: emptyBomOutbound(),
   },
-  receipt: {
-    itemKey: '',
-    detail: null,
-    detailError: null,
-    detailLoading: false,
-    locationId: '',
-    quantity: '1',
-    supplierQr: '',
-    note: '',
-    templateId: '',
-    draft: null,
-    submitting: false,
-    success: null,
-    error: null,
-  },
-  issue: {
-    borrowerId: '',
-    project: '',
-    bagRaw: '',
-    bagInfo: null,
-    bagError: null,
-    loadingBag: false,
-    lines: [],
-    note: '',
-    draft: null,
-    submitting: false,
-    success: null,
-    error: null,
-  },
-  return: {
-    issues: [],
-    query: '',
-    cursor: null,
-    next: null,
-    loading: false,
-    selected: null,
-    quantity: '',
-    note: '',
-    draft: null,
-    submitting: false,
-    success: null,
-    error: null,
-  },
-  trace: { raw: '', loading: false, result: null, error: null },
   settings: {
     mode: 'relay',
     relayUrl: 'http://127.0.0.1:49621',
@@ -250,12 +223,6 @@ function toast(message, kind = 'info', ms = 4200) {
   setTimeout(() => {
     if (item.parentNode) item.parentNode.removeChild(item);
   }, ms);
-}
-
-function showBanner(message, kind = 'info') {
-  dom.banner.hidden = false;
-  dom.banner.className = 'banner ' + kind;
-  dom.banner.textContent = String(message);
 }
 
 function hideBanner() {
@@ -413,20 +380,11 @@ async function loadBootstrap() {
     const data = await call('inventory.bootstrap');
     state.bootstrap = data;
     state.bootstrapError = null;
-    const borrowers = Array.isArray(data.borrowers) ? data.borrowers : [];
-    if (!state.issue.borrowerId) {
-      const self = borrowers.find((borrower) => borrower.is_self);
-      if (self) state.issue.borrowerId = String(self.id);
-      else if (borrowers.length === 1) state.issue.borrowerId = String(borrowers[0].id);
-    }
-    if (!state.receipt.locationId && Array.isArray(data.locations) && data.locations.length) {
-      state.receipt.locationId = String(data.locations[0].id);
-    }
   } catch (error) {
     state.bootstrapError = error;
   } finally {
     state.bootstrapLoading = false;
-    if (['receipt', 'issue', 'return', 'settings'].includes(state.tab)) render();
+    if (['settings', 'bom'].includes(state.tab)) render();
   }
 }
 
@@ -446,18 +404,6 @@ function render() {
       break;
     case 'bom':
       renderBom();
-      break;
-    case 'receipt':
-      renderReceipt();
-      break;
-    case 'issue':
-      renderIssue();
-      break;
-    case 'return':
-      renderReturn();
-      break;
-    case 'trace':
-      renderTrace();
       break;
     case 'settings':
       renderSettings();
@@ -770,17 +716,6 @@ function renderInventoryDetail(detail) {
       el('dt', {}, '资料库库存'), el('dd', {}, item.catalog_stock === null || item.catalog_stock === undefined ? '—' : fmtQty(item.catalog_stock)),
     ]),
     el('div', { class: 'row', style: 'margin-top:10px' }, [
-      el('button', {
-        class: 'btn primary',
-        type: 'button',
-        onclick: () => {
-          state.receipt.itemKey = item.item_key || ('lcsc:' + code);
-          state.receipt.detail = detail;
-          state.receipt.detailError = null;
-          state.receipt.templateId = '';
-          nav('receipt');
-        },
-      }, '入库此器件'),
       el('button', { class: 'btn', type: 'button', onclick: () => copyText(code, '已复制 C 编号') }, '复制 C 编号'),
     ]),
   ]);
@@ -826,7 +761,7 @@ function renderInventoryDetail(detail) {
     panel.appendChild(el('h3', {}, '袋 / 批次追溯'));
     panel.appendChild(
       table(
-        [{ label: '追溯码' }, { label: '在库', num: true }, { label: '可用', num: true }, { label: '未归还', num: true }, { label: '库位' }, { label: '批次/收货' }, { label: '' }],
+        [{ label: '追溯码' }, { label: '在库', num: true }, { label: '可用', num: true }, { label: '未归还', num: true }, { label: '库位' }, { label: '批次/收货' }],
         bags.map((bag) => [
           el('span', { class: 'mono' }, bag.trace_code || '—'),
           fmtQty(bag.quantity),
@@ -834,7 +769,6 @@ function renderInventoryDetail(detail) {
           fmtQty(bag.outstanding_quantity),
           bagLocationName(bag),
           [bagLotName(bag), fmtDate(bag.receipt_date)].filter(Boolean).join(' / ') || '—',
-          el('button', { class: 'btn small', type: 'button', onclick: () => prefillIssueBag(bag) }, '领用'),
         ]),
       ),
     );
@@ -856,7 +790,7 @@ function renderInventoryDetail(detail) {
         ]),
       ),
     );
-    panel.appendChild(el('p', { class: 'muted' }, '归还必须按原领用明细（issue_line_id），不能按器件总量归还。'));
+    panel.appendChild(el('p', { class: 'muted' }, '归还需按原领用明细（issue_line_id），请在 Odoo 网页端或 Flutter 客户端办理。'));
   }
 
   if (history.length) {
@@ -918,23 +852,23 @@ function bomStatusChip(status) {
 
 function renderBom() {
   if (!isActive()) {
-    dom.view.appendChild(loginGate('BOM 对比'));
+    dom.view.appendChild(loginGate('原理图库存'));
     return;
   }
   const bom = state.bom;
 
   const scope = bom.scope;
   const radios = el('div', { class: 'chips' }, [
-    scopeRadio('project', '当前工程 BOM', scope),
     scopeRadio('selected', '选中器件', scope),
+    scopeRadio('project', '当前工程 BOM', scope),
     scopeRadio('page', '当前图页', scope),
     scopeRadio('loaded', '已加载图页', scope),
   ]);
 
   dom.view.appendChild(
     el('section', { class: 'panel' }, [
-      el('h2', {}, 'BOM 对比云端库存'),
-      el('p', { class: 'muted' }, '按立创 C 编号归并器件，只读取 EDA 与 Odoo，不会修改原理图、BOM 或库存。数量按 1 块板计算。'),
+      el('h2', {}, '原理图库存与库位'),
+      el('p', { class: 'muted' }, '选中器件后可直接查看库存与库位：按立创 C 编号归并器件，只读取 EDA 与 Odoo，不会修改原理图、BOM 或库存。数量按 1 块板计算。'),
       el('div', { class: 'row', style: 'justify-content:space-between;margin-top:10px' }, [
         radios,
         el('div', { class: 'row' }, [
@@ -952,9 +886,11 @@ function renderBom() {
           ),
         ]),
       ]),
-      scope === 'project'
-        ? el('p', { class: 'notice', style: 'margin-top:10px' }, '当前工程 BOM 由 EDA 制造数据导出（pcb_ManufactureData.getBomFile），覆盖全部图页，不依赖图页是否已加载。若导出不可用会自动改用已加载图页。')
-        : el('p', { class: 'notice warn', style: 'margin-top:10px' }, '注意：原理图范围只返回已加载图页中的器件；需要完整 BOM 请用「当前工程 BOM」。'),
+      scope === 'selected'
+        ? el('p', { class: 'notice', style: 'margin-top:10px' }, '在原理图中选中器件后点击「读取并对比」，即可查看这些器件的可用库存、库位路径与袋追溯码。未选中器件时请改用「当前图页」或「当前工程 BOM」。')
+        : scope === 'project'
+          ? el('p', { class: 'notice', style: 'margin-top:10px' }, '当前工程 BOM 由 EDA 制造数据导出（sch_/pcb_ManufactureData.getBomFile），覆盖全部图页，不依赖图页是否已加载。若导出不可用会自动改用已加载图页。')
+          : el('p', { class: 'notice warn', style: 'margin-top:10px' }, '注意：原理图范围只返回已加载图页中的器件；需要完整 BOM 请用「当前工程 BOM」。'),
     ]),
   );
 
@@ -989,6 +925,45 @@ function renderBom() {
     );
   }
 
+  if (bom.outbound.notice) {
+    const notice = bom.outbound.notice;
+    dom.view.appendChild(
+      el('div', { class: 'notice ' + notice.tone, style: 'margin-top:10px' }, [
+        el('strong', {}, notice.title + '：'),
+        notice.text,
+      ]),
+    );
+  }
+  if (bom.outbound.outcome === OUTBOUND_OUTCOME.UNKNOWN && bom.outbound.attempt) {
+    const key = bom.outbound.attempt.draft.key;
+    dom.view.appendChild(
+      el('div', { style: 'margin-top:8px' }, [
+        el('p', { class: 'muted' }, '本次请求号：' + shortKey(key) + '（原样重试会复用同一请求号）'),
+        el('div', { class: 'row' }, [
+          el(
+            'button',
+            {
+              class: 'btn primary',
+              type: 'button',
+              disabled: bom.outbound.submitting,
+              onclick: () => retryBomOutbound(),
+            },
+            bom.outbound.submitting ? '重试中…' : '原样重试（同一请求号）',
+          ),
+          el('button', { class: 'btn', type: 'button', onclick: () => copyText(key, '已复制请求号') }, '复制请求号'),
+          el(
+            'button',
+            {
+              class: 'btn',
+              type: 'button',
+              onclick: () => call('ui.open', { action: 'request_log' }).catch((error) => toast(error.message, 'error')),
+            },
+            '打开 Odoo 请求记账（人工核对）',
+          ),
+        ]),
+      ]),
+    );
+  }
   if (bom.outbound.error) dom.view.appendChild(errorBox(bom.outbound.error));
   if ((bom.outbound.shortage || []).length) {
     dom.view.appendChild(
@@ -1006,9 +981,22 @@ function renderBom() {
       ]),
     );
   }
-  if (bom.outbound.result) {
+  if (bom.outbound.outcome === OUTBOUND_OUTCOME.SUCCESS && bom.outbound.result) {
+    const data = bom.outbound.result;
+    const lines = Array.isArray(data.lines) ? data.lines : [];
     dom.view.appendChild(
-      el('div', { class: 'notice ok', style: 'margin-top:10px' }, '一键出库成功：' + ((bom.outbound.result.plan || []).length) + ' 个型号，按袋扣减完成。可在「领用」页签查看领用单。'),
+      section('一键出库已完成（真实领用单）', [
+        table(
+          [{ label: 'issue_line_id' }, { label: '袋' }, { label: '数量', num: true }, { label: '未归还', num: true }],
+          lines.map((line) => [
+            String(line.issue_line_id),
+            line.trace_code || String(line.bag_id),
+            fmtQty(line.quantity),
+            fmtQty(line.outstanding_quantity),
+          ]),
+        ),
+        el('p', { class: 'muted', style: 'margin-top:8px' }, '归还需使用上面的 issue_line_id，可在 Odoo 网页端或 Flutter 客户端的领用记录中办理。'),
+      ]),
     );
   }
 
@@ -1025,6 +1013,7 @@ function renderBom() {
       (row.locations || [])
         .map((location) => locationSummary(location))
         .join(' ') || '—',
+      bagTraceSummary(row.bags),
     ]);
     dom.view.appendChild(
       section('对比结果', [
@@ -1038,6 +1027,7 @@ function renderBom() {
             { label: '可用', num: true },
             { label: '缺口', num: true },
             { label: '库位' },
+            { label: '袋' },
           ],
           tableRows,
         ),
@@ -1104,7 +1094,10 @@ async function openBomOutbound() {
   out.error = null;
   out.shortage = null;
   out.plan = null;
+  out.attempt = null;
   out.result = null;
+  out.outcome = null;
+  out.notice = null;
   out.sourceLines = bomOutboundSourceLines(state.bom.rows);
   render();
   try {
@@ -1119,6 +1112,13 @@ async function openBomOutbound() {
   if (!out.error && !(out.shortage || []).length && (out.plan || []).length) await confirmBomOutbound();
 }
 
+/** Apply a terminal outcome to the page. Only SUCCESS renders success wording. */
+function applyOutboundOutcome(out, outcome, options = {}) {
+  out.outcome = outcome;
+  out.notice = outboundNotice(outcome, options);
+  if (outcome !== OUTBOUND_OUTCOME.SUCCESS) out.result = null;
+}
+
 async function confirmBomOutbound() {
   const out = state.bom.outbound;
   const bootstrap = state.bootstrap || {};
@@ -1127,8 +1127,9 @@ async function confirmBomOutbound() {
     toast('没有可用的领用人，请先刷新连接或确认权限。', 'error');
     return;
   }
-  let borrowerId = String(state.issue.borrowerId || (borrowers[0] && borrowers[0].id) || '');
-  let project = state.issue.project || '';
+  const self = borrowers.find((borrower) => borrower.is_self);
+  let borrowerId = String((self && self.id) || (borrowers[0] && borrowers[0].id) || '');
+  let project = '';
   const borrowerSelect = el(
     'select',
     { class: 'grow' },
@@ -1166,7 +1167,7 @@ async function confirmBomOutbound() {
       ],
       planRows,
     ),
-    el('p', { class: 'muted' }, '确认后立即按袋扣减云端库存并生成领用单，不可撤销；归还需走「归还」。'),
+    el('p', { class: 'muted' }, '确认后立即按袋扣减云端库存并生成领用单，不可撤销；归还需按原领用单，在 Odoo 网页端或 Flutter 客户端办理。'),
   ]);
   const ok = await confirmModal('一键出库（' + (out.plan || []).length + ' 个型号）', content, '确认出库');
   if (!ok) return;
@@ -1174,31 +1175,115 @@ async function confirmBomOutbound() {
     toast('请填写项目/用途。', 'error');
     return;
   }
-  state.issue.project = project.trim();
-  out.submitting = true;
-  out.error = null;
-  render();
+  // A fresh confirmation always starts a NEW attempt (and therefore a new
+  // request key). An existing UNKNOWN attempt is retried only via its own
+  // 「原样重试」 button, never by re-running the confirm dialog.
+  let attempt;
   try {
-    const response = await call('inventory.outbound', {
-      lines: out.sourceLines,
-      dry_run: false,
-      request_key: defaultKeyFactory(),
-      borrower_id: Number(borrowerId),
+    attempt = freezeOutboundAttempt({
+      borrowerId,
       project: project.trim(),
       note: 'BOM 一键出库',
+      plan: out.plan,
     });
-    out.result = response;
-    toast('已出库 ' + ((response && response.plan) || []).length + ' 个型号', 'ok');
-    out.submitting = false;
-    await runBom();
-    state.bom.outbound.result = response;
-    render();
   } catch (error) {
-    out.submitting = false;
     out.error = error;
     render();
     toast(String(error.message || error), 'error', 6000);
+    return;
   }
+  out.attempt = attempt;
+  out.shortage = null;
+  out.result = null;
+  out.outcome = null;
+  out.notice = null;
+  await submitBomOutbound(attempt);
+}
+
+/** Submit (or retry) the frozen attempt. Retry reuses the same request key. */
+async function submitBomOutbound(attempt) {
+  const out = state.bom.outbound;
+  let submitted;
+  try {
+    submitted = beginSubmit(attempt.draft);
+  } catch (error) {
+    out.error = error;
+    toast(error.message, 'warn');
+    return;
+  }
+  attempt.draft = submitted;
+  out.attempt = attempt;
+  out.submitting = true;
+  out.error = null;
+  out.outcome = null;
+  out.notice = null;
+  render();
+  try {
+    const response = await call('inventory.outbound', outboundRequestParams(attempt), 120000);
+    const outcome = classifyOutboundResponse(response);
+    out.submitting = false;
+    if (outcome === OUTBOUND_OUTCOME.SUCCESS) {
+      attempt.draft = markSuccess(submitted, response);
+      out.result = response.result || null;
+      applyOutboundOutcome(out, OUTBOUND_OUTCOME.SUCCESS, {
+        count: (response.plan || attempt.plan || []).length,
+        replayed: Boolean(response.result && response.result.replayed),
+      });
+      const done = outboundToast(OUTBOUND_OUTCOME.SUCCESS, {
+        count: (response.plan || attempt.plan || []).length,
+      });
+      toast(done.text, done.tone);
+      await runBom();
+      // runBom() resets outbound state; restore the terminal success so the
+      // operator still sees the real issue lines.
+      state.bom.outbound.result = out.result;
+      state.bom.outbound.outcome = OUTBOUND_OUTCOME.SUCCESS;
+      state.bom.outbound.notice = out.notice;
+      render();
+      return;
+    }
+    if (outcome === OUTBOUND_OUTCOME.RECONFIRM) {
+      // Nothing written; the frozen allocation is stale. Drop it and let the
+      // operator re-preview against live stock.
+      attempt.draft = markFailure(submitted, { code: 'PRECONDITION_FAILED' });
+      out.attempt = null;
+      applyOutboundOutcome(out, OUTBOUND_OUTCOME.RECONFIRM);
+      out.shortage = (response && response.shortage) || null;
+      const redo = outboundToast(OUTBOUND_OUTCOME.RECONFIRM);
+      toast(redo.text, redo.tone, 6000);
+      render();
+      return;
+    }
+    // FAILED / UNKNOWN from a business envelope: keep the attempt for retry.
+    // UNKNOWN must stay retryable with the SAME key, so mark it ambiguous
+    // rather than success (success would rotate the key on the next attempt).
+    attempt.draft =
+      outcome === OUTBOUND_OUTCOME.UNKNOWN
+        ? markFailure(submitted, { code: 'TIMEOUT_AMBIGUOUS', mayHaveBeenSent: true })
+        : markFailure(submitted, { code: (response && response.code) || 'FAILED' });
+    applyOutboundOutcome(out, outcome);
+    out.error = null;
+    const failed = outboundToast(outcome);
+    toast(failed.text, failed.tone, 6000);
+    render();
+  } catch (error) {
+    const outcome = classifyOutboundError(error);
+    attempt.draft = markFailure(submitted, error);
+    out.submitting = false;
+    out.error = error;
+    applyOutboundOutcome(out, outcome);
+    if (outcome === OUTBOUND_OUTCOME.RECONFIRM) out.attempt = null;
+    const failed = outboundToast(outcome);
+    // Include the server message, but never success wording for a non-success outcome.
+    toast(failed.text + ' ' + String(error.message || error.code || error), failed.tone, 6000);
+    render();
+  }
+}
+
+async function retryBomOutbound() {
+  const out = state.bom.outbound;
+  if (!out.attempt || out.submitting) return;
+  await submitBomOutbound(out.attempt);
 }
 
 function scopeRadio(value, label, current) {
@@ -1212,7 +1297,7 @@ function scopeRadio(value, label, current) {
       state.bom.unmapped = [];
       state.bom.warnings = [];
       state.bom.grouped = null;
-      state.bom.outbound = { computing: false, submitting: false, plan: null, shortage: null, error: null, result: null };
+      state.bom.outbound = emptyBomOutbound();
       render();
     }
   });
@@ -1263,7 +1348,7 @@ async function runBom() {
     });
     bom.summary = summarize(bom.rows);
     bom.scannedAt = scan.scannedAt;
-    bom.outbound = { computing: false, submitting: false, plan: null, shortage: null, error: null, result: null };
+    bom.outbound = emptyBomOutbound();
   } catch (error) {
     bom.error = error;
   } finally {
@@ -1302,7 +1387,7 @@ function csvCell(value) {
 }
 
 function exportBomCsv(rows) {
-  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位'];
+  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位', '袋'];
   const lines = rows.map((row) => [
     BOM_STATUS_LABEL[row.status] || row.status,
     row.code,
@@ -1313,6 +1398,7 @@ function exportBomCsv(rows) {
     row.available === null ? '未知' : row.available,
     row.gap === null ? '未知' : row.gap,
     (row.locations || []).map((location) => locationSummary(location)).join(' '),
+    bagTraceSummary(row.bags),
   ]);
   const csv = '\ufeff' + [header].concat(lines).map((line) => line.map(csvCell).join(',')).join('\r\n');
   try {
@@ -1329,1077 +1415,6 @@ function exportBomCsv(rows) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Receipt                                                             */
-/* ------------------------------------------------------------------ */
-
-function renderReceipt() {
-  if (!isActive()) {
-    dom.view.appendChild(loginGate('入库登记'));
-    return;
-  }
-  if (state.receipt.success) {
-    renderReceiptSuccess();
-    return;
-  }
-
-  const receipt = state.receipt;
-  const bootstrap = state.bootstrap;
-  const locations = Array.isArray(bootstrap && bootstrap.locations) ? bootstrap.locations : [];
-  const permissions = (bootstrap && bootstrap.permissions) || {};
-  if (bootstrap && permissions.can_receipt === false) {
-    showBanner('当前账号没有入库权限（lab_workflow.group_lab_operator），提交会被服务器拒绝。', 'warn');
-  } else if (state.bootstrapError) {
-    dom.view.appendChild(errorBox(state.bootstrapError, { retry: () => loadBootstrap() }));
-  }
-
-  const itemInput = el('input', { type: 'text', placeholder: 'C123 或 lcsc:C123', value: receipt.itemKey, class: 'mono' });
-  itemInput.addEventListener('input', () => {
-    receipt.itemKey = itemInput.value.trim();
-  });
-  itemInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void queryReceiptItem();
-    }
-  });
-
-  const locationSelect = el(
-    'select',
-    {},
-    locations.length
-      ? locations.map((location) =>
-          el('option', { value: String(location.id), selected: String(receipt.locationId) === String(location.id) }, location.path || location.name || String(location.id)),
-        )
-      : [el('option', { value: '' }, '暂无可用库位')],
-  );
-  locationSelect.addEventListener('change', () => {
-    receipt.locationId = locationSelect.value;
-  });
-
-  const qtyInput = el('input', { type: 'number', min: '0.000001', step: 'any', value: receipt.quantity });
-  qtyInput.addEventListener('input', () => {
-    receipt.quantity = qtyInput.value;
-  });
-
-  const supplierInput = el('input', { type: 'text', placeholder: '可选：立创原厂袋二维码内容', value: receipt.supplierQr });
-  supplierInput.addEventListener('input', () => {
-    receipt.supplierQr = supplierInput.value;
-  });
-
-  const noteInput = el('textarea', { placeholder: '可选备注（不要填写密码等凭据）', value: receipt.note });
-  noteInput.addEventListener('input', () => {
-    receipt.note = noteInput.value;
-  });
-
-  const form = el('section', { class: 'panel' }, [
-    el('h2', {}, '入库登记（生成新袋 + 真实库存移动）'),
-    el('p', { class: 'muted' }, '入库会创建新的袋追溯码与 stock.lot，并写入 Odoo 原生库存。每次提交都有确认步骤和幂等请求号。'),
-    el('div', { class: 'row' }, [
-      el('div', { class: 'grow' }, field('物料编号', itemInput, '只接受 C 编号或 lab:<id>；不会用型号猜测 C 编号。')),
-      el('button', { class: 'btn', type: 'button', disabled: receipt.detailLoading, onclick: () => queryReceiptItem() }, receipt.detailLoading ? '查询中…' : '查询器件'),
-    ]),
-  ]);
-
-  if (receipt.detailError) form.appendChild(errorBox(receipt.detailError, { retry: () => queryReceiptItem() }));
-  if (receipt.detail) {
-    const item = receipt.detail.item || {};
-    const templates = Array.isArray(receipt.detail.lab_templates) ? receipt.detail.lab_templates : [];
-    form.appendChild(
-      el('div', { class: 'panel', style: 'margin-top:10px;background:var(--panel-2)' }, [
-        el('div', { class: 'chips' }, [
-          el('span', { class: 'chip' }, item.item_key || '—'),
-          el('span', { class: 'chip' }, '在库 ' + fmtQty(item.lab_quantity)),
-          el('span', { class: 'chip' }, '可用 ' + fmtQty(item.lab_available_quantity)),
-        ]),
-        el('p', { style: 'margin-top:8px' }, (item.name || '未命名器件') + (item.mpn ? ' · ' + item.mpn : '') + (item.brand ? ' · ' + item.brand : '')),
-        templates.length > 1
-          ? (() => {
-              const select = el('select', {}, [
-                el('option', { value: '' }, '请选择要归属的 SN 档案（必选）'),
-                ...templates.map((template) =>
-                  el(
-                    'option',
-                    { value: String(template.id), selected: String(receipt.templateId) === String(template.id) },
-                    (template.sn || '无 SN') + ' · ' + (template.name || '') + ' · 在库 ' + fmtQty(template.quantity),
-                  ),
-                ),
-              ]);
-              select.addEventListener('change', () => {
-                receipt.templateId = select.value;
-              });
-              return field('同名 C 编号有多个档案，请选择 SN', select, '不选择会被服务器以 AMBIGUOUS_MATERIAL 拒绝，插件不会自动取第一个。');
-            })()
-          : el('p', { class: 'muted' }, templates.length === 1 ? '将使用唯一档案：' + (templates[0].sn || '无 SN') : '暂无本地档案，服务器将按 C 编号校验/建档。'),
-      ]),
-    );
-  }
-
-  form.appendChild(
-    el('div', { class: 'grid-2', style: 'margin-top:10px' }, [
-      field('入库库位', locationSelect),
-      field('数量', qtyInput, '必须是大于 0 的数量；服务器按 UoM 校验。'),
-    ]),
-  );
-  form.appendChild(el('div', { class: 'grid-2', style: 'margin-top:10px' }, [field('供应商二维码（可选）', supplierInput), field('备注（可选）', noteInput)]));
-
-  if (receipt.error) {
-    form.appendChild(
-      el('div', { style: 'margin-top:10px' }, [
-        errorBox(receipt.error, {
-          retry: receipt.draft && (receipt.draft.state === 'ambiguous' || receipt.draft.state === 'error') ? () => submitReceipt(true) : null,
-          retryLabel: '用同一请求号重试',
-        }),
-      ]),
-    );
-  }
-
-  const keyLine = receipt.draft
-    ? el('p', { class: 'muted' }, '当前请求号：' + shortKey(receipt.draft.key) + '（修改表单会自动换新请求号；未修改时重试复用）')
-    : el('p', { class: 'muted' }, '提交时生成请求号；网络超时后可用同一请求号重试，不会重复入库。');
-
-  form.appendChild(
-    el('div', { class: 'row', style: 'margin-top:12px;justify-content:space-between' }, [
-      keyLine,
-      el('button', { class: 'btn primary', type: 'button', disabled: receipt.submitting, onclick: () => submitReceipt(false) }, receipt.submitting ? '提交中…' : '确认入库'),
-    ]),
-  );
-  dom.view.appendChild(form);
-}
-
-async function queryReceiptItem() {
-  const receipt = state.receipt;
-  const parsed = parseItemKey(receipt.itemKey);
-  if (!parsed.key) {
-    receipt.detailError = { code: 'VALIDATION_ERROR', message: '物料编号无效：请输入 C123 或 lcsc:C123。' };
-    receipt.detail = null;
-    render();
-    return;
-  }
-  receipt.itemKey = parsed.key;
-  receipt.detailLoading = true;
-  receipt.detailError = null;
-  receipt.detail = null;
-  receipt.templateId = '';
-  render();
-  try {
-    receipt.detail = await call('catalog.detail', { item_key: parsed.key });
-  } catch (error) {
-    receipt.detailError = error;
-  } finally {
-    receipt.detailLoading = false;
-    render();
-  }
-}
-
-function buildReceiptPayload() {
-  const receipt = state.receipt;
-  const parsed = parseItemKey(receipt.itemKey);
-  if (!parsed.key) throw Object.assign(new Error('物料编号无效。'), { code: 'VALIDATION_ERROR' });
-  const locationId = Number(receipt.locationId);
-  if (!Number.isInteger(locationId) || locationId <= 0) throw Object.assign(new Error('请选择入库库位。'), { code: 'VALIDATION_ERROR' });
-  const quantity = Number(receipt.quantity);
-  if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('数量必须大于 0。'), { code: 'VALIDATION_ERROR' });
-  const templates = receipt.detail && Array.isArray(receipt.detail.lab_templates) ? receipt.detail.lab_templates : [];
-  if (templates.length > 1 && !receipt.templateId) {
-    throw Object.assign(new Error('该 C 编号有多个本地档案，请先选择 SN 档案。'), { code: 'AMBIGUOUS_MATERIAL' });
-  }
-  return {
-    item_key: parsed.key,
-    product_template_id: receipt.templateId ? Number(receipt.templateId) : null,
-    location_id: locationId,
-    quantity,
-    supplier_qr: receipt.supplierQr.trim(),
-    note: receipt.note.trim(),
-  };
-}
-
-async function submitReceipt(skipConfirm) {
-  const receipt = state.receipt;
-  if (receipt.submitting) return;
-  let payload;
-  try {
-    payload = buildReceiptPayload();
-  } catch (error) {
-    receipt.error = error;
-    render();
-    return;
-  }
-  receipt.draft = receipt.draft ? withPayload(receipt.draft, payload) : createDraft('inventory.receipt', payload);
-  if (!skipConfirm) {
-    const templates = receipt.detail && Array.isArray(receipt.detail.lab_templates) ? receipt.detail.lab_templates : [];
-    const chosen = templates.find((template) => String(template.id) === String(receipt.templateId));
-    const confirmed = await confirmModal(
-      '确认入库',
-      el('div', {}, [
-        el('p', {}, '物料：' + payload.item_key),
-        el('p', {}, '库位：' + (state.bootstrap && state.bootstrap.locations || []).map((location) => String(location.id) === String(payload.location_id) ? location.path || location.name : '').filter(Boolean).join('')),
-        el('p', {}, '数量：' + fmtQty(payload.quantity)),
-        chosen ? el('p', {}, 'SN 档案：' + (chosen.sn || chosen.name || chosen.id)) : null,
-        payload.supplier_qr ? el('p', { class: 'muted' }, '将同时记录供应商二维码（服务端校验一致性）') : null,
-        el('p', { class: 'muted' }, '提交后会在 Odoo 创建真实库存移动与新袋追溯码。'),
-      ]),
-    );
-    if (!confirmed) return;
-  }
-  let submitted;
-  try {
-    submitted = beginSubmit(receipt.draft);
-  } catch (error) {
-    receipt.error = error;
-    toast(error.message, 'warn');
-    return;
-  }
-  receipt.draft = submitted;
-  receipt.submitting = true;
-  receipt.error = null;
-  render();
-  try {
-    const data = await call('inventory.receipt', Object.assign({}, payload, { request_key: submitted.key }), 60000);
-    receipt.draft = markSuccess(submitted, data);
-    receipt.success = data;
-    receipt.error = null;
-    receipt.draft = null;
-    toast('入库成功' + (data.replayed ? '（服务器重放，未重复记账）' : ''), 'ok');
-  } catch (error) {
-    receipt.draft = markFailure(submitted, error);
-    if (error.code === 'CONFLICT') receipt.draft = null;
-    receipt.error = error;
-    toast('入库失败：' + (error.code || error.message), 'error');
-  } finally {
-    receipt.submitting = false;
-    render();
-  }
-}
-
-function renderReceiptSuccess() {
-  const data = state.receipt.success || {};
-  const bag = data.bag || {};
-  const operation = data.operation || {};
-  dom.view.appendChild(
-    el('section', { class: 'panel' }, [
-      el('h2', {}, '入库成功' + (data.replayed ? '（服务器重放）' : '')),
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, '作业单'), el('dd', {}, (operation.name || '—') + (operation.id ? '（ID ' + operation.id + '）' : '')),
-        el('dt', {}, '袋追溯码'), el('dd', { class: 'mono' }, bag.trace_code || '—'),
-        el('dt', {}, '库位'), el('dd', {}, bag.location_path || '—'),
-        el('dt', {}, '袋内数量'), el('dd', {}, fmtQty(bag.quantity)),
-        el('dt', {}, '物料'), el('dd', {}, (data.material && (data.material.name || data.material.mpn)) || data.item_key || '—'),
-        el('dt', {}, '物料实时在库'), el('dd', {}, fmtQty(data.lab_quantity)),
-      ]),
-      el('div', { class: 'row', style: 'margin-top:12px' }, [
-        el('button', { class: 'btn primary', type: 'button', onclick: () => copyText(bag.trace_code || '', '已复制追溯码') }, '复制追溯码'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => {
-            state.trace.raw = bag.trace_code || '';
-            state.trace.result = null;
-            state.trace.error = null;
-            nav('trace');
-            if (state.trace.raw) setTimeout(() => resolveTrace(), 0);
-          },
-        }, '查看袋追溯'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => {
-            state.receipt.success = null;
-            state.receipt.itemKey = '';
-            state.receipt.detail = null;
-            state.receipt.quantity = '1';
-            state.receipt.supplierQr = '';
-            state.receipt.note = '';
-            state.receipt.templateId = '';
-            state.receipt.error = null;
-            render();
-          },
-        }, '继续入库'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => call('ui.open', { action: 'operation_list' }).catch((error) => toast(error.message, 'error')),
-        }, '打开 Odoo 作业流水'),
-      ]),
-      el('p', { class: 'muted', style: 'margin-top:10px' }, '标签打印请使用 Odoo 的「批量标签（A4）」入口；本插件不生成前端二维码。'),
-    ]),
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Issue                                                               */
-/* ------------------------------------------------------------------ */
-
-function prefillIssueBag(bag) {
-  if (!bag || !bag.id) {
-    toast('该袋没有有效 ID，无法领用。', 'error');
-    return;
-  }
-  const available = bagAvailableQuantity(bag);
-  if (available !== null && available <= 0) {
-    toast('该袋实时可用数量为 0，不能领用。', 'warn');
-    return;
-  }
-  const existing = state.issue.lines.find((line) => Number(line.bag_id) === Number(bag.id));
-  if (existing) {
-    toast('该袋已在领用明细中。', 'warn');
-  } else {
-    state.issue.lines.push({
-      bag_id: Number(bag.id),
-      trace_code: bag.trace_code || '',
-      name: bag.name || bag.mpn || '',
-      available,
-      quantity: String(Math.min(1, available === null ? 1 : available) || 1),
-    });
-  }
-  state.issue.bagInfo = bag;
-  state.issue.bagRaw = bag.trace_code || '';
-  nav('issue');
-}
-
-function renderIssue() {
-  if (!isActive()) {
-    dom.view.appendChild(loginGate('领用出库'));
-    return;
-  }
-  if (state.issue.success) {
-    renderIssueSuccess();
-    return;
-  }
-  const issue = state.issue;
-  const bootstrap = state.bootstrap;
-  const borrowers = Array.isArray(bootstrap && bootstrap.borrowers) ? bootstrap.borrowers : [];
-  const permissions = (bootstrap && bootstrap.permissions) || {};
-  if (bootstrap && permissions.can_issue === false) {
-    showBanner('当前账号没有领料权限（lab_workflow.group_lab_operator），提交会被服务器拒绝。', 'warn');
-  }
-  if (bootstrap && borrowers.length === 0) {
-    showBanner('没有可选的系统领用账号。领用人必须是已建立且启用的 Odoo 用户，请联系库存管理员。', 'warn');
-  }
-
-  const borrowerSelect = el(
-    'select',
-    {},
-    borrowers.length
-      ? borrowers.map((borrower) =>
-          el(
-            'option',
-            { value: String(borrower.id), selected: String(issue.borrowerId) === String(borrower.id) },
-            (borrower.name || borrower.login || String(borrower.id)) + (borrower.is_self ? '（本人）' : ''),
-          ),
-        )
-      : [el('option', { value: '' }, '暂无授权领用人')],
-  );
-  borrowerSelect.addEventListener('change', () => {
-    issue.borrowerId = borrowerSelect.value;
-  });
-
-  const projectInput = el('input', { type: 'text', placeholder: '例如：项目 A / 2026-10 打样', value: issue.project });
-  projectInput.addEventListener('input', () => {
-    issue.project = projectInput.value;
-  });
-
-  const bagInput = el('input', { type: 'text', placeholder: '扫描或粘贴 LABB: 追溯码', value: issue.bagRaw, class: 'mono' });
-  bagInput.addEventListener('input', () => {
-    issue.bagRaw = bagInput.value.trim();
-  });
-  bagInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void resolveIssueBag();
-    }
-  });
-
-  const noteInput = el('textarea', { placeholder: '可选备注（不要填写密码等凭据）', value: issue.note });
-  noteInput.addEventListener('input', () => {
-    issue.note = noteInput.value;
-  });
-
-  const panel = el('section', { class: 'panel' }, [
-    el('h2', {}, '领用出库（按袋，系统账号 + 项目）'),
-    el('p', { class: 'muted' }, '领用人必须从服务器提供的授权系统账号中选择；操作人由服务器按登录会话记录。不能按器件总量扣减。'),
-    el('div', { class: 'grid-2' }, [
-      field('领用人', borrowerSelect, '必须是已建立的系统账号，不接受手填姓名。'),
-      field('项目', projectInput, '必填；会写入领用记录。'),
-    ]),
-  ]);
-
-  panel.appendChild(
-    el('div', { class: 'row', style: 'margin-top:10px' }, [
-      el('div', { class: 'grow' }, field('袋追溯码', bagInput, '也可从器件详情的袋列表直接点「领用」。')),
-      el('button', { class: 'btn', type: 'button', disabled: issue.loadingBag, onclick: () => resolveIssueBag() }, issue.loadingBag ? '解析中…' : '解析袋码'),
-    ]),
-  );
-
-  if (issue.bagError) panel.appendChild(el('div', { style: 'margin-top:10px' }, errorBox(issue.bagError)));
-  if (issue.bagInfo) {
-    const bag = issue.bagInfo;
-    panel.appendChild(
-      el('div', { class: 'panel', style: 'margin-top:10px;background:var(--panel-2)' }, [
-        el('div', { class: 'chips' }, [
-          el('span', { class: 'chip mono' }, bag.trace_code || '—'),
-          el('span', { class: 'chip' }, '在库 ' + fmtQty(bag.quantity)),
-          el('span', { class: 'chip' }, '可用 ' + (bagAvailableQuantity(bag) === null ? '—' : fmtQty(bagAvailableQuantity(bag)))),
-          el('span', { class: 'chip' }, bag.location_path || bag.location_code || '—'),
-        ]),
-        el('p', { style: 'margin-top:8px' }, (bag.name || bag.mpn || '') + (bag.lot_name ? ' · 批次 ' + bag.lot_name : '')),
-        el('button', {
-          class: 'btn primary',
-          type: 'button',
-          onclick: () => {
-            prefillIssueBag(bag);
-          },
-        }, '加入领用明细'),
-      ]),
-    );
-  }
-
-  const lines = issue.lines;
-  if (lines.length) {
-    const rows = lines.map((line, index) => {
-      const qtyInput = el('input', { type: 'number', min: '0.000001', step: 'any', value: line.quantity, style: 'width:110px' });
-      qtyInput.addEventListener('input', () => {
-        line.quantity = qtyInput.value;
-      });
-      return [
-        el('span', { class: 'mono' }, line.trace_code || String(line.bag_id)),
-        line.name || '—',
-        fmtQty(line.available),
-        qtyInput,
-        el('button', {
-          class: 'btn small danger',
-          type: 'button',
-          onclick: () => {
-            issue.lines.splice(index, 1);
-            render();
-          },
-        }, '移除'),
-      ];
-    });
-    panel.appendChild(el('h3', {}, '领用明细'));
-    panel.appendChild(
-      table([{ label: '袋追溯码' }, { label: '物料' }, { label: '可用', num: true }, { label: '本次领用' }, { label: '' }], rows),
-    );
-  } else {
-    panel.appendChild(el('div', { class: 'empty', style: 'margin-top:10px' }, '领用明细为空。请先解析袋码并加入。'));
-  }
-
-  panel.appendChild(el('div', { style: 'margin-top:10px' }, field('备注（可选）', noteInput)));
-
-  if (issue.error) {
-    panel.appendChild(
-      el('div', { style: 'margin-top:10px' }, [
-        errorBox(issue.error, {
-          retry: issue.draft && (issue.draft.state === 'ambiguous' || issue.draft.state === 'error') ? () => submitIssue(true) : null,
-          retryLabel: '用同一请求号重试',
-        }),
-      ]),
-    );
-  }
-
-  panel.appendChild(
-    el('div', { class: 'row', style: 'margin-top:12px;justify-content:space-between' }, [
-      el('p', { class: 'muted' }, issue.draft ? '当前请求号：' + shortKey(issue.draft.key) : '提交时生成请求号；修改明细会换新请求号。'),
-      el('button', {
-        class: 'btn primary',
-        type: 'button',
-        disabled: issue.submitting || (bootstrap && bootstrap.permissions && bootstrap.permissions.can_issue === false),
-        onclick: () => submitIssue(false),
-      }, issue.submitting ? '提交中…' : '确认领用'),
-    ]),
-  );
-  dom.view.appendChild(panel);
-}
-
-async function resolveIssueBag() {
-  const issue = state.issue;
-  const raw = issue.bagRaw.trim();
-  if (!raw) {
-    issue.bagError = { code: 'VALIDATION_ERROR', message: '请先输入或扫描袋追溯码。' };
-    render();
-    return;
-  }
-  issue.loadingBag = true;
-  issue.bagError = null;
-  issue.bagInfo = null;
-  render();
-  try {
-    const data = await call('inventory.resolve', { raw });
-    if (data.kind !== 'bag' || !data.bag) {
-      issue.bagError = {
-        code: 'VALIDATION_ERROR',
-        message:
-          '扫码类型是「' + (data.kind || '未知') + '」，领用必须扫本系统袋标签（LABB:）。' +
-          (data.location ? ' 这是库位码：' + (data.location.path || data.location.code) : '') +
-          (data.item_key ? ' 物料：' + data.item_key : '') +
-          (data.ambiguous_material ? ' 该 C 编号有多个档案，请先扫具体袋码。' : ''),
-      };
-    } else {
-      issue.bagInfo = data.bag;
-      issue.bagRaw = data.bag.trace_code || raw;
-    }
-  } catch (error) {
-    issue.bagError = error;
-  } finally {
-    issue.loadingBag = false;
-    render();
-  }
-}
-
-function buildIssuePayload() {
-  const issue = state.issue;
-  const borrowerId = Number(issue.borrowerId);
-  if (!Number.isInteger(borrowerId) || borrowerId <= 0) throw Object.assign(new Error('请选择领用人。'), { code: 'VALIDATION_ERROR' });
-  const project = issue.project.trim();
-  if (!project) throw Object.assign(new Error('请填写领用项目。'), { code: 'VALIDATION_ERROR' });
-  if (!issue.lines.length) throw Object.assign(new Error('领用明细为空。'), { code: 'VALIDATION_ERROR' });
-  const lines = issue.lines.map((line) => {
-    const quantity = Number(line.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      throw Object.assign(new Error('明细数量必须大于 0。'), { code: 'VALIDATION_ERROR' });
-    }
-    if (line.available !== null && quantity - line.available > 1e-9) {
-      throw Object.assign(new Error('袋 ' + (line.trace_code || line.bag_id) + ' 的领用数量超过解析时的可用量 ' + fmtQty(line.available) + '。'), {
-        code: 'VALIDATION_ERROR',
-      });
-    }
-    return { bag_id: Number(line.bag_id), quantity };
-  });
-  return { borrower_id: borrowerId, project, lines, note: issue.note.trim() };
-}
-
-async function submitIssue(skipConfirm) {
-  const issue = state.issue;
-  if (issue.submitting) return;
-  let payload;
-  try {
-    payload = buildIssuePayload();
-  } catch (error) {
-    issue.error = error;
-    render();
-    return;
-  }
-  issue.draft = issue.draft ? withPayload(issue.draft, payload) : createDraft('inventory.issue', payload);
-  if (!skipConfirm) {
-    const borrowers = (state.bootstrap && state.bootstrap.borrowers) || [];
-    const borrower = borrowers.find((item) => String(item.id) === String(payload.borrower_id));
-    const confirmed = await confirmModal(
-      '确认领用',
-      el('div', {}, [
-        el('p', {}, '领用人：' + (borrower ? borrower.name || borrower.login : payload.borrower_id)),
-        el('p', {}, '项目：' + payload.project),
-        el('p', {}, '明细：' + payload.lines.map((line) => {
-          const local = issue.lines.find((entry) => Number(entry.bag_id) === Number(line.bag_id));
-          return (local && local.trace_code ? local.trace_code : String(line.bag_id)) + ' × ' + fmtQty(line.quantity);
-        }).join('；')),
-        el('p', { class: 'muted' }, '提交后会写入 Odoo 领用记录与真实库存移动，操作人取当前登录账号。'),
-      ]),
-    );
-    if (!confirmed) return;
-  }
-  let submitted;
-  try {
-    submitted = beginSubmit(issue.draft);
-  } catch (error) {
-    issue.error = error;
-    toast(error.message, 'warn');
-    return;
-  }
-  issue.draft = submitted;
-  issue.submitting = true;
-  issue.error = null;
-  render();
-  try {
-    const data = await call('inventory.issue', Object.assign({}, payload, { request_key: submitted.key }), 60000);
-    issue.draft = markSuccess(submitted, data);
-    issue.success = data;
-    issue.draft = null;
-    issue.lines = [];
-    issue.bagInfo = null;
-    issue.bagRaw = '';
-    toast('领用成功' + (data.replayed ? '（服务器重放，未重复记账）' : ''), 'ok');
-  } catch (error) {
-    issue.draft = markFailure(submitted, error);
-    if (error.code === 'CONFLICT') issue.draft = null;
-    issue.error = error;
-    toast('领用失败：' + (error.code || error.message), 'error');
-  } finally {
-    issue.submitting = false;
-    render();
-  }
-}
-
-function renderIssueSuccess() {
-  const data = state.issue.success || {};
-  const operation = data.operation || {};
-  const lines = Array.isArray(data.lines) ? data.lines : [];
-  dom.view.appendChild(
-    el('section', { class: 'panel' }, [
-      el('h2', {}, '领用成功' + (data.replayed ? '（服务器重放）' : '')),
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, '作业单'), el('dd', {}, (operation.name || '—') + (operation.id ? '（ID ' + operation.id + '）' : '')),
-        el('dt', {}, '领用人'), el('dd', {}, operation.borrower_name || '—'),
-        el('dt', {}, '项目'), el('dd', {}, operation.project || '—'),
-        el('dt', {}, '操作人'), el('dd', {}, operation.actor_name || '—'),
-      ]),
-      el('h3', {}, '领用明细（归还时必须用 issue_line_id）'),
-      table(
-        [{ label: 'issue_line_id' }, { label: '袋' }, { label: '数量', num: true }, { label: '未归还', num: true }],
-        lines.map((line) => [String(line.issue_line_id), line.trace_code || String(line.bag_id), fmtQty(line.quantity), fmtQty(line.outstanding_quantity)]),
-      ),
-      el('div', { class: 'row', style: 'margin-top:12px' }, [
-        el('button', {
-          class: 'btn primary',
-          type: 'button',
-          onclick: () => {
-            state.issue.success = null;
-            state.return.selected = null;
-            state.return.issues = [];
-            state.return.next = null;
-            state.return.cursor = null;
-            state.return.loaded = false;
-            nav('return');
-          },
-        }, '去归还'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => call('ui.open', { action: 'issue_list' }).catch((error) => toast(error.message, 'error')),
-        }, '打开 Odoo 领用记录'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => {
-            state.issue.success = null;
-            render();
-          },
-        }, '继续领用'),
-      ]),
-      el('p', { class: 'muted', style: 'margin-top:10px' }, '请保留 issue_line_id；归还接口只接受原领用明细，不能按器件总量归还。'),
-    ]),
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Return                                                              */
-/* ------------------------------------------------------------------ */
-
-function renderReturn() {
-  if (!isActive()) {
-    dom.view.appendChild(loginGate('归还'));
-    return;
-  }
-  if (state.return.success) {
-    renderReturnSuccess();
-    return;
-  }
-  const ret = state.return;
-
-  const queryInput = el('input', { type: 'search', placeholder: '按袋追溯码或项目筛选', value: ret.query });
-  queryInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      ret.query = queryInput.value.trim();
-      void loadReturnIssues(true);
-    }
-  });
-
-  const panel = el('section', { class: 'panel' }, [
-    el('h2', {}, '按原领用单归还'),
-    el('p', { class: 'muted' }, '归还必须选择真实 issue_line_id，数量不得超过未归还余额；服务器会在行锁后重新校验。'),
-    el('div', { class: 'row' }, [
-      el('div', { class: 'grow' }, queryInput),
-      el('button', {
-        class: 'btn',
-        type: 'button',
-        disabled: ret.loading,
-        onclick: () => {
-          ret.query = queryInput.value.trim();
-          void loadReturnIssues(true);
-        },
-      }, ret.loading ? '查询中…' : '查询未归还'),
-    ]),
-  ]);
-
-  if (ret.error) panel.appendChild(el('div', { style: 'margin-top:10px' }, errorBox(ret.error, { retry: () => loadReturnIssues(true) })));
-
-  if (ret.issues.length) {
-    panel.appendChild(
-      table(
-        [{ label: '领用单 ID' }, { label: '袋' }, { label: '领用', num: true }, { label: '已还', num: true }, { label: '未还', num: true }, { label: '领用人' }, { label: '项目' }, { label: '时间' }, { label: '' }],
-        ret.issues.map((issue) => [
-          String(issue.issue_line_id),
-          el('span', { class: 'mono' }, issue.trace_code || String(issue.bag_id)),
-          fmtQty(issue.quantity),
-          fmtQty(issue.returned_quantity),
-          fmtQty(issue.outstanding_quantity),
-          issue.borrower_name || String(issue.borrower_id || ''),
-          issue.project || '—',
-          fmtDate(issue.date),
-          el('button', {
-            class: 'btn small' + (ret.selected && ret.selected.issue_line_id === issue.issue_line_id ? ' primary' : ''),
-            type: 'button',
-            onclick: () => {
-              ret.selected = issue;
-              ret.quantity = String(issue.outstanding_quantity);
-              ret.error = null;
-              render();
-            },
-          }, ret.selected && ret.selected.issue_line_id === issue.issue_line_id ? '已选择' : '选择'),
-        ]),
-      ),
-    );
-    if (ret.next) {
-      panel.appendChild(
-        el('div', { class: 'row', style: 'margin-top:10px;justify-content:center' }, [
-          el('button', { class: 'btn', type: 'button', disabled: ret.loading, onclick: () => loadReturnIssues(false) }, '加载更多未归还'),
-        ]),
-      );
-    }
-  } else if (!ret.loading) {
-    panel.appendChild(el('div', { class: 'empty', style: 'margin-top:10px' }, '没有未归还的领用记录。'));
-  }
-
-  if (ret.selected) {
-    const selected = ret.selected;
-    const qtyInput = el('input', { type: 'number', min: '0.000001', step: 'any', value: ret.quantity });
-    qtyInput.addEventListener('input', () => {
-      ret.quantity = qtyInput.value;
-    });
-    const noteInput = el('textarea', { placeholder: '可选备注', value: ret.note });
-    noteInput.addEventListener('input', () => {
-      ret.note = noteInput.value;
-    });
-    panel.appendChild(el('h3', {}, '归还明细'));
-    panel.appendChild(
-      el('div', { class: 'panel', style: 'background:var(--panel-2)' }, [
-        el('dl', { class: 'kv' }, [
-          el('dt', {}, '原领用单'), el('dd', {}, String(selected.issue_line_id)),
-          el('dt', {}, '袋'), el('dd', { class: 'mono' }, selected.trace_code || '—'),
-          el('dt', {}, '领用人 / 项目'), el('dd', {}, (selected.borrower_name || '—') + ' / ' + (selected.project || '—')),
-          el('dt', {}, '原领用 / 已还 / 未还'), el('dd', {}, fmtQty(selected.quantity) + ' / ' + fmtQty(selected.returned_quantity) + ' / ' + fmtQty(selected.outstanding_quantity)),
-        ]),
-        el('div', { class: 'grid-2', style: 'margin-top:10px' }, [
-          field('本次归还数量', qtyInput, '不能超过未归还数量 ' + fmtQty(selected.outstanding_quantity)),
-          field('备注（可选）', noteInput),
-        ]),
-      ]),
-    );
-  }
-
-  panel.appendChild(
-    el('div', { class: 'row', style: 'margin-top:12px;justify-content:space-between' }, [
-      el('p', { class: 'muted' }, ret.draft ? '当前请求号：' + shortKey(ret.draft.key) : '提交时生成请求号；修改内容会换新请求号。'),
-      el('button', {
-        class: 'btn primary',
-        type: 'button',
-        disabled: ret.submitting || !ret.selected,
-        onclick: () => submitReturn(false),
-      }, ret.submitting ? '提交中…' : '确认归还'),
-    ]),
-  );
-  dom.view.appendChild(panel);
-  if (!ret.loaded && !ret.loading) void loadReturnIssues(true);
-}
-
-async function loadReturnIssues(reset) {
-  const ret = state.return;
-  if (ret.loading) return;
-  ret.loading = true;
-  ret.error = null;
-  if (reset) {
-    ret.issues = [];
-    ret.next = null;
-    ret.cursor = null;
-    ret.selected = null;
-  }
-  render();
-  try {
-    const data = await call('inventory.issues', {
-      query: ret.query,
-      outstanding_only: true,
-      cursor: ret.cursor,
-      limit: 30,
-    });
-    const issues = Array.isArray(data.issues) ? data.issues : [];
-    ret.issues = reset ? issues : ret.issues.concat(issues);
-    ret.next = data.next_cursor || null;
-    ret.cursor = data.next_cursor || null;
-    ret.loaded = true;
-  } catch (error) {
-    ret.error = error;
-    ret.loaded = true;
-  } finally {
-    ret.loading = false;
-    render();
-  }
-}
-
-function buildReturnPayload() {
-  const ret = state.return;
-  if (!ret.selected) throw Object.assign(new Error('请选择原领用记录。'), { code: 'VALIDATION_ERROR' });
-  const quantity = Number(ret.quantity);
-  if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('归还数量必须大于 0。'), { code: 'VALIDATION_ERROR' });
-  if (quantity - Number(ret.selected.outstanding_quantity) > 1e-9) {
-    throw Object.assign(new Error('归还数量超过未归还数量 ' + fmtQty(ret.selected.outstanding_quantity) + '。'), { code: 'VALIDATION_ERROR' });
-  }
-  return {
-    issue_line_id: Number(ret.selected.issue_line_id),
-    quantity,
-    note: ret.note.trim(),
-  };
-}
-
-async function submitReturn(skipConfirm) {
-  const ret = state.return;
-  if (ret.submitting) return;
-  let payload;
-  try {
-    payload = buildReturnPayload();
-  } catch (error) {
-    ret.error = error;
-    render();
-    return;
-  }
-  ret.draft = ret.draft ? withPayload(ret.draft, payload) : createDraft('inventory.return', payload);
-  if (!skipConfirm) {
-    const confirmed = await confirmModal(
-      '确认归还',
-      el('div', {}, [
-        el('p', {}, '原领用单：' + payload.issue_line_id),
-        el('p', {}, '袋：' + (ret.selected.trace_code || '')),
-        el('p', {}, '归还数量：' + fmtQty(payload.quantity) + ' / 未还 ' + fmtQty(ret.selected.outstanding_quantity)),
-        el('p', { class: 'muted' }, '提交后会写回原袋原库位，并更新原领用明细的未归还余额。'),
-      ]),
-    );
-    if (!confirmed) return;
-  }
-  let submitted;
-  try {
-    submitted = beginSubmit(ret.draft);
-  } catch (error) {
-    ret.error = error;
-    toast(error.message, 'warn');
-    return;
-  }
-  ret.draft = submitted;
-  ret.submitting = true;
-  ret.error = null;
-  render();
-  try {
-    const data = await call('inventory.return', Object.assign({}, payload, { request_key: submitted.key }), 60000);
-    ret.draft = markSuccess(submitted, data);
-    ret.success = data;
-    ret.draft = null;
-    ret.selected = null;
-    ret.quantity = '';
-    ret.issues = [];
-    ret.loaded = false;
-    toast('归还成功' + (data.replayed ? '（服务器重放，未重复记账）' : ''), 'ok');
-  } catch (error) {
-    ret.draft = markFailure(submitted, error);
-    if (error.code === 'CONFLICT') ret.draft = null;
-    ret.error = error;
-    toast('归还失败：' + (error.code || error.message), 'error');
-  } finally {
-    ret.submitting = false;
-    render();
-  }
-}
-
-function renderReturnSuccess() {
-  const data = state.return.success || {};
-  const operation = data.operation || {};
-  const bag = data.bag || {};
-  const issueLine = data.issue_line || {};
-  dom.view.appendChild(
-    el('section', { class: 'panel' }, [
-      el('h2', {}, '归还成功' + (data.replayed ? '（服务器重放）' : '')),
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, '作业单'), el('dd', {}, (operation.name || '—') + (operation.id ? '（ID ' + operation.id + '）' : '')),
-        el('dt', {}, '袋'), el('dd', { class: 'mono' }, bag.trace_code || '—'),
-        el('dt', {}, '本次归还后未归还'), el('dd', {}, fmtQty(data.outstanding_quantity)),
-        el('dt', {}, '原领用单'), el('dd', {}, String(issueLine.issue_line_id || '—')),
-      ]),
-      el('div', { class: 'row', style: 'margin-top:12px' }, [
-        el('button', {
-          class: 'btn primary',
-          type: 'button',
-          onclick: () => {
-            state.return.success = null;
-            state.return.loaded = false;
-            nav('return');
-          },
-        }, '继续归还'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => call('ui.open', { action: 'issue_list' }).catch((error) => toast(error.message, 'error')),
-        }, '打开 Odoo 领用记录'),
-      ]),
-    ]),
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Trace                                                               */
-/* ------------------------------------------------------------------ */
-
-const KIND_LABEL = {
-  bag: '袋追溯码',
-  location: '库位码',
-  sn: '物料 SN',
-  lcsc: '立创 C 编号',
-  jlc: '立创原厂物料袋',
-  unknown: '未知',
-};
-
-function renderTrace() {
-  if (!isActive()) {
-    dom.view.appendChild(loginGate('袋/库位追溯'));
-    return;
-  }
-  const trace = state.trace;
-  const input = el('input', { type: 'text', placeholder: 'LABB:... / LABL:... / SN / C123 / 立创原厂袋二维码', value: trace.raw, class: 'mono' });
-  input.addEventListener('input', () => {
-    trace.raw = input.value.trim();
-  });
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void resolveTrace();
-    }
-  });
-
-  dom.view.appendChild(
-    el('section', { class: 'panel' }, [
-      el('h2', {}, '袋 / 库位 / 物料追溯'),
-      el('p', { class: 'muted' }, '服务端按真实编码规则识别；无法识别、歧义、无权限都会原样提示。'),
-      el('div', { class: 'row' }, [
-        el('div', { class: 'grow' }, input),
-        el('button', { class: 'btn primary', type: 'button', disabled: trace.loading, onclick: () => resolveTrace() }, trace.loading ? '解析中…' : '解析'),
-      ]),
-    ]),
-  );
-
-  if (trace.error) dom.view.appendChild(el('div', { style: 'margin-top:10px' }, errorBox(trace.error, { retry: () => resolveTrace() })));
-  if (!trace.result) return;
-
-  const data = trace.result;
-  const bag = data.bag;
-  const location = data.location;
-  const material = data.material;
-  const candidates = Array.isArray(data.candidates) ? data.candidates : [];
-  const supplier = data.supplier_metadata || {};
-
-  const panel = el('section', { class: 'panel' }, [
-    el('h2', {}, '解析结果：' + (KIND_LABEL[data.kind] || data.kind || '未知')),
-    el('dl', { class: 'kv' }, [
-      el('dt', {}, '原始内容'), el('dd', { class: 'mono' }, data.raw || '—'),
-      el('dt', {}, '规范化'), el('dd', { class: 'mono' }, data.normalized || '—'),
-      el('dt', {}, 'item_key'), el('dd', { class: 'mono' }, data.item_key || '—'),
-    ]),
-  ]);
-
-  if (bag) {
-    panel.appendChild(el('h3', {}, '袋'));
-    panel.appendChild(
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, '追溯码'), el('dd', { class: 'mono' }, bag.trace_code || '—'),
-        el('dt', {}, '物料 / SN'), el('dd', {}, (bag.name || '') + ' / ' + (bag.sn || '—')),
-        el('dt', {}, '库位'), el('dd', {}, bagLocationName(bag)),
-        el('dt', {}, '在库 / 可用 / 未归还'), el('dd', {}, fmtQty(bag.quantity) + ' / ' + (bagAvailableQuantity(bag) === null ? '—' : fmtQty(bagAvailableQuantity(bag))) + ' / ' + fmtQty(bag.outstanding_quantity)),
-        el('dt', {}, '批次'), el('dd', {}, bagLotName(bag) || '—'),
-        el('dt', {}, '收货时间'), el('dd', {}, fmtDate(bag.receipt_date) || '—'),
-        el('dt', {}, '供应商订单 / 型号'), el('dd', {}, [bag.supplier_order, bag.supplier_mpn].filter(Boolean).join(' / ') || '—'),
-      ]),
-    );
-    panel.appendChild(
-      el('div', { class: 'row', style: 'margin-top:10px' }, [
-        el('button', { class: 'btn primary', type: 'button', onclick: () => prefillIssueBag(bag) }, '领用此袋'),
-        el('button', { class: 'btn', type: 'button', onclick: () => copyText(bag.trace_code || '', '已复制追溯码') }, '复制追溯码'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => call('ui.open', { action: 'bag_list' }).catch((error) => toast(error.message, 'error')),
-        }, '打开 Odoo 袋列表'),
-        el('button', {
-          class: 'btn',
-          type: 'button',
-          onclick: () => call('ui.open', { action: 'label_open' }).catch((error) => toast(error.message, 'error')),
-        }, '标签入口（Odoo）'),
-      ]),
-      el('p', { class: 'muted', style: 'margin-top:8px' }, '标签 PDF 与二维码由 Odoo 现有标签功能生成；本插件不虚构前端二维码。标签入口通常仅库存管理员可用。'),
-    );
-  }
-
-  if (location) {
-    panel.appendChild(el('h3', {}, '库位'));
-    panel.appendChild(
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, '库码'), el('dd', { class: 'mono' }, location.code || '—'),
-        el('dt', {}, '路径'), el('dd', {}, location.path || '—'),
-      ]),
-    );
-  }
-
-  if (material) {
-    panel.appendChild(el('h3', {}, '物料'));
-    panel.appendChild(
-      el('dl', { class: 'kv' }, [
-        el('dt', {}, 'item_key'), el('dd', { class: 'mono' }, material.item_key || '—'),
-        el('dt', {}, '名称 / 型号'), el('dd', {}, (material.name || '') + ' / ' + (material.mpn || '—')),
-        el('dt', {}, 'C 编号'), el('dd', { class: 'mono' }, material.catalog_code || '—'),
-      ]),
-    );
-  }
-
-  if (candidates.length) {
-    panel.appendChild(el('h3', {}, '候选档案（必须人工选择，禁止自动取第一个）'));
-    panel.appendChild(
-      table(
-        [{ label: '档案 ID' }, { label: 'SN' }, { label: '名称' }, { label: '型号' }, { label: '封装' }],
-        candidates.map((candidate) => [
-          String(candidate.product_template_id),
-          candidate.sn || '—',
-          candidate.name || '—',
-          candidate.mpn || '—',
-          candidate.package || '—',
-        ]),
-      ),
-    );
-  }
-
-  if (Object.keys(supplier).length) {
-    panel.appendChild(el('h3', {}, '供应商二维码元数据（仅供参考）'));
-    panel.appendChild(el('pre', {}, JSON.stringify(supplier, null, 2)));
-  }
-
-  dom.view.appendChild(panel);
-}
-
-async function resolveTrace() {
-  const trace = state.trace;
-  const raw = trace.raw.trim();
-  if (!raw) {
-    trace.error = { code: 'VALIDATION_ERROR', message: '请输入要解析的追溯码。' };
-    render();
-    return;
-  }
-  trace.loading = true;
-  trace.error = null;
-  trace.result = null;
-  render();
-  try {
-    trace.result = await call('inventory.resolve', { raw });
-  } catch (error) {
-    trace.error = error;
-  } finally {
-    trace.loading = false;
-    render();
-  }
-}
-
-/* ------------------------------------------------------------------ */
 /* Settings / session                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -2519,12 +1534,8 @@ function renderSettings() {
       table(
         [{ label: '能力' }, { label: '允许' }],
         [
-          ['入库', permissions.can_receipt],
-          ['领用', permissions.can_issue],
-          ['归还', permissions.can_return],
+          ['一键出库（领用）', permissions.can_issue],
           ['代他人领用', permissions.can_issue_for_others],
-          ['新建库位', permissions.can_manage_locations],
-          ['标签', permissions.can_manage_labels],
           ['管理员', permissions.is_manager],
         ].map(([label, value]) => [label, value ? '是' : '否']),
       ),
@@ -2545,7 +1556,7 @@ function renderSettings() {
       el('ul', { class: 'list' }, [
         el('li', {}, '连接失败时，先确认「start-windows.cmd」窗口仍然打开。'),
         el('li', {}, '配对码每次启动都会变化，请从桥接窗口重新复制。'),
-        el('li', {}, '入库、领用、归还都要在确认弹窗后才会写入 Odoo。'),
+        el('li', {}, '「一键出库」要在确认弹窗后才会写入 Odoo；入库、归还、扫码追溯请在网页端或 Flutter 客户端办理。'),
         el('li', {}, '如果账号没有对应权限，界面会显示服务器返回的权限提示。'),
       ]),
     );
@@ -2713,8 +1724,8 @@ function renderDiagnostics() {
         'POST /web/session/get_session_info',
         'POST /web/session/destroy',
         'POST /lab/api/catalog/search|detail|categories|facets',
-        'POST /lab/api/inventory/bootstrap|locations|resolve_code',
-        'POST /lab/api/inventory/receipt|issue|return|issues|history',
+        'POST /lab/api/inventory/bootstrap',
+        'POST /lab/api/inventory/issue（仅经 inventory.outbound 一键出库调用）',
         'GET  /lab/api/asset?url=...（仅用于图片，同源白名单）',
       ].join('\n')),
     );

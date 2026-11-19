@@ -318,6 +318,51 @@ void main() {
       expect(params['gap_mm'], 2.0);
       // 'qr' is stripped on the wire as well as in validation: exactly one code.
       expect(params['fields'], <String>['sn', 'catalog_code']);
+      // The default call keeps the old contract: no include_content key.
+      expect(params.containsKey('include_content'), isFalse);
+    });
+
+    test('include_content is only sent when the thermal printer asks for it', () async {
+      final api = FakeLabApi();
+      api.answerWith(<String, Map<String, dynamic>>{
+        LabApiRoutes.labelsPreview: <String, dynamic>{
+          'pdf_base64': 'JVBERi0xLjQK',
+          'filename': 'labels.pdf',
+          'labels': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'kind': 'bag',
+              'ref_id': 42,
+              'payload': 'LABB:TRC-2026-0001',
+              'trace_code': 'TRC-2026-0001',
+              'title': 'SN-0001',
+              'lines': <String>['追溯码：TRC-2026-0001', '名称：0.1uF 0402 50V X7R'],
+            },
+          ],
+        },
+      });
+
+      final result = await api.client.previewLabels(
+        const LabelSpec(
+          kind: LabelKind.bag,
+          ids: <int>[42],
+          copies: 1,
+          widthMm: 40,
+          heightMm: 20,
+          marginMm: 10,
+          gapMm: 2,
+          fields: <String>['trace_code', 'name'],
+        ),
+        includeContent: true,
+      );
+
+      final params = api.onlyParams(LabApiRoutes.labelsPreview);
+      expect(params['include_content'], isTrue);
+      expect(result.hasContents, isTrue);
+      expect(result.contents.single.payload, 'LABB:TRC-2026-0001');
+      expect(result.contents.single.title, 'SN-0001');
+      expect(result.contents.single.lines, hasLength(2));
+      // Still a real PDF result: the direct-print path is additive.
+      expect(result.isPdf, isTrue);
     });
 
     test('resolve_code sends the raw scanned payload', () async {

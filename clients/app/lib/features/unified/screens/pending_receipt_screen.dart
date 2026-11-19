@@ -686,6 +686,9 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                                 onChoose: (candidate) => unawaited(
                                   _fetch.chooseCandidate(candidate),
                                 ),
+                                onQueryAgain: _fetch.hasQueryableTask
+                                    ? () => unawaited(_fetch.resume())
+                                    : null,
                               ),
                       ),
                     if (_item != null || _newMaterial != null)
@@ -915,14 +918,47 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                         ),
                     ]),
                   if (selectedCount > 200) const Text('一次最多打印 200 袋，请分批选择。'),
-                  FilledButton.icon(
-                    onPressed:
-                        _busy || selectedCount == 0 || selectedCount > 200
-                        ? null
-                        : _print,
-                    icon: const Icon(Icons.print_outlined),
-                    label: Text('预览并打印（$selectedCount 袋）'),
-                  ),
+                  // ---- step 1 close-out ----------------------------------
+                  //
+                  // This step used to END at the print button: nothing told the
+                  // operator the step was done, and nothing led to the next one,
+                  // so "制袋贴标" had no finish line (the reported "没有完成按钮").
+                  // The two buttons below are that finish line: print, then go
+                  // receive the bags you just labelled.
+                  _section([
+                    Text('第 1 步 · 制袋贴标', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      selectedCount == 0
+                          ? '队列里还没有勾选要打印的袋。生成袋码后，在每一条上勾选「加入待打印」。'
+                          : '已选 $selectedCount 袋。打印后把标签贴到对应实物袋上，'
+                                '再到「扫码上架」逐袋核对入库。',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed:
+                          _busy || selectedCount == 0 || selectedCount > 200
+                          ? null
+                          : _print,
+                      icon: const Icon(Icons.print_outlined),
+                      label: Text('预览并打印（$selectedCount 袋）'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => setState(() {
+                                _tab = 1;
+                                _resolved = null;
+                                _recommendations = [];
+                                _locationId = null;
+                                _scanCycle++;
+                              }),
+                      icon: const Icon(Icons.arrow_forward),
+                      label: const Text('完成贴标，进入「扫码上架」'),
+                    ),
+                  ]),
                 ] else ...[
                   _section([
                     ScanInputField(

@@ -1,0 +1,26 @@
+{
+  "file": "clients/windows/releases/1.3.3+13/LC_ELC-Windows-1.3.3+13-x64.zip",
+  "bytes": 36621297,
+  "sha256": "36ed014ec4ce974ed65ef120a24bc26673282a186bc9203a5c002e10492a6b3b",
+  "version": "1.3.3+13",
+  "source_manifest": "maintenance/registry/source-client-1.3.3-13-20261119.json",
+  "source_tree_sha256": "a11b09193878198b99cfc900f07bc6774f0b43e0c2a6bd813eb17fd7c1a09bb9",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 13,
+  "files": 30,
+  "executable_sha256": "228f5c18ef20245e51ae5653c04db4d4efbdd5ced511d4214a22f85ced49ccd9",
+  "validation": "built and tested on this machine; label layout verified by unit tests only",
+  "changes_in_this_build": [
+    "标签直打版式：二维码 13mm→11mm（0.44mm/模块，仍可扫）",
+    "去掉中文前缀（名称：/型号：），文字区 22mm→24mm",
+    "正文 3 行→4 行，字号 5.5pt→6.8pt，标题 6.5pt→8.0pt",
+    "修复选择器件点击丢失（onTapDown 提交 + 稳定 key）"
+  ],
+  "unverified": [
+    "真实打印观感与扫码",
+    "真实登录与入库/领用",
+    "实体扫码",
+    "DPAPI"
+  ]
+}

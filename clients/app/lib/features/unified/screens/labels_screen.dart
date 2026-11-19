@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../services/niimbot_android_printer.dart';
 import '../models/labels.dart';
 import '../providers/catalog_providers.dart';
 import '../providers/inventory_providers.dart';
@@ -170,6 +171,19 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
       context: context,
       builder: (context) => LabelPdfDialog(pdf: pdf),
     );
+  }
+
+  /// Direct thermal print to the NIIMBOT (精臣) printer.
+  ///
+  /// The result banner is the ONLY success signal: a printer error (缺纸/开盖/
+  /// 未连接...) is shown in red and the PDF fallback stays available.
+  Future<void> _printDirect() async {
+    final result = await ref
+        .read(labelDesignerProvider.notifier)
+        .printDirect(printer: ref.read(niimbotLabelPrinterProvider));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(result.summary)));
   }
 
   @override
@@ -542,9 +556,32 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
                 : const Icon(Icons.picture_as_pdf),
             label: const Text('生成 A4 PDF 并预览'),
           ),
+          if (ref.watch(niimbotAvailableProvider)) ...<Widget>[
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: state.canPreview ? _printDirect : null,
+              icon: state.printingDirect
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.local_print_shop),
+              label: const Text('精臣打印机直打'),
+            ),
+          ],
+          if (NiimbotAndroidPrinter.supported) ...<Widget>[
+            const SizedBox(height: 8),
+            _AndroidBluetoothPrinterCard(
+              spec: state.spec,
+              layoutValid: layout.isValid,
+            ),
+          ],
           const SizedBox(height: 6),
           Text(
-            '生成/重新打印不会改变库存；打印使用系统打印对话框，保存写入本机文档目录。',
+            '生成/重新打印不会改变库存；打印使用系统打印对话框，保存写入本机文档目录。'
+            '${ref.watch(niimbotAvailableProvider) ? '已检测到精臣打印组件，可直接打印热敏标签（二维码 + 标题 + 文字）。' : ''}'
+            '${NiimbotAndroidPrinter.supported ? '安卓手机可连接精臣 B1 Pro 蓝牙打印机直接出纸。' : ''}',
             style: theme.textTheme.labelSmall,
           ),
           const SizedBox(height: 24),
@@ -590,5 +627,143 @@ class _LabelsScreenState extends ConsumerState<LabelsScreen> {
     return '已选 ${state.selection.length} 个袋：'
         '${labels.take(3).join('、')}'
         '${labels.length > 3 ? ' …' : ''}';
+  }
+}
+
+/// Android-only Bluetooth printer area: search → pick → connect → print.
+///
+/// Rendered only when the app runs on Android. It is hidden (not disabled) when
+/// the native SDK did not initialise, and every failure is shown with the
+/// specific Chinese reason the platform/SDK returned — there is no "success"
+/// state that was not backed by a completed print job.
+class _AndroidBluetoothPrinterCard extends ConsumerWidget {
+  const _AndroidBluetoothPrinterCard({
+    required this.spec,
+    required this.layoutValid,
+  });
+
+  final LabelSpec spec;
+  final bool layoutValid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final printer = ref.watch(androidPrinterProvider);
+    final controller = ref.read(androidPrinterProvider.notifier);
+
+    // Hidden (not a dead button) while probing and when the native SDK is not
+    // usable on this device.
+    if (printer.checking || !printer.available) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Text('蓝牙打印机（精臣 B1 Pro）', style: theme.textTheme.titleSmall),
+                const Spacer(),
+                if (printer.connected != null)
+                  TextButton(
+                    onPressed: printer.printing ? null : controller.disconnect,
+                    child: const Text('断开'),
+                  ),
+              ],
+            ),
+            if (printer.connected != null)
+              Text(
+                '已连接：${printer.connected!.display}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+              )
+            else
+              Text(
+                '请先打开手机蓝牙；Android 10/11 还需打开定位服务。',
+                style: theme.textTheme.labelSmall,
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                OutlinedButton.icon(
+                  onPressed: printer.canScan
+                      ? () => controller.startScan()
+                      : (printer.scanning ? controller.stopScan : null),
+                  icon: printer.scanning
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.bluetooth_searching),
+                  label: Text(printer.scanning ? '停止搜索' : '搜索打印机'),
+                ),
+                const SizedBox(width: 8),
+                if (printer.scanning)
+                  Text(
+                    '已发现 ${printer.devices.length} 台',
+                    style: theme.textTheme.labelSmall,
+                  ),
+              ],
+            ),
+            if (printer.devices.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 6),
+              for (final device in printer.devices)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.print_outlined),
+                  title: Text(
+                    device.name.isEmpty ? '未命名设备' : device.name,
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                  subtitle: Text(device.address),
+                  trailing: printer.connected?.address == device.address
+                      ? const Icon(Icons.check_circle, size: 18)
+                      : null,
+                  onTap: printer.printing
+                      ? null
+                      : () => controller.connect(device),
+                ),
+            ],
+            const SizedBox(height: 6),
+            FilledButton.icon(
+              onPressed: (layoutValid && printer.canPrint)
+                  ? () async {
+                      final result = await controller.printSpec(spec);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(result.summary)));
+                    }
+                  : null,
+              icon: printer.printing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.bluetooth_connected),
+              label: Text(
+                printer.connected == null
+                    ? '连接后可直接打印'
+                    : (printer.printing ? '正在打印…' : '蓝牙打印当前标签'),
+              ),
+            ),
+            if (printer.error != null) ...<Widget>[
+              const SizedBox(height: 6),
+              StatusBanner(message: printer.error!, tone: StatusTone.error, dense: true),
+            ],
+            if (printer.notice != null) ...<Widget>[
+              const SizedBox(height: 6),
+              StatusBanner(message: printer.notice!, tone: StatusTone.success, dense: true),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

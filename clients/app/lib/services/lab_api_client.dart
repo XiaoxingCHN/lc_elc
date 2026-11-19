@@ -50,6 +50,7 @@ class LabApiRoutes {
   // Inventory / workflow.
   static const String inventoryBootstrap = '/lab/api/inventory/bootstrap';
   static const String inventoryLocations = '/lab/api/inventory/locations';
+  static const String inventoryBags = '/lab/api/inventory/bags';
   static const String inventoryLocationCreate = '/lab/api/inventory/location_create';
   static const String inventoryResolveCode = '/lab/api/inventory/resolve_code';
   static const String inventoryReceipt = '/lab/api/inventory/receipt';
@@ -230,10 +231,50 @@ class LabApiClient {
   }
 
   /// `/lab/api/inventory/locations`.
-  Future<List<LabStockLocation>> locations() async {
-    final data = await _invoke(LabApiRoutes.inventoryLocations, const {});
+  ///
+  /// [withStats] asks the server for the per-location aggregates (`bag_count`,
+  /// `bag_quantity`, `quantity`). It costs one extra query server-side, so the
+  /// pickers keep the default `false` and only the 仓位速览 asks for it.
+  Future<List<LabStockLocation>> locations({bool withStats = false}) async {
+    final data = await _invoke(
+      LabApiRoutes.inventoryLocations,
+      withStats ? const <String, dynamic>{'with_stats': true} : const {},
+    );
     final nodes = data['locations'] ?? data['items'];
     return asMapList(nodes).map(LabStockLocation.fromJson).toList();
+  }
+
+  /// `/lab/api/inventory/bags` - one page of physical bags.
+  ///
+  /// [locationId] includes descendant locations (`child_of` server-side), so a
+  /// shelf with sub-locations shows everything on it. [hasStock] defaults to
+  /// true, matching the server: an empty historical bag is not "in the location".
+  ///
+  /// The server caps `limit` at 100 (`p3_rules.clamp_limit`), which is lower
+  /// than [maxPageSize]; the value is clamped here so a caller asking for 200
+  /// gets the real page size instead of a silent server-side truncation.
+  Future<BagPage> bags({
+    String? query,
+    String? itemKey,
+    int? locationId,
+    bool hasStock = true,
+    bool outstandingOnly = false,
+    String? cursor,
+    int limit = 50,
+  }) async {
+    final data = await _invoke(LabApiRoutes.inventoryBags, <String, dynamic>{
+      if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
+      if (itemKey != null && itemKey.trim().isNotEmpty) 'item_key': itemKey.trim(),
+      if (locationId != null) 'location_id': locationId,
+      'has_stock': hasStock,
+      'outstanding_only': outstandingOnly,
+      if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+      'limit': limit.clamp(1, 100),
+    });
+    return BagPage(
+      bags: asMapList(data['bags']).map(LabBag.fromJson).toList(),
+      nextCursor: firstString(data, const ['next_cursor']),
+    );
   }
 
   /// `/lab/api/inventory/location_create` - a new internal location + 库码.
@@ -431,8 +472,18 @@ class LabApiClient {
   /// `/lab/api/labels/preview` - render a real A4 PDF.
   ///
   /// This is read-only: generating or reprinting a label never changes stock.
-  Future<LabelPdfResult> previewLabels(LabelSpec spec) async {
-    final data = await _invoke(LabApiRoutes.labelsPreview, spec.toParams());
+  ///
+  /// [includeContent] additionally asks the server for the structured per-label
+  /// content (`labels` array) used by the thermal-printer path. It defaults to
+  /// false so every existing caller keeps the exact old wire payload; the
+  /// server-side default is false too.
+  Future<LabelPdfResult> previewLabels(
+    LabelSpec spec, {
+    bool includeContent = false,
+  }) async {
+    final params = spec.toParams();
+    if (includeContent) params['include_content'] = true;
+    final data = await _invoke(LabApiRoutes.labelsPreview, params);
     return LabelPdfResult.fromJson(data);
   }
 }

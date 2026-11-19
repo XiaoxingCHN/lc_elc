@@ -273,6 +273,77 @@ void main() {
       expect(notifier.state.fields, isNot(contains('sn')));
     });
 
+    test('direct print asks for structured content and never claims success on failure', () async {
+      api.answerWith(<String, Map<String, dynamic>>{
+        LabApiRoutes.labelsPreview: <String, dynamic>{
+          'pdf_base64': base64Encode(<int>[0x25, 0x50, 0x44, 0x46]),
+          'filename': 'labels.pdf',
+          'labels': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'kind': 'bag',
+              'ref_id': 1,
+              'payload': 'LABB:TRACE-1',
+              'trace_code': 'TRACE-1',
+              'title': 'SN-1',
+              'lines': <String>['名称：A'],
+            },
+          ],
+        },
+      });
+
+      final notifier = build();
+      notifier.setWidth(40);
+      notifier.setHeight(20);
+      notifier.toggleSelection(1, 'TRACE-1');
+
+      // The test host has no DLL/printer, so the job must refuse, not succeed.
+      final result = await notifier.printDirect();
+
+      expect(api.onlyParams(LabApiRoutes.labelsPreview)['include_content'], isTrue);
+      expect(result.ok, isFalse);
+      expect(notifier.state.printingDirect, isFalse);
+      expect(notifier.state.notice, isNull, reason: 'a failure must not set a success notice');
+      expect(notifier.state.error, isNotNull);
+      expect(notifier.state.errorCode, anyOf('NO_PRINTER_SDK', startsWith('NIIMBOT')));
+      // Still read-only: no stock endpoint was touched.
+      expect(api.countFor(LabApiRoutes.inventoryReceipt), 0);
+      expect(api.countFor(LabApiRoutes.inventoryIssue), 0);
+      expect(api.countFor(LabApiRoutes.inventoryReturn), 0);
+    });
+
+    test('direct print refuses when the server omits structured content', () async {
+      api.answerWith(<String, Map<String, dynamic>>{
+        LabApiRoutes.labelsPreview: <String, dynamic>{
+          'pdf_base64': base64Encode(<int>[0x25, 0x50, 0x44, 0x46]),
+          'filename': 'labels.pdf',
+        },
+      });
+
+      final notifier = build();
+      notifier.setWidth(40);
+      notifier.setHeight(20);
+      notifier.toggleSelection(1, 'TRACE-1');
+
+      final result = await notifier.printDirect();
+
+      expect(result.ok, isFalse);
+      expect(notifier.state.error, contains('直打内容'));
+      expect(notifier.state.errorCode, 'NO_CONTENT');
+      expect(notifier.state.notice, isNull);
+    });
+
+    test('direct print does not reach the server for an invalid layout', () async {
+      final notifier = build();
+      notifier.setWidth(250);
+      notifier.toggleSelection(1, 'TRACE-1');
+
+      final result = await notifier.printDirect();
+
+      expect(result.ok, isFalse);
+      expect(api.calls, isEmpty);
+      expect(notifier.state.errorCode, 'LABEL_LAYOUT');
+    });
+
     test('changing a size invalidates a previously generated PDF', () async {
       api.answerWith(<String, Map<String, dynamic>>{
         LabApiRoutes.labelsPreview: <String, dynamic>{

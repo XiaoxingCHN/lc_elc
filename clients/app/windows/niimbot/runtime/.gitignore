@@ -1,0 +1,13 @@
+# NIIMBOT (精臣) PC C++ SDK 4.0.6 runtime payload.
+#
+# These are vendor binaries (jcPrinterApi.dll and its 7 dependencies, the
+# icudtl.dat data file and the ZT001.ttf font). They are NOT project source:
+# the repository Git boundary rejects *.dll and large binary payloads, and the
+# files are reproducible from the registered archive. Only this .gitignore is
+# tracked; restore the payload on a build machine with:
+#
+#   python tools/restore_niimbot_runtime.py
+#
+# See ../README.md for the source archive, SHA256 list and upgrade procedure.
+*
+!.gitignore

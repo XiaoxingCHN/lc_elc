@@ -46,9 +46,11 @@ class LabBackButton extends StatelessWidget {
 
 /// Per-screen app bar on glass.
 ///
-/// There is deliberately no global navigation shell in this app: fifteen
-/// screens build their own bar, and restyling this one widget is what changes
-/// all of them. `flexibleSpace` must stay a [LabGlassSurface] instance.
+/// Every screen builds its own bar - the four warehouse sections included. The
+/// shell (`lib/features/warehouse/warehouse_shell.dart`) adds only the section
+/// switcher and never an app bar, so a screen's title, actions and back
+/// behaviour stay its own. Restyling this one widget is what changes all of
+/// them. `flexibleSpace` must stay a [LabGlassSurface] instance.
 class LabAppBar extends AppBar {
   LabAppBar({
     super.key,

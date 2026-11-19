@@ -156,6 +156,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
       initialItemKey: state.uri.queryParameters['item_key'],
       initialItemName: state.uri.queryParameters['name'],
       initialCode: state.uri.queryParameters['code'],
+      initialLocationId: int.tryParse(state.uri.queryParameters['location_id'] ?? ''),
     ),
     ),
   ),

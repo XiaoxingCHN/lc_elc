@@ -1,0 +1,21 @@
+# NIIMBOT (精臣) Android SDK 4.1.1 binaries.
+#
+# `4.1.1-release.aar` (0.8 MB) and `image-1.9.5.aar` (28.7 MB) are VENDOR
+# artifacts, not project source. The repository Git boundary keeps binary
+# payloads out (see the root .gitignore: *.dll, *.so, *.apk, *.zip), and the
+# Windows side already handles its SDK the same way - see
+# ../../../windows/niimbot/runtime/.gitignore.
+#
+# Only this .gitignore and README.md are tracked. README.md records the source
+# archive, both SHA256 values and why `image-1.9.5.aar` cannot be dropped.
+#
+# On a build machine, restore them from the registered archive
+# `F:\lc_elc\Android-4.1.1-20261117.zip` (Git-excluded local material):
+#
+#   <unzip>/Android-4.1.1-20261117/SDK接入包/4.1.1-release.aar
+#   <unzip>/Android-4.1.1-20261117/SDK接入包/image-1.9.5.aar
+#
+# then verify each file's SHA256 against README.md before building.
+*
+!.gitignore
+!README.md

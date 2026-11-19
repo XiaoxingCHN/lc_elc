@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lab_inventory_client/config/odoo_config.dart';
 import 'package:lab_inventory_client/models/odoo_exception.dart';
 import 'package:lab_inventory_client/providers/auth_provider.dart';
 import 'package:lab_inventory_client/services/login_memory_store.dart';
@@ -760,6 +761,193 @@ void main() {
       );
       expect(ok, isTrue);
       expect(broken.read(authProvider).isAuthenticated, isTrue);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  group('session-only (LAN acceleration) login', () {
+    const lanUrl = 'http://192.168.31.105:8069';
+
+    test('nothing about the account is written to preferences or the key store',
+        () async {
+      final ok = await notifierOf(container).login(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+        rememberLogin: true, // ignored on this path
+        ephemeral: true,
+      );
+
+      expect(ok, isTrue);
+      final state = container.read(authProvider);
+      expect(state.isAuthenticated, isTrue);
+      expect(state.ephemeral, isTrue);
+      expect(state.savedAccount, isNull);
+      expect(state.rememberLogin, isFalse);
+
+      final store = storeOf(container);
+      expect(store.accounts, isEmpty);
+      expect(store.lastUsedAccount, isNull);
+      expect(store.accountFor(scopeA()), isNull);
+      expect(backend.writes, isEmpty);
+      expect(await rawPreferenceDocument(), isEmpty);
+    });
+
+    test('a restart neither pre-fills nor auto-signs-in to the LAN server',
+        () async {
+      final first = notifierOf(container);
+      await first.login(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+        rememberLogin: true,
+        ephemeral: true,
+      );
+
+      final restarted = newContainer();
+      await notifierOf(restarted).bootstrap();
+
+      expect(gateway.calls, hasLength(1), reason: 'only the manual login ran');
+      final state = restarted.read(authProvider);
+      expect(state.isAuthenticated, isFalse);
+      expect(state.savedAccount, isNull);
+      expect(state.baseUrl, isNull);
+      expect(state.manualLoginReason, ManualLoginReason.none);
+    });
+
+    test('logging out of an ephemeral session leaves nothing behind', () async {
+      final notifier = notifierOf(container);
+      await notifier.login(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+        rememberLogin: false,
+        ephemeral: true,
+      );
+      await notifier.logout();
+
+      final state = container.read(authProvider);
+      expect(state.isAuthenticated, isFalse);
+      expect(state.savedAccount, isNull);
+      expect(storeOf(container).accounts, isEmpty);
+      expect(await rawPreferenceDocument(), isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  group('atomic server switch', () {
+    const lanUrl = 'http://192.168.31.105:8069';
+
+    Future<void> signedInOnPublic() async {
+      final ok = await notifierOf(container).login(
+        baseUrl: urlA,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+        rememberLogin: true,
+      );
+      expect(ok, isTrue);
+    }
+
+    test('a failed switch keeps the session, the account and the old server',
+        () async {
+      await signedInOnPublic();
+      final before = container.read(authProvider);
+      final writesBefore = backend.writes.length;
+
+      gateway.failure = OdooAuthException('Invalid credentials');
+      final ok = await notifierOf(container).switchServer(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: 'wrong',
+      );
+
+      expect(ok, isFalse);
+      final after = container.read(authProvider);
+      expect(after.isAuthenticated, isTrue);
+      expect(after.baseUrl, urlA);
+      expect(after.uid, before.uid);
+      expect(after.savedAccount?.baseUrl, urlA);
+      expect(after.errorMessage, contains('切换失败'));
+      expect(after.switching, isFalse);
+      expect(gateway.cancelCount, greaterThan(0),
+          reason: 'in-flight requests of the old session are cancelled first');
+      expect(backend.writes.length, writesBefore,
+          reason: 'a failed switch writes no credential');
+    });
+
+    test('a successful switch commits the new server and stays ephemeral',
+        () async {
+      await signedInOnPublic();
+      final writesBefore = backend.writes.length;
+
+      final ok = await notifierOf(container).switchServer(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+      );
+
+      expect(ok, isTrue);
+      final state = container.read(authProvider);
+      expect(state.isAuthenticated, isTrue);
+      expect(state.baseUrl, lanUrl);
+      expect(gateway.baseUrl, lanUrl);
+      expect(state.ephemeral, isTrue);
+      expect(state.savedAccount, isNull);
+      expect(backend.writes.length, writesBefore,
+          reason: 'a switch never stores a password');
+      expect(storeOf(container).accounts, hasLength(1),
+          reason: 'the earlier public login is untouched');
+    });
+
+    test('a 401 from the session before the switch cannot sign out the new one',
+        () async {
+      await signedInOnPublic();
+      await notifierOf(container).switchServer(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+      );
+
+      final generationAfterSwitch = gateway.sessionGeneration;
+      // Simulate the late answer of the PREVIOUS session: the gateway has since
+      // been repointed (generation moved on), so the auth layer must ignore it.
+      gateway.bumpGeneration();
+      notifierOf(container).handleSessionInvalid();
+
+      expect(generationAfterSwitch, lessThan(gateway.sessionGeneration));
+      final state = container.read(authProvider);
+      expect(state.isAuthenticated, isTrue,
+          reason: 'a stale 401 must not tear down the switched session');
+      expect(state.baseUrl, lanUrl);
+    });
+
+    test('switchToPublic leaves the LAN address out of memory', () async {
+      await signedInOnPublic();
+      await notifierOf(container).switchServer(
+        baseUrl: lanUrl,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+      );
+      expect(OdooConfig.runtimeLanBaseUrl, lanUrl);
+
+      final ok = await notifierOf(container).switchToPublic(
+        baseUrl: urlA,
+        database: dbA,
+        login: userA,
+        password: passwordA,
+      );
+
+      expect(ok, isTrue);
+      expect(OdooConfig.runtimeLanBaseUrl, isNull);
+      expect(container.read(authProvider).baseUrl, urlA);
     });
   });
 

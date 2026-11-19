@@ -1,5 +1,84 @@
 # 变更记录
 
+## 2026.11.19 修「新建器件」建出的物料不可入库；制袋贴标补完成按钮
+
+- **服务端 bug（用户截图里的报错）**：`lab_pending_create` 的「新建器件」分支建模板时**漏了
+  `is_storable` 与 `tracking`**，于是模板以 `is_storable=False` 建出来；制袋码能生成，但到
+  「扫码上架」确认时 `lab_ensure_storable_tracking` 直接拒绝——「物料『GH1.25 端子 2P』当前
+  未开启库存管理（is_storable=False）」。其它建档路径（`_lab_create_minimal_material`、
+  资料库绑定）都设了这两项，只有这一条没有。已补 `is_storable=True` + `tracking='lot'`。
+  测试 `test_pending_create_key_replay_and_manual_archive` 增断言：手工建档的物料必须
+  `is_storable` 且能真正入库（确认后数量从 0 变 20）。
+- **制袋贴标没有完成按钮**：这一页原本结束在「预览并打印」上——打印完既不告诉操作员这一步
+  结束了，也没有去下一步的入口。新增收尾区「第 1 步 · 制袋贴标」：说明当前勾选了几袋、
+  打印按钮，以及 **「完成贴标，进入『扫码上架』」**（切到页签 2 并清空上一袋的核对状态）。
+- **实测**：`flutter test --no-pub` **504 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning；服务端文件 `py_compile` 通过。
+- **版本**：客户端 `1.3.5+19 → 1.3.5+20`；`lab_workflow` `19.0.2.0.3 → 19.0.2.0.4`。
+- **产物**：
+  - Windows `clients/windows/releases/1.3.5+20/LC_ELC-Windows-1.3.5+20-x64.zip`
+    （37,734,716 B，sha256 `6fcc3d25…a4eed6`，30 文件，exe sha256 `8c5be592…a2a1169`）。
+  - Android `clients/android/releases/1.3.5+20/LC_ELC-Android-1.3.5+20.apk`
+    （108,025,712 B，sha256 `9a31d0a0…0eb5ff`，versionCode 20，arm64-v8a + armeabi-v7a，
+    证书 `8b4c2409…9ff43` 与登记 keystore 一致）。
+  - 清单 `source-client-1.3.5-20-20261119.json`（220 文件）与服务端清单
+    `source-server-pending-storable-20261119.json`（274 文件）均已激活。`repo_check` **PASS 53 项**。
+- **未验证**：服务端 Odoo 测试本机跑不了（Windows 上没有 Odoo 运行时），
+  `test_workflow_business.py` 的新断言需在服务器上跑；**服务端修复未部署**
+  （需在服务器上 `upgrade_modules.sh lab_workflow`，属生产写入，需授权）；未提交/未推送。
+
+## 2026.11.19 客户端 1.3.5+19：修卡片对比度；库位标签改为「库码在下、名称放大」
+
+- 版本：`clients/app` `1.3.4+18 → 1.3.5+19`（`pubspec.yaml`、`components.json` 一致）。
+- **对比度**（用户原话「你这个色调的对比度完全看不清好吧」）：库存管理的五张卡片把 `prominent: true` 传给了 `GlassPanel`，整张卡铺荧光绿（`#C9FF3F` @94%），而标题/说明仍用 `onSurface`/`muted` —— 实测对比度 **1.2:1**，等于看不见。`GlassSurface` 自己的文档就写着「每屏最多一个 prominent」，五张并列本来就违背了它。改为中性玻璃面板 + 荧光绿图标（44×44 圆角底），文字回到面板色。新增 `test/features/warehouse/warehouse_contrast_test.dart`（11 条）：用 WCAG 相对亮度算真实合成色上的对比度，钉住「正文/次要文字/禁用原因 ≥4.5:1」，并把「onSurface 压在 accent 上 <4.5:1」这条错误组合也钉住，防止回退。
+- **桌面切换器**：宽度 ≥900 时不再拉满整行（那看起来像第二条工具栏），改为左侧紧凑胶囊。
+- **库位标签版式**（用户要求「库码放在二维码下面，库名称放大放在左边要能看得见」）：`planThermalLabel` 为 `kind == 'location'` 单独出一条几何 —— QR 11 mm @ (1,1)，**库码在 QR 正下方**（6 pt，宽 8.3 mm，严格落在 11 mm 码列内），**名称在右侧 17 pt**（`kThermalMaxLocationNameFontMm`）。名称取自 `名称：` 那一行而不是 `title`：服务端给库位标签的 `title` 是**库码**（`lab_code or name`），照抄会把编码打成标题。库码取自 payload，保证打出来的和扫出来的是同一个串。器件袋标签版式完全不变（有测试钉住）。Windows FFI 与 Android 桥接都按「caption 用自己的 x/width」绘制。
+- **实测**：`flutter test --no-pub` **504 passed / 5 skipped / 0 failed**；`flutter analyze --no-pub lib test` 0 error / 0 warning。真实 Windows 进程截图确认卡片文字清晰可读、顶部切换器为紧凑胶囊。
+- **未验证**：真实打印库位标签的观感与扫码、Android 实机。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.4+18：登录后拆成四个分区（库存速览 / 仓位速览 / 器件库 / 库存管理）
+
+- 版本：`clients/app` `1.3.3+17 → 1.3.4+18`（`pubspec.yaml`、`components.json` 一致）。
+- **为什么改**（用户原话「我们还是太集中了，应该通过几个菜单把功能做分流」）：登录后唯一落点是器件库，入库只有一个浮动按钮、领料/归还/标签/历史散落在详情页；仓位更是没有任何页面，只能先知道要找什么器件才能问「它在哪」。现在按**看什么**分区：
+  - **库存速览** `/stock`（新落点）：器件种类 / 有库存器件 / 仓位 / 实物袋 / 在库数量，仓位分布前 5，有库存器件列表。
+  - **仓位速览** `/stock/locations`：每个仓位的袋数与数量；`/stock/locations/:id` 是**仓位内容页**（按仓位分页的实物袋列表 + 录入库存 + 打印仓位标签）。
+  - **器件库** `/catalog`：原 `UnifiedCatalogScreen`，一行未改。
+  - **库存管理** `/stock/manage`：入库 / 领料 / 归还 / 标签打印 / 历史追溯 五个入口，按 `InventoryPermissions` 决定可点。
+- **切换**：`GlassSegmentedControl`，宽度 ≥900 在顶部、窄屏在底部；200% 文本换成下拉（阈值与入库页步骤切换一致）。四个分支由 `StatefulShellRoute.indexedStack` 承载，各自保留页面栈。
+- **作业页仍在根级、全屏 push**（`/receipt`、`/receipt/prepare`、`/issue`、`/return`、`/labels`、`/history`），深链、扫码 intent、返回栈不变；库存管理只是入口。`/home`、`/products`、`/products/:id` 仍重定向到 `/catalog`。
+- **数据层（纯增量）**：`LabStockLocation` 解析 `usage`/`bag_count`/`bag_quantity`（缺失为 null，不默认 0）；`locations({withStats})` 传 `with_stats`；新增 `bags()` 接 `/lab/api/inventory/bags`（`limit` 夹到服务端上限 100，`next_cursor` 键集分页）；`LabBag` 补 `availableQuantity`/`outstandingQuantity`/`locationPath`/`uom`。服务端**零改动**。
+- **统计口径**：器件数/有库存数取 `/catalog/search` 的 `total`（一次不带 `stock_only`、一次带）；仓位数与在库数量取 `locations(with_stats:1)` 的 `stock.quant` 合计。客户端不累加一页数据冒充总数。
+- **离线边界**：`/catalog?offline=1` 现在位于外壳内，但无会话时外壳**不渲染分区切换器**（否则会把未登录访客引向路由会拒绝的页面），有专门测试钉住。
+- **实测**：`flutter test --no-pub` **488 passed / 5 skipped / 0 failed**（新增 18 条：分区切换与无障碍、200% 文本回退、`bags()` 分页与 `limit` 夹取、`with_stats` 只在需要时发、仓位统计 null 与 0 的区分、离线不出现切换器）；`flutter analyze --no-pub lib test` 0 error / 0 warning。`tools/build_client.py --platform windows --test` 三步 **exit 0 / 0 / 0**（构建内同样 488 passed），产物冒烟 RUNNING → STOPPED；`repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：`clients/windows/releases/1.3.4+18/LC_ELC-Windows-1.3.4+18-x64.zip`，37,731,644 B，sha256 `6cd4ca0e…c2472317`，30 文件，exe sha256 `74c53bf9…df7a6f`，`NotSigned`。清单 `source-client-1.3.4-18-20261119.json`（218 文件，已 `--activate`），产物登记 `artifact-client-windows-1.3.4-18-20261119.json`。
+- **未验证**：真实登录后的四区切换手感（尤其 320px 手机底部栏高度）、仓位内容页在 >100 袋时的分页、真实打印仓位标签与扫码、Android 实机布局。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.3+17：有线接入的内网加速；标签排版先完整后字号
+
+- 版本：`clients/app` `1.3.3+16 → 1.3.3+17`（`pubspec.yaml`、`components.json` 一致）。
+- **有线接入**（用户原话「Windows 平台有时候我的内网是通过有线接入的」）：内网加速提示原先只按 WiFi SSID 匹配，插网线的台式机永远没有 SSID，功能在最该用的机器上静默失效。新增 `lib/services/lan_probe.dart`：对配置的内网地址发一次 `GET /web/health`（3 秒上限、不带任何凭据、只探私有网段），`statusCode < 500` 即视为可达。判定改为「平台报告了 SSID → 仍以名称为准；没有 SSID（有线或读不到）→ 探测成功才提示」，因此**填过 WiFi 名但今天插网线**的机器也能提示。`LanAccelerationState` 增 `lanReachable`/`dismissedWired`；换地址清空旧探测结果；无 SSID 时「忽略」记的是有线标志。提示条文案与图标（`Icons.lan`）分两种，设置页在无 SSID 时显示探测结论；未填 WiFi 名时不再申请定位权限。
+- **标签排版修 bug**（`niimbot_layout.dart`）：`wrappedBody()` 每次尝试都 `omitted.clear()`，把「超出四行上限的源行」也一并清掉 —— 第五个字段（封装）没打出来，`truncated` 却报 `false`，界面告诉操作员「打全了」。现拆为 `capOmitted`（一次性）与 `wrapOmitted`（每次重算）两个列表。
+- **字号让位于完整性**：适配改成两遍 —— 第一遍找「放得下且一行不丢」的最大字号，找不到才退到「放得下就行」并如实上报丢弃项。此前 7.4 pt 下长描述要折三行（超两行上限被丢），而 7.0 pt 两行就够，旧代码宁可丢字段也要 7.4 pt。
+- **清理**：删除 `DrawLableBarCode` 的 FFI 绑定与 `drawBarCode()`（条形码方案已按用户要求放弃；保留未使用的符号查找只会在 DLL 变动时多一个失败点）。
+- **实测**：`flutter test --no-pub` **468 passed / 5 skipped / 0 failed**（新增有线分支、探测拒公网、长描述缩字号等用例）；`flutter analyze --no-pub lib test` 0 error / 0 warning（119 条既有风格 info）。`tools/build_client.py --platform windows --test` 三步 **exit 0 / 0 / 0**（构建内同样 468 passed），产物冒烟进程 RUNNING → STOPPED。`python tools/repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：`clients/windows/releases/1.3.3+17/LC_ELC-Windows-1.3.3+17-x64.zip`，37,666,952 B，sha256 `f09957ae…32580c`，30 文件，exe sha256 `a22c5871…c0fa96`，`NotSigned`。清单 `source-client-1.3.3-17-20261119.json`（206 文件，tree `0322ce1d…182d`，已 `--activate`），产物登记 `artifact-client-windows-1.3.3-17-20261119.json`。
+- **未验证**：真实插拔网线时的提示时机、现网 `GET /web/health` 实际返回、真实打印与扫码、Android 蓝牙出纸、应用内更新。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.3+11：精臣 B1 Pro 热敏标签直打（Windows USB / Android 蓝牙）
+
+- 版本：`clients/app` `1.3.2+10 → 1.3.3+11`（`pubspec.yaml`、`components.json` 一致）。
+- **为什么改**：现有标签是“服务端毫米排版 → A4 PDF → 系统打印”，无法直接驱动热敏标签机；用户机型为精臣 **B1 Pro**，需要 40×20 mm 标签直接出纸。
+- **服务端**：`lab_labels_preview` 新增可选参数 `include_content`（默认 false，旧契约不变）。为 true 时额外返回 `labels` 数组，每张含 `title`、`lines[]`、`payload`（唯一二维码 `LABB:`/`LABL:`）；数据与 PDF 同源（同一份 `build_contents`），两条打印路径不会漂移。新增 2 条 ORM 测试。
+- **Windows（USB）**：新增 `lib/services/niimbot_printer.dart`（`dart:ffi` 绑定 `jcPrinterApi.dll` 的 14 个函数）、`niimbot_layout.dart`（纯 Dart 排版，可单测）、`tools/restore_niimbot_runtime.py`（从登记 zip 恢复 x64 DLL 与字体并校验 SHA256）。8 个 DLL + `icudtl.dat` + `font/ZT001.ttf` 随包分发、不入 Git。40×20 版式：QR 13×13 @ (1.5, 3.5)，标题 6.49 pt，正文 5.50 pt × 3 行（第 4 行「封装」省略并返回 `truncated`）。
+- **Android（蓝牙）**：集成 `4.1.1-release.aar` + `image-1.9.5.aar`，新增 `NiimbotPrinterBridge.kt`（`lab/printer` 通道 + 扫描事件流）、`proguard-rules.pro`（Flutter release 默认 R8，不保留 SDK 类会破坏反射/native 回调）、四组蓝牙与定位权限。按 SDK 文档纠正 4 处：扫描参数是秒数、`isConnection()==0` 才是已连接、`drawLabelText` 行模式用 6、`drawEmptyLabel` 用 List 重载。
+- **ABI**：APK 仅 `arm64-v8a` + `armeabi-v7a`。`build_client.py` 加 `--target-platform android-arm64 --target-platform android-arm`；`packaging.jniLibs.excludes += "lib/x86_64/**"` 清掉插件 AAR 里预编译的 x86_64 JNI 库。包体 135 MB → 102.6 MB。
+- **构建（本机真实执行）**：Windows 三步 exit 0 / 0 / 0，`flutter test` **456 passed / 5 skipped**；Android 三步 exit 0 / 0 / 0，Gradle 约 142 s，同样 456 passed。`flutter analyze` 0 error / 119 info（全部既有风格提示）。`repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：
+  - Windows `clients/windows/releases/1.3.3+11/LC_ELC-Windows-1.3.3+11-x64.zip`，36,622,042 B，sha256 `5e5d2e6a02b8c09f8ecd17ad017abc2c9c4f375f64e83ed2541248de9651cce9`，30 文件，exe `aa8ced4c…967e`，`NotSigned`。
+  - Android `clients/android/releases/1.3.3+11/LC_ELC-Android-1.3.3+11.apk`，107,647,900 B，sha256 `cdf317857ef1b7117fe4ab93fdbd68b1f69cffc0fc56553b1d1824f11fb99184`，1.3.3 / code 11 / minSdk 24 / target 36，证书 `8b4c2409…9ff43` 与登记 keystore 一致。
+- **清单**：客户端 `source-client-1.3.3-11-20261119.json`（204 文件，tree `9b3acfd9…`）、服务端 `source-server-labels-print-20261119.json`、EDA `source-eda-drawing-assistant-20261119.json`，三份均已 `--activate`。
+- **未验证**：真实 USB 打印（缺纸/开盖/超时）、真机蓝牙配对与出纸、Android 6–11 与 12+ 两套权限弹窗、实体扫码、DPAPI、应用内更新。未提交/未推送。
+
 ## 2026.11.18 Flutter 客户端 Linux 1.3.2+10 构建（WSL Ubuntu 22.04；未实机验收）
 
 - 在 WSL Ubuntu 22.04 用归档工具链（Flutter 3.47.7 + `dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz` 的 pubcache/sysroot/prebuilt）执行 `tools/build_client.py --platform linux --test`，pub get / flutter test / flutter build linux 三步 **exit 0 / 0 / 0**，`flutter test` **340 passed / 5 skipped**。

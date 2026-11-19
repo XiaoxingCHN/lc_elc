@@ -42,6 +42,7 @@ class ReceiptScreen extends ConsumerStatefulWidget {
     this.initialItemKey,
     this.initialItemName,
     this.initialCode,
+    this.initialLocationId,
   });
 
   final String? initialItemKey;
@@ -49,6 +50,13 @@ class ReceiptScreen extends ConsumerStatefulWidget {
 
   /// Code to resolve on open (deep link / scanner intent).
   final String? initialCode;
+
+  /// Location the operator arrived FROM (a location's contents page).
+  ///
+  /// It is preselected, not locked: the dropdown still lists every location and
+  /// stays editable, because a mis-scan at the shelf must be correctable
+  /// without backing out. Preselecting is what removes the extra tap.
+  final int? initialLocationId;
 
   @override
   ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
@@ -97,6 +105,17 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     if (!mounted || _prefilled) return;
     _prefilled = true;
     final notifier = ref.read(receiptControllerProvider.notifier);
+
+    // Arrived from a location's contents page: start on that location so the
+    // operator does not have to re-pick the shelf they are standing at.
+    final locationId = widget.initialLocationId;
+    if (locationId != null && locationId > 0) {
+      final known = ref
+          .read(inventoryBootstrapProvider)
+          .valueOrNull
+          ?.locationById(locationId);
+      notifier.setLocation(locationId, label: known?.display ?? '');
+    }
 
     final code = widget.initialCode?.trim();
     if (code != null && code.isNotEmpty) {
@@ -349,6 +368,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                               status: _fetch.status!,
                               onChoose: (candidate) =>
                                   unawaited(_fetch.chooseCandidate(candidate)),
+                              onQueryAgain: _fetch.hasQueryableTask
+                                  ? () => unawaited(_fetch.resume())
+                                  : null,
                             ),
                     ),
                   if (archivesLoading)

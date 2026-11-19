@@ -24,12 +24,28 @@ final inventoryBootstrapProvider = FutureProvider<InventoryBootstrap>((ref) asyn
 });
 
 /// Internal locations, re-read from the server after a write.
+///
+/// Plain rows (`id`/`code`/`name`/`path`): the pickers only need those, and the
+/// aggregate query behind `with_stats` costs a second round trip server-side.
 final inventoryLocationsProvider =
     FutureProvider<List<LabStockLocation>>((ref) async {
   ref.watch(dataRevisionProvider);
   ref.watch(effectiveSessionScopeProvider);
   final api = ref.watch(labApiProvider);
   return api.locations();
+});
+
+/// The same locations WITH the per-location aggregates (袋数 / 袋内数量 / 在库数量).
+///
+/// Separate from [inventoryLocationsProvider] on purpose: 仓位速览 needs the
+/// numbers, every dropdown does not, and sharing one provider would make each
+/// picker pay for an aggregate the operator never sees.
+final inventoryLocationsWithStatsProvider =
+    FutureProvider<List<LabStockLocation>>((ref) async {
+  ref.watch(dataRevisionProvider);
+  ref.watch(effectiveSessionScopeProvider);
+  final api = ref.watch(labApiProvider);
+  return api.locations(withStats: true);
 });
 
 // -----------------------------------------------------------------------------

@@ -1674,6 +1674,9 @@ body.lc-body .lc-footer a:hover {
   body.lc-body .lc-actions,
   body.lc-body .lc-searchbar,
   body.lc-body .lc-sidebar,
+  body.lc-body .lc-nav-toggle,
+  body.lc-body .lc-nav-head,
+  body.lc-body .lc-nav-scrim,
   body.lc-body .lc-loading,
   body.lc-body #lc-more {
     display: none !important;
@@ -2456,6 +2459,12 @@ body.lc-body .lc-nav-toggle {
   display: none;
 }
 
+/* 抽屉内的「主导航 / 关闭」手柄：只在窄屏抽屉里出现（桌面固定侧栏不需要，
+   菜单按钮也隐藏了）。默认隐藏，避免桌面侧栏多出一条标题行。 */
+body.lc-body .lc-nav-head {
+  display: none;
+}
+
 @media (max-width: 1023px) {
   body.lc-body .lc-nav-toggle {
     display: inline-flex;
@@ -2487,10 +2496,15 @@ body.lc-body .lc-nav-toggle {
     box-shadow: 0 -5px 0 currentColor, 0 5px 0 currentColor;
   }
 
-  /* 覆盖 ≤760px 那版"横向滚动导航"：整个侧栏变抽屉 */
+  /* 覆盖 ≤760px 那版"横向滚动导航"：整个侧栏变抽屉。
+     层级取舍（M1/P2-01）：抽屉与遮罩都抬到 sticky 顶栏（z-index 100）之上，
+     而不是把抽屉顶端压到顶栏下沿。顶栏在窄屏会随字号/换行改变高度（实测
+     375/768/1023px 为 73px），用固定 top 留缝会在 200% 字号或换行时再次盖住
+     首项；抬高层级则与顶栏高度无关。代价是顶栏菜单按钮被遮罩盖住，触控用户
+     改由抽屉内的 .lc-nav-close 手柄关闭（键盘仍有 Esc，焦点回到菜单按钮）。 */
   body.lc-body .lc-rail {
     position: fixed;
-    z-index: 60;
+    z-index: 110;
     top: 0;
     bottom: 0;
     left: 0;
@@ -2510,6 +2524,55 @@ body.lc-body .lc-nav-toggle {
   body.lc-body.lc-nav-open .lc-rail {
     transform: translateX(0);
     visibility: visible;
+  }
+
+  /* 抽屉内的关闭手柄：44px 触控目标，抽屉顶端一行「主导航 / 关闭」。
+     导航项多或横屏高度不足时抽屉内部滚动，手柄用 sticky 留在顶部，保证
+     触控用户随时能关；背景用面板色，滚动内容不会从手柄后面透出。 */
+  body.lc-body .lc-nav-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  body.lc-body .lc-nav-head-title {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  body.lc-body .lc-nav-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    min-width: 44px;
+    margin-left: auto;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  body.lc-body .lc-nav-close:hover {
+    border-color: var(--lime);
+    color: var(--lime);
   }
 
   body.lc-body .lc-rail .lc-nav {
@@ -2537,11 +2600,13 @@ body.lc-body .lc-nav-toggle {
     padding: 24px 0 56px;
   }
 
+  /* 遮罩必须高于 sticky 顶栏（100），否则抽屉虽在顶栏之上，遮罩却盖不住顶栏，
+     顶栏会透出一条可读的内容。105 夹在顶栏 100 与抽屉 110 之间。 */
   body.lc-body.lc-nav-open .lc-nav-scrim {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 55;
+    z-index: 105;
     background: rgba(3, 4, 6, 0.62);
   }
 
@@ -2550,7 +2615,8 @@ body.lc-body .lc-nav-toggle {
   }
 
   body.lc-body .lc-rail .lc-nav-link:focus-visible,
-  body.lc-body .lc-nav-toggle:focus-visible {
+  body.lc-body .lc-nav-toggle:focus-visible,
+  body.lc-body .lc-nav-close:focus-visible {
     outline: 2px solid var(--lime);
     outline-offset: 2px;
   }

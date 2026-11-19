@@ -203,8 +203,15 @@ class LabWorkflowLabels(models.AbstractModel):
 
     @api.model
     def lab_labels_preview(self, kind='bag', ids=None, copies=1, width_mm=50, height_mm=30,
-                           margin_mm=10, gap_mm=2, fields=None):
-        """生成标签 PDF（base64）；全过程只读，不改任何库存。"""
+                           margin_mm=10, gap_mm=2, fields=None, include_content=False):
+        """生成标签 PDF（base64）；全过程只读，不改任何库存。
+
+        ``include_content``（可选，默认 False）：额外返回 ``labels`` 数组，
+        给出每张标签的**结构化内容**（标题、逐行文字、唯一二维码的载荷），
+        供客户端用热敏打印机直打时使用。它与 PDF 用的是同一份
+        ``build_contents`` 结果，因此两条打印路径不会漂移；默认关闭以保持
+        旧客户端与契约不变。
+        """
         spec, id_list = self._lab_label_request(
             kind, ids, copies, width_mm, height_mm, margin_mm, gap_mm, fields)
         payloads = self._lab_label_payloads(spec, id_list)
@@ -229,7 +236,7 @@ class LabWorkflowLabels(models.AbstractModel):
                               {error.field: 'invalid'} if error.field else {})
 
         filename = 'labels_%s_%s.pdf' % (spec.kind, len(payloads))
-        return {
+        result = {
             'pdf_base64': base64.b64encode(pdf_bytes).decode('ascii'),
             'filename': filename,
             'page_count': meta['page_count'],
@@ -246,3 +253,6 @@ class LabWorkflowLabels(models.AbstractModel):
             'fields': list(spec.fields),
             'qr_per_label': 1,
         }
+        if include_content:
+            result['labels'] = [content.as_dict() for content in contents]
+        return result

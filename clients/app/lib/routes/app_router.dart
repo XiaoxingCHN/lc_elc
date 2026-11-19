@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/unified/unified_routes.dart';
+import '../features/warehouse/warehouse_routes.dart';
+import '../features/warehouse/warehouse_shell.dart';
 import '../screens/login_screen.dart';
 import '../screens/splash_screen.dart';
 import '../providers/auth_provider.dart';
@@ -52,11 +54,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (auth.isAuthenticated) {
-        // The signed-in home is the UNIFIED library. A session that arrives
-        // while the app sits on the login/splash screen goes straight there -
-        // one catalog, no dashboard detour.
+        // The signed-in home is 库存速览 (the shell's first section). A session
+        // that arrives while the app sits on the login/splash screen goes
+        // straight there; the library is one tap away in the same shell.
         return (location == '/login' || location == '/splash')
-            ? UnifiedRoutes.catalog
+            ? WarehouseRoutes.overview
             : null;
       }
 
@@ -82,14 +84,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // ---- Unified business (one library, one detail, stock + labels) -------
-      // The list is exported by the UI owner so the router stays owned by the
-      // auth/integration side. Home entry: /catalog.
+      // ---- Four sections, each with its own stack ---------------------------
+      // 库存速览 / 仓位速览 / 器件库 / 库存管理. The shell only decides where the
+      // switcher sits; every screen keeps its own app bar and back behaviour.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            WarehouseShell(navigationShell: navigationShell),
+        branches: warehouseBranches,
+      ),
+
+      // ---- Operational pages (full screen, OUTSIDE the shell) ---------------
+      // 入库 / 领料 / 归还 / 标签 / 历史 stay top-level so a deep link, a scanner
+      // intent and the back button behave exactly as they did before the shell
+      // existed. The shell's 库存管理 section is only a launcher for these.
       ...unifiedRoutes,
 
       // ---- Compatibility redirects -----------------------------------------
-      // The old dashboard is gone: every signed-in entry point resolves to the
-      // unified library, so no second "inventory only" navigation exists.
+      // `/home` and `/products` used to be the old dashboard's paths. They now
+      // land on the library, which is still the right answer for them: a link
+      // that meant "show me parts" must not become "show me totals".
       GoRoute(
         path: '/home',
         redirect: (context, state) => UnifiedRoutes.catalog,

@@ -1,5 +1,5 @@
 {
-  "client": "maintenance/registry/source-client-1.3.2-10-20261110.json",
-  "server": "maintenance/registry/source-server-web-fetch-entry-20261109-r9.json",
-  "eda": "maintenance/registry/source-eda-baseline.json"
+  "client": "maintenance/registry/source-client-1.3.5-20-20261119.json",
+  "server": "maintenance/registry/source-server-pending-storable-20261119.json",
+  "eda": "maintenance/registry/source-eda-drawing-assistant-20261119.json"
 }

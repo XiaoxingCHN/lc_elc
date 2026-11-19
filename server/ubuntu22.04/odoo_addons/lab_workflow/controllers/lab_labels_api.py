@@ -62,6 +62,7 @@ class LabLabelsApi(http.Controller):
                 margin_mm=data.get('margin_mm') or 10,
                 gap_mm=data.get('gap_mm') or 2,
                 fields=data.get('fields'),
+                include_content=bool(data.get('include_content')),
             )
         return handler()
 

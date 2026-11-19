@@ -28,7 +28,7 @@ async function loadPackage() {
 
 test('package exists at the expected deterministic name', async () => {
   const { extension, buffer } = await loadPackage();
-  assert.equal(extension.version, '3.0.3');
+  assert.equal(extension.version, '3.1.0');
   assert.ok(buffer.length > 50000);
 });
 
@@ -36,7 +36,7 @@ test('package SHA-256 matches build manifest', async () => {
   const { manifest, buffer } = await loadPackage();
   assert.equal(sha256(buffer), manifest.sha256);
   assert.equal(manifest.uuid, EXPECTED_UUID);
-  assert.equal(manifest.version, '3.0.3');
+  assert.equal(manifest.version, '3.1.0');
 });
 
 test('ZIP root contains extension.json and all runtime resources', async () => {
@@ -76,39 +76,69 @@ test('package has no source, tests, tooling, dependencies or credentials', async
   }
 });
 
-test('extension.json keeps the upgrade UUID and expected menus', async () => {
+test('extension.json keeps the upgrade UUID and the four retained menus', async () => {
   const { zip } = await loadPackage();
   const manifest = JSON.parse(await zip.file('extension.json').async('string'));
   assert.equal(manifest.uuid, EXPECTED_UUID);
-  assert.equal(manifest.version, '3.0.3');
+  assert.equal(manifest.version, '3.1.0');
   assert.equal(manifest.entry, './dist/index');
   assert.equal(manifest.name, 'lab-inventory');
   assert.ok(Array.isArray(manifest.headerMenus.sch));
   assert.ok(Array.isArray(manifest.headerMenus.pcb));
   const schItems = manifest.headerMenus.sch[0].menuItems.map((item) => item.registerFn);
-  for (const fn of [
-    'showInventoryPanel',
-    'bomCompare',
-    'openReceipt',
-    'openIssue',
-    'openReturn',
-    'openTrace',
-    'openSettings',
-    'showDebugLog',
-  ]) {
+  for (const fn of ['showInventoryPanel', 'bomCompare', 'openSettings', 'showDebugLog']) {
     assert.ok(schItems.includes(fn), 'missing menu ' + fn);
   }
+  for (const fn of ['openReceipt', 'openIssue', 'openReturn', 'openTrace']) {
+    assert.equal(schItems.includes(fn), false, 'removed menu still present ' + fn);
+  }
+  const pcbItems = manifest.headerMenus.pcb[0].menuItems.map((item) => item.registerFn);
+  for (const fn of ['openReceipt', 'openIssue', 'openReturn', 'openTrace']) {
+    assert.equal(pcbItems.includes(fn), false, 'removed pcb menu still present ' + fn);
+  }
+  const bomMenu = manifest.headerMenus.sch[0].menuItems.find((item) => item.registerFn === 'bomCompare');
+  assert.equal(bomMenu.title, '原理图库存');
 });
 
-test('main bundle exposes activate and menu handlers', async () => {
+test('main bundle exposes activate and the retained menu handlers only', async () => {
   const { zip } = await loadPackage();
   const text = await zip.file('dist/index.js').async('string');
   assert.ok(text.length > 10000);
-  for (const name of ['activate', 'showInventoryPanel', 'bomCompare', 'openReceipt', 'openIssue', 'openReturn', 'openTrace', 'openSettings', 'showDebugLog']) {
+  for (const name of ['activate', 'showInventoryPanel', 'bomCompare', 'openSettings', 'showDebugLog']) {
     assert.ok(text.includes(name), 'bundle missing ' + name);
   }
+  for (const name of ['openReceipt', 'openIssue', 'openReturn', 'openTrace']) {
+    assert.equal(text.includes(name), false, 'bundle still exports ' + name);
+  }
   assert.equal(text.includes('admin/admin123'), false);
-  assert.equal(text.includes("password: 'admin"), false);
+  assert.equal(text.includes("password: 'admin'"), false);
+});
+
+test('iframe bundle no longer renders receipt/issue/return/trace tabs', async () => {
+  const { zip } = await loadPackage();
+  const html = await zip.file('iframe/app.html').async('string');
+  for (const name of [
+    'renderReceipt',
+    'renderReceiptSuccess',
+    'renderIssue',
+    'renderIssueSuccess',
+    'renderReturn',
+    'renderReturnSuccess',
+    'renderTrace',
+    'prefillIssueBag',
+    'queryReceiptItem',
+    'buildReceiptPayload',
+    'buildIssuePayload',
+    'buildReturnPayload',
+    'resolveTrace',
+  ]) {
+    assert.equal(html.includes(name), false, 'iframe bundle still contains ' + name);
+  }
+  for (const label of ['器件库', '原理图库存', '连接/账户', '诊断']) {
+    assert.ok(html.includes(label), 'iframe missing retained tab ' + label);
+  }
+  assert.equal(html.includes('BOM 对比'), false);
+  assert.ok(html.includes('一键出库'));
 });
 
 test('iframe is self-contained, Chinese and uses the trusted bridge', async () => {
@@ -127,7 +157,7 @@ test('iframe is self-contained, Chinese and uses the trusted bridge', async () =
 test('README documents Odoo 19, CORS, session cookie and permissions', async () => {
   const { zip } = await loadPackage();
   const readme = await zip.file('README.md').async('string');
-  for (const phrase of ['Odoo 19', '3.0.3', '本机桥接', '配对码', 'LcHardwareHouse', 'group_lab_operator', '外部交互']) {
+  for (const phrase of ['Odoo 19', '3.1.0', '本机桥接', '配对码', 'LcHardwareHouse', 'group_lab_operator', '外部交互']) {
     assert.ok(readme.includes(phrase), 'README missing ' + phrase);
   }
 });

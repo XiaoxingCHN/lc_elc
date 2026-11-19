@@ -356,13 +356,29 @@ class LoginMemoryStore {
   ///
   /// Contains no secret, so it is safe on plain preferences; the caller is
   /// expected to have authenticated successfully first.
+  ///
+  /// [persistent] false is the "session-only / LAN acceleration" path: the
+  /// account is returned for display but is NOT added to [_accounts] and NOT
+  /// written to disk. It can therefore never become [lastUsedAccount], never
+  /// be pre-filled after a restart and never be used for automatic sign-in.
   Future<RememberedAccount> rememberAccount(
     LoginScope scope, {
     required bool rememberLogin,
     DateTime? at,
+    bool persistent = true,
   }) async {
-    await ensureLoaded();
     final now = at ?? _clock();
+    if (!persistent) {
+      return RememberedAccount(
+        baseUrl: scope.baseUrl,
+        database: scope.database,
+        login: scope.login,
+        rememberLogin: false,
+        lastUsedAt: now.millisecondsSinceEpoch,
+      );
+    }
+
+    await ensureLoaded();
     final existing = accountFor(scope);
     final account = (existing ?? RememberedAccount(
               baseUrl: scope.baseUrl,

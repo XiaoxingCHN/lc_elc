@@ -9,11 +9,22 @@ def plan(a):
  cache=Path(a.pub_cache) if a.pub_cache else ROOT/('dependencies/pub-cache-'+host)
  commands=[[str(flutter),'pub','get','--enforce-lockfile']+([] if a.online else ['--offline'])]
  if a.test:commands.append([str(flutter),'test','--no-pub'])
- if not a.test_only:commands.append([str(flutter),'build','apk' if a.platform=='android' else a.platform,'--release','--no-pub','--dart-define=LAB_ODOO_URL='+a.server,'--dart-define=LAB_ODOO_DB='+a.database])
+ if not a.test_only:
+  build=[str(flutter),'build','apk' if a.platform=='android' else a.platform,'--release','--no-pub','--dart-define=LAB_ODOO_URL='+a.server,'--dart-define=LAB_ODOO_DB='+a.database]
+  # The NIIMBOT Android SDK ships arm64-v8a and armeabi-v7a only. Building the
+  # x86_64 slice would produce an APK that installs on an emulator but fails at
+  # print time (no libminilzo.so / libniimbot_canvas_image.so for that ABI), so
+  # the client is built for the two ABIs the hardware actually uses.
+  if a.platform=='android':build+=['--target-platform','android-arm64','--target-platform','android-arm']
+  commands.append(build)
  return host,flutter,cache,commands
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--gradle-cache');p.add_argument('--server',default='http://192.168.31.105:8069');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');p.add_argument('--work-root');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--platform',choices=['windows','android','linux'],required=True);p.add_argument('--flutter');p.add_argument('--pub-cache');p.add_argument('--android-sdk');p.add_argument('--jdk');p.add_argument('--signing-key');p.add_argument('--gradle-cache')
+ # Default to the PUBLIC deployment: the client must work off the lab network.
+ # The LAN address is a per-run setting inside the app, never baked in unless a
+ # build explicitly passes --server.
+ p.add_argument('--server',default='https://team.l-creation.club');p.add_argument('--database',default='LcHardwareHouse');p.add_argument('--online',action='store_true');p.add_argument('--test',action='store_true');p.add_argument('--test-only',action='store_true');p.add_argument('--dry-run',action='store_true');p.add_argument('--work-root');a=p.parse_args()
  if a.test_only:a.test=True
  host,flutter,cache,commands=plan(a)
  print(json.dumps({'source':'clients/app','host':host,'platform':a.platform,'pub_cache':str(cache),'commands':commands,'writes':'new timestamp directory under local/build; no release overwrite'},ensure_ascii=False,indent=2))

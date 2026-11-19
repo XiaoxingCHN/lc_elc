@@ -47,15 +47,20 @@ class CatalogFetchPanel extends StatelessWidget {
     super.key,
     required this.status,
     required this.onChoose,
+    this.onQueryAgain,
   });
 
   final CatalogFetchStatus status;
   final ValueChanged<CatalogFetchCandidate> onChoose;
 
+  /// Asks the server about a task this client stopped following. Only rendered
+  /// when the status is still queryable and the caller wired an action.
+  final VoidCallback? onQueryAgain;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final running = !status.isTerminal;
+    final running = status.isActive;
     final (IconData icon, Color tone) = switch (status.state) {
       'done' => (Icons.check_circle_outline, theme.colorScheme.primary),
       'failed' || 'not_found' => (
@@ -67,6 +72,10 @@ class CatalogFetchPanel extends StatelessWidget {
           theme.colorScheme.onSurfaceVariant,
         ),
       'review' => (Icons.fact_check_outlined, theme.colorScheme.tertiary),
+      CatalogFetchStatus.stillRunningState => (
+          Icons.schedule,
+          theme.colorScheme.tertiary,
+        ),
       _ => (Icons.hourglass_top, theme.colorScheme.primary),
     };
 
@@ -105,6 +114,17 @@ class CatalogFetchPanel extends StatelessWidget {
             if (!running && status.message.isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
               Text(status.message, style: theme.textTheme.bodySmall),
+            ],
+            if (status.isStillRunning && onQueryAgain != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: onQueryAgain,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重新查询任务状态'),
+                ),
+              ),
             ],
             if (status.isDone && status.message.isEmpty) ...<Widget>[
               const SizedBox(height: 8),
@@ -163,6 +183,8 @@ class CatalogFetchPanel extends StatelessWidget {
         return '立创商城未找到完全匹配的型号';
       case 'candidates':
         return '在立创商城找到多个候选';
+      case CatalogFetchStatus.stillRunningState:
+        return '抓取任务仍在后台处理';
       default:
         return '抓取状态';
     }

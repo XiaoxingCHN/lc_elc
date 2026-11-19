@@ -475,6 +475,24 @@
         "metadata": "maintenance/registry/bore-p2-fonts-20261027.json"
       },
       "notes": "Isolated browser test environment only; extract privately and supply FONTCONFIG_FILE/FONTCONFIG_PATH. Never install into system font directories."
+    },
+    {
+      "id": "niimbot-cpp-sdk-windows",
+      "path": "external: CPP-4.0.6_release_20251114.zip (NIIMBOT vendor SDK)",
+      "type": "external",
+      "version": "4.0.6",
+      "sha256": "dbe9c4d0bbb256f4eb9fe2ce4e961f1353a4ea45833c3f41f61c52995b70793f",
+      "size_bytes": 161570781,
+      "acquisition": {
+        "method": "vendor-supplied-archive",
+        "commands": [
+          "Obtain CPP-4.0.6_release_20251114.zip from NIIMBOT (精臣) technical support; it is not downloadable from a public package registry",
+          "Place it at the repository root (Git-excluded *.zip) and run: python tools/restore_niimbot_runtime.py --zip <path>/CPP-4.0.6_release_20251114.zip",
+          "The script extracts only 接入包/Resources_x64/ (8 DLLs + icudtl.dat + font/ZT001.ttf + font/language.json) into clients/app/windows/niimbot/runtime/ and verifies every SHA256"
+        ],
+        "metadata": "clients/app/windows/niimbot/README.md"
+      },
+      "notes": "x64 Windows only; Resources_x86 is never used. Vendor binaries and fonts stay out of Git (repository boundary rejects *.dll and large payloads). Missing payload degrades to the PDF/system-print path; the direct-print button is hidden."
     }
   ]
 }

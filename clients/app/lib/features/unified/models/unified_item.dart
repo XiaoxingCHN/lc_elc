@@ -429,6 +429,15 @@ class CatalogFetchStatus {
     'candidates',
   };
 
+  /// A LOCAL state, never sent by the server.
+  ///
+  /// The client stopped waiting (poll budget used up, or the network dropped)
+  /// but the server task was NOT cancelled and may still finish on its next
+  /// cron pass. It is deliberately not terminal: the task id is kept, the
+  /// operator can ask the server again, and the state is never shown as a
+  /// failure. A retry / re-query is always an explicit human action.
+  static const String stillRunningState = 'still_running';
+
   final int? requestId;
   final String state;
   final String query;
@@ -439,8 +448,41 @@ class CatalogFetchStatus {
   final List<CatalogFetchCandidate> candidates;
 
   bool get isTerminal => terminalStates.contains(state);
+
+  /// The server may still be working on this task; the client is not polling.
+  bool get isStillRunning => state == stillRunningState;
+
+  /// Non-terminal AND not abandoned by the client: a poll subscription is (or
+  /// should be) running for it.
+  bool get isActive => !isTerminal && !isStillRunning;
+
   bool get isDone => state == 'done';
   bool get isCandidates => state == 'candidates';
+
+  /// True when the server can still be asked about this task.
+  bool get isQueryable => requestId != null && !isTerminal;
+
+  CatalogFetchStatus copyWith({
+    int? requestId,
+    String? state,
+    String? query,
+    String? queryKind,
+    String? catalogCode,
+    String? itemKey,
+    String? message,
+    List<CatalogFetchCandidate>? candidates,
+  }) {
+    return CatalogFetchStatus(
+      requestId: requestId ?? this.requestId,
+      state: state ?? this.state,
+      query: query ?? this.query,
+      queryKind: queryKind ?? this.queryKind,
+      catalogCode: catalogCode ?? this.catalogCode,
+      itemKey: itemKey ?? this.itemKey,
+      message: message ?? this.message,
+      candidates: candidates ?? this.candidates,
+    );
+  }
 
   factory CatalogFetchStatus.fromJson(Map<String, dynamic> json) {
     return CatalogFetchStatus(

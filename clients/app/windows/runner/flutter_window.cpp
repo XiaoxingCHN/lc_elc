@@ -1,11 +1,66 @@
 #include "flutter_window.h"
 
+#include <windows.h>
+#include <wlanapi.h>
+
 #include <optional>
+#include <string>
+
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 #include <netlistmgr.h>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+// Current Wi-Fi SSID, or an empty string when the machine is on Ethernet, the
+// WLAN service is unavailable, or no network is associated. The value is used
+// only for the in-memory LAN hint; nothing is persisted by this code.
+std::string CurrentWifiSsid() {
+  DWORD negotiated = 0;
+  HANDLE client = nullptr;
+  if (WlanOpenHandle(2, nullptr, &negotiated, &client) != ERROR_SUCCESS) {
+    return std::string();
+  }
+
+  PWLAN_INTERFACE_INFO_LIST interfaces = nullptr;
+  std::string ssid;
+  if (WlanEnumInterfaces(client, nullptr, &interfaces) == ERROR_SUCCESS &&
+      interfaces != nullptr) {
+    for (DWORD i = 0; i < interfaces->dwNumberOfItems; ++i) {
+      const WLAN_INTERFACE_INFO& info = interfaces->InterfaceInfo[i];
+      if (info.isState != wlan_interface_state_connected) continue;
+
+      PWLAN_CONNECTION_ATTRIBUTES attributes = nullptr;
+      DWORD size = 0;
+      WLAN_OPCODE_VALUE_TYPE opcode_type;
+      if (WlanQueryInterface(client, &info.InterfaceGuid,
+                             wlan_intf_opcode_current_connection, nullptr,
+                             &size, reinterpret_cast<PVOID*>(&attributes),
+                             &opcode_type) != ERROR_SUCCESS ||
+          attributes == nullptr) {
+        continue;
+      }
+
+      const WLAN_ASSOCIATION_ATTRIBUTES& association =
+          attributes->wlanAssociationAttributes;
+      if (association.dot11Ssid.uSSIDLength > 0) {
+        ssid.assign(
+            reinterpret_cast<const char*>(association.dot11Ssid.ucSSID),
+            association.dot11Ssid.uSSIDLength);
+      }
+      WlanFreeMemory(attributes);
+      if (!ssid.empty()) break;
+    }
+    WlanFreeMemory(interfaces);
+  }
+
+  WlanCloseHandle(client, nullptr);
+  return ssid;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -49,6 +104,22 @@ bool FlutterWindow::OnCreate() {
       result->Success(flutter::EncodableValue(cost == NLM_CONNECTION_COST_UNRESTRICTED));
     } else { result->NotImplemented(); }
   });
+
+  // Wi-Fi SSID for the in-memory LAN acceleration hint.
+  flutter::MethodChannel<flutter::EncodableValue> wifi(
+      flutter_controller_->engine()->messenger(), "lab/wifi_ssid",
+      &flutter::StandardMethodCodec::GetInstance());
+  wifi.SetMethodCallHandler([](const auto& call, auto result) {
+    if (call.method_name() == "currentSsid") {
+      result->Success(flutter::EncodableValue(CurrentWifiSsid()));
+    } else if (call.method_name() == "requestPermission") {
+      // Windows needs no runtime permission to read the SSID.
+      result->Success(flutter::EncodableValue(true));
+    } else {
+      result->NotImplemented();
+    }
+  });
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
