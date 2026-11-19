@@ -112,6 +112,46 @@ class LabWorkflowTransactionTest(TransactionCase):
         self.assertTrue(pdf.get('pdf_base64'))
         self.assertEqual(self.template._lab_quantity(), before)
 
+    def test_every_creation_path_makes_a_receivable_material(self):
+        """EVERY way of creating a material must produce one that can be received.
+
+        Odoo 19 declares ``is_storable`` with ``default=False``
+        (``addons/stock/models/product.py``), so a ``create()`` that forgets it
+        silently produces a non-storable product: the bag code is generated, and
+        the operator only finds out at the shelf with
+        "当前未开启库存管理（is_storable=False）".
+
+        This bit the "新建器件" branch once and produced SEVEN unusable materials
+        in one day. Each creation path is exercised here, not just the one that
+        broke.
+        """
+        common = self.common.with_user(self.operator)
+
+        # 1) 手工新建器件（曾经漏设 is_storable/tracking 的那条）
+        manual = common.lab_pending_create({
+            'request_key': _key('guard-manual'),
+            'material': {'name': '守卫测试器件'}, 'quantity': 1, 'count': 1})
+        manual_tmpl = self.env['product.template'].browse(
+            manual['records'][0]['product_template_id'])
+
+        # 2) 立创 C 编号自动建档
+        lcsc_tmpl = common.lab_search_template('C999002', create_if_missing=True,
+                                               origin='test')
+
+        for tmpl, label in ((manual_tmpl, '手工新建'), (lcsc_tmpl, '立创建档')):
+            self.assertEqual(tmpl.type, 'consu', label)
+            self.assertTrue(tmpl.is_storable,
+                            '%s 建出的物料不可库存，入库时会被拒绝' % label)
+            self.assertIn(tmpl.tracking, ('lot', 'serial'),
+                          '%s 建出的物料没有批次跟踪' % label)
+
+        # 而且必须真的能入库（不只是字段看着对）。
+        common.lab_pending_confirm({
+            'request_key': _key('guard-confirm'),
+            'pending_id': manual['records'][0]['id'],
+            'location_id': self.location_a.id, 'quantity': 1})
+        self.assertEqual(manual_tmpl._lab_quantity(), 1)
+
     def test_pending_create_key_replay_and_manual_archive(self):
         common = self.common.with_user(self.operator)
         payload = {'request_key': _key('prepare'), 'material': {

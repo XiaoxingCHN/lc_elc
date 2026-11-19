@@ -40,17 +40,94 @@ SHA256 完全一致）。
 配置形态，不是本次升级造成的——升级前日志显示 Odoo 一直正常服务 `LcHardwareHouse`。
 服务本身健康。
 
-## 二、存量数据修复：模板 #16
+## 二、存量数据修复：全库 8 个物料（一次修完）
 
-截图报错的 `GH1.25 端子 2P`（`product.template` id=16，`lab_sn=LAB-000025`）在库里是
-`is_storable=False / tracking=none`。代码修复只影响**新建**物料，所以单独改了这条：
+**教训**：第一次只修了截图里那一条（#16），用户第二次截图换成 4P（#17）又报同样的错。
+这是**系统性数据问题**，不是单条异常——应当第一轮就 `SELECT ... WHERE is_storable=false`
+查全量。
 
-1. 先查无批次正库存：`stock_quant` 里 internal/transit、`lot_id IS NULL`、`quantity>0`
-   的记录数 = **0**；
-2. 按 `lab_ensure_storable_tracking` 的同一规则写成 `is_storable=True / tracking=lot`。
+`product_template` 里 `type='consu' AND is_storable=false` 共 **7 条**（#16 此前已修），
+全部为 GH1.25 端子线系列，且 `tracking` 均为 `none`：
 
-**如果以后遇到别的 `is_storable=False` 物料**：同一流程——先查无批次正库存，
-为 0 才能直接开跟踪；不为 0 必须走「历史库存分袋适配」，否则那些库存会失去追溯。
+| id | SN | 名称 |
+|---|---|---|
+| 13 | LAB-000022 | GH1.25端子线 |
+| 14 | LAB-000023 | GH1.25 3P |
+| 15 | LAB-000024 | GH1.25 端子 3P |
+| 17 | LAB-000026 | GH1.25 端子 4P |
+| 18 | LAB-000027 | GH1.25 端子线 黑色 |
+| 19 | LAB-000028 | GH1.25 端子线 红色 |
+| 20 | LAB-000029 | GH1.25 成品端子线 7P 反向 |
+
+**修法**（逐条按 `lab_ensure_storable_tracking` 的同一安全规则）：
+
+1. 先查无批次正库存（`stock_quant` internal/transit、`lot_id IS NULL`、`quantity>0`）——
+   7 条全部为 **0**，可以安全开启跟踪；
+2. 写 `is_storable=True / tracking='lot'`。
+
+**结果**：7 条全部修复，`REFUSED 0`；全库 `is_storable=false` 残留 **0**。
+
+**以后遇到同类数据**：先 `SELECT id, lab_sn FROM product_template WHERE type='consu'
+AND is_storable=false` 查全量，再逐条按上面的规则处理——不要只修报错的那一条。
+若某条有无批次正库存，**不能**直接开跟踪，必须走「历史库存分袋适配」。
+
+### 根因（追到底）
+
+Odoo 19 的字段定义（`/opt/odoo/odoo-19/addons/stock/models/product.py:839`）：
+
+```python
+is_storable = fields.Boolean(
+    'Track Inventory', store=True, compute='compute_is_storable', readonly=False,
+    default=False, precompute=True, tracking=True, ...)
+```
+
+**默认 `False`**。所以任何忘记显式写 `is_storable=True` 的 `create()` 都会静默建出
+不可库存的物料——制袋码照常生成，到上架时才报错。
+
+我们代码里建 `product.template` 的地方只有三处：
+
+| 位置 | 是否设置 | 结果 |
+|---|---|---|
+| `lab_pending_receipt.py`「新建器件」分支 | **原本漏设** | 7 个物料全部不可入库 |
+| `lab_workflow_common._lab_create_minimal_material`（立创 C 码建档） | `is_storable: True` | 正常 |
+| `lab_catalog/controllers/catalog_api.py`（create_material） | `is_storable: True` | 正常 |
+
+数据佐证：7 个坏物料全部 `lab_lcsc_code` 为空、`create_date` 都是 2026-11-19、`create_uid=2`
+——即用户当天连续用「新建器件」建了 7 条，每条都撞同一个 bug。
+
+### 防回归
+
+`test_workflow_business.py` 新增
+`test_every_creation_path_makes_a_receivable_material`：**逐条**走两条建档路径
+（手工新建 / 立创 C 码），断言建出的物料 `type=consu` + `is_storable=True` +
+`tracking in (lot, serial)`，并真的执行一次 `lab_pending_confirm` 证明能入库。
+不是只测修好的那一条。
+
+### 在服务器上跑测试（此前误以为本机跑不了）
+
+```bash
+sudo -u odoo /opt/odoo/venv/bin/python3 /opt/odoo/odoo-19/odoo-bin   --config=/etc/odoo.conf -d LcHardwareHouse   --test-tags /lab_workflow --stop-after-init --no-http   --workers 0 --http-port=8199 --log-level=test
+```
+
+四个必须项，缺一个就看不到结果：
+
+- `--workers 0`：配置文件里是 `workers = 2`，workers 模式下 Odoo **不执行**测试，
+  只打印「0 post-tests」；
+- `--http-port=8199`：8069 被运行中的服务占用；
+- `--log-level=test`；
+- 结果**不在 stdout**：`/etc/odoo.conf` 的 `logfile` 会接管输出，要去
+  `/var/log/odoo/odoo.log` 里 `grep "of N tests when loading"`。
+
+### 顺带修掉的测试隔离缺陷
+
+`test_p3_backend_api.test_01_bags_pagination_and_filters` 原先断言
+`len(lab_bags(has_stock=False)) == 2`，但 `lab_bags` 是**全公司**范围，这个库又是生产库，
+所以只要有真实袋就必失败。改为只断言「本测试的袋落在哪一侧」。
+
+同时确认了 `has_stock` 的真实语义：`true` 加 `quantity > 0`；**`false` 不加任何条件**
+（即返回全部）。注释里写清楚了，免得下一个人再按「false = 空袋」去写。
+
+**最终：`/lab_workflow` 88 个测试全部通过（0 failed / 0 error）。**
 
 ## 三、作业页带着分区切换器（客户端 bug）
 

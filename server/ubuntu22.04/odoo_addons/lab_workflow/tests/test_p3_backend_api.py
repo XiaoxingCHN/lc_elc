@@ -158,8 +158,22 @@ class LabP3BackendTest(TransactionCase):
         # 没有库存的袋（领空后）在 has_stock=true 时被过滤
         self._issue(first['bag'], quantity=10)
         self.env['lab.bag'].browse(first['bag']['id'])._lab_sync_quantity()
-        self.assertEqual(len(self.common.lab_bags(has_stock=True)['bags']), 1)
-        self.assertEqual(len(self.common.lab_bags(has_stock=False)['bags']), 2)
+        # `lab_bags` is not scoped to this test: it lists the whole company, and
+        # this database is the production one, so absolute counts assert the
+        # database's contents rather than the filter.
+        #
+        # What `has_stock` actually means (see `lab_bags`): `true` adds
+        # `quantity > 0`; `false` adds NOTHING, i.e. it returns every bag. So
+        # the contract is one-sided - the emptied bag must drop out of
+        # `has_stock=true`, and must still be present when no filter is asked.
+        with_stock = {row['id'] for row in self.common.lab_bags(has_stock=True)['bags']}
+        without_filter = {
+            row['id'] for row in self.common.lab_bags(has_stock=False)['bags']}
+        self.assertIn(second['bag']['id'], with_stock)
+        self.assertNotIn(first['bag']['id'], with_stock,
+                         '领空后的袋不应出现在 has_stock=True')
+        self.assertIn(first['bag']['id'], without_filter,
+                      'has_stock=false 表示不过滤，空袋仍应列出')
 
     def test_02_bag_detail_and_label_facts(self):
         receipt = self._receipt(10)

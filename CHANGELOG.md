@@ -1,5 +1,29 @@
 # 变更记录
 
+## 2026.11.19 追查 is_storable 根因；全库 8 个物料修复；Odoo 测试实跑
+
+- **根因**：Odoo 19 的 `is_storable` 默认是 **`False`**
+  （`addons/stock/models/product.py:839`，`default=False, precompute=True`）。任何忘记显式
+  写 `is_storable=True` 的 `create()` 都会静默建出不可库存的物料——制袋码照常生成，
+  到「扫码上架」才报错。我们的 `lab_pending_receipt.py`「新建器件」分支正是漏了这一个。
+  另两条建档路径（`_lab_create_minimal_material`、`catalog_api.create_material`）都设了，
+  所以只有「新建器件」出的物料会坏。
+- **数据佐证**：7 个坏物料全部 `lab_lcsc_code` 为空、`create_date` 都是 2026-11-19、
+  `create_uid=2`——用户当天连续用「新建器件」建了 7 条，每条都撞同一个 bug。
+  我第一轮只修了截图里那一条（#16），第二次截图换成 4P（#17）才去查全量，这是判断失误。
+- **已全部修复**：`type='consu' AND is_storable=false` 共 7 条（#13/14/15/17/18/19/20），
+  逐条确认无无批次正库存后写 `is_storable=True / tracking='lot'`。全库残留 **0**。
+- **防回归**：新增 `test_every_creation_path_makes_a_receivable_material`，
+  **逐条**走两条建档路径，断言 `is_storable=True` + `tracking in (lot,serial)`，
+  并真的执行一次入库证明可用——不是只测修好的那一条。
+- **在服务器上实跑 Odoo 测试**（此前误以为本机跑不了）：`/lab_workflow`
+  **88 个测试全部通过（0 failed / 0 error）**。四个必须项：`--workers 0`（否则 workers
+  模式不执行测试）、`--http-port=8199`（8069 被占用）、`--log-level=test`、
+  结果去 `/var/log/odoo/odoo.log` 读（配置里的 `logfile` 会接管 stdout）。
+- **顺带修测试隔离缺陷**：`test_01_bags_pagination_and_filters` 断言全公司袋数 == 2，
+  但测试跑在生产库上，有真实袋就必失败。改为只断言本测试的袋落在哪一侧；同时确认
+  `has_stock` 语义是「true 加 `quantity>0`，false 不加任何条件」。
+
 ## 2026.11.19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
 
 - 版本：`clients/app` `1.3.5+21 → 1.3.5+22`。
