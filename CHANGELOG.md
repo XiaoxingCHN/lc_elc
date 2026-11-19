@@ -1,5 +1,32 @@
 # 变更记录
 
+## 2026.11.19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
+
+- 版本：`clients/app` `1.3.5+21 → 1.3.5+22`。
+- **作业页带着分区切换器**（用户截图：采购入库页底部还有「库存 / 仓位 / 器件库」）：
+  `context.push` 在 `StatefulShellRoute` 分支内部会推到**该分支自己的导航器**上，所以
+  入库/领料/归还/标签/历史被套在外壳里。给这 7 条根级路由加
+  `parentNavigatorKey: rootNavigatorKey`，它们现在总是覆盖外壳。
+  导航器 key 抽到 `lib/routes/navigator_keys.dart`，避免 `unified_routes` 与 `app_router`
+  循环依赖。
+- **顺带修掉一处重复定义**：`/catalog` 同时存在于 shell 分支和 `unifiedRoutes`，根级那份
+  赢得匹配，导致器件库其实不在外壳里、切走再切回会丢页面栈。删掉根级那份。
+- **服务端已部署**（lc-nas，2026-11-19 13:54 UTC）：
+  `lab_workflow 19.0.2.0.3 → 19.0.2.0.4`，`lab_team_web` 同步换代码（窄屏抽屉关闭手柄）。
+  备份点 `/var/backups/lc-elc/20261119T135447Z-before-upgrade`。
+- **存量数据修复**：截图里报错的 `GH1.25 端子 2P`（模板 #16，`LAB-000025`）原本
+  `is_storable=False / tracking=none`。代码修复只影响新建，所以单独改了这一条：
+  先确认无无批次正库存（0 条），再按 `lab_ensure_storable_tracking` 的同一规则写成
+  `is_storable=True / tracking=lot`。
+- **实测**：`flutter test --no-pub` **510 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning；新增回归测试钉住
+  「作业页不带切换器」。服务端升级退出码 0、0 条 ERROR/Traceback，服务 active，
+  `/web/health` 200，公网 `https://team.l-creation.club/` 200。
+- **产物**：Windows `LC_ELC-Windows-1.3.5+22-x64.zip`（37,739,348 B，sha256 `7e5b6a72…c900e6fa`）；
+  Android `LC_ELC-Android-1.3.5+22.apk`（108,025,712 B，sha256 `b87c5d82…afdcfa78`，
+  versionCode 22，证书与登记 keystore 一致）。`repo_check` **PASS 53**。
+- **未验证**：Android 实机观感；真实打印与扫码。
+
 ## 2026.11.19 客户端 1.3.5+21：修手机切换器撑满整屏；拦下内网 https 手误
 
 - 版本：`clients/app` `1.3.5+20 → 1.3.5+21`。

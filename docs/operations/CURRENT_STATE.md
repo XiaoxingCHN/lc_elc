@@ -1,5 +1,13 @@
 # 当前状态与已知限制
 
+## 2026-11-19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
+
+- 作业页（入库/领料/归还/标签/历史）曾带着分区切换器显示：`context.push` 在 shell 分支内会推到该分支的导航器。7 条根级路由加 `parentNavigatorKey: rootNavigatorKey` 后总是覆盖外壳。同时删掉 `/catalog` 在 `unifiedRoutes` 里的重复定义（根级那份赢得匹配，器件库其实不在外壳里）。
+- **服务端已部署**：`lab_workflow 19.0.2.0.3 → 19.0.2.0.4`、`lab_team_web` 同步换代码。备份 `/var/backups/lc-elc/20261119T135447Z-before-upgrade`。升级退出码 0、0 条 ERROR、服务 active、`/web/health` 200、公网 `/` 200。
+- 存量数据：模板 #16 `GH1.25 端子 2P`（`LAB-000025`）原 `is_storable=False`，已确认无无批次库存后改为 `is_storable=True / tracking=lot`。
+- 实测：`flutter test` **510 passed / 5 skipped**；`analyze` 0 error / 0 warning。
+- **未验证**：Android 实机、真实打印与扫码。
+
 ## 2026-11-19 客户端 1.3.5+21：手机切换器布局 + 内网 https 手误
 
 - 手机底部栏里分区切换器被撑成整屏胶囊（`Center` 在有限高度约束下扩张）。实测 412×915 屏幕上从 412×907 修到 412×52，加回归测试。

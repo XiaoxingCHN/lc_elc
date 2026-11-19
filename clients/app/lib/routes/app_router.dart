@@ -9,6 +9,9 @@ import '../features/warehouse/warehouse_shell.dart';
 import '../screens/login_screen.dart';
 import '../screens/splash_screen.dart';
 import '../providers/auth_provider.dart';
+import 'navigator_keys.dart';
+
+export 'navigator_keys.dart' show rootNavigatorKey;
 import 'offline_access.dart';
 
 /// Bridges Riverpod auth state into GoRouter's `refreshListenable`.
@@ -33,7 +36,6 @@ class _AuthRouterRefresh extends ChangeNotifier {
   }
 }
 
-final rootNavigatorKey = GlobalKey<NavigatorState>();
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRouterRefresh(ref);
 

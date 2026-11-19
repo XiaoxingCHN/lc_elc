@@ -1,3 +1,4 @@
+import 'package:lab_inventory_client/routes/navigator_keys.dart';
 import 'package:lab_inventory_client/widgets/lab_ui.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,7 +9,6 @@ import 'screens/labels_screen.dart';
 import 'screens/receipt_screen.dart';
 import 'screens/pending_receipt_screen.dart';
 import 'screens/return_screen.dart';
-import 'screens/unified_catalog_screen.dart';
 import 'screens/unified_item_detail_screen.dart';
 
 /// Route paths of the unified client business.
@@ -121,23 +121,20 @@ class UnifiedRoutes {
 final List<RouteBase> unifiedRoutes = <RouteBase>[
   GoRoute(
     path: UnifiedRoutes.pendingReceipt,
+    parentNavigatorKey: rootNavigatorKey,
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.catalog,
       child: PendingReceiptScreen(initialTab: state.uri.queryParameters['step'] == 'scan' ? 1 : 0,
         initialItemKey: state.uri.queryParameters['item_key']),
     ),
   ),
-  GoRoute(
-    path: UnifiedRoutes.catalog,
-    name: 'unifiedCatalog',
-    builder: (context, state) => UnifiedCatalogScreen(
-      initialQuery: state.uri.queryParameters['query'],
-      initialCategoryId: int.tryParse(state.uri.queryParameters['category_id'] ?? ''),
-      offline: UnifiedRoutes.isOffline(state.uri.queryParameters),
-    ),
-  ),
+  // NOTE: `/catalog` is NOT defined here. It is the 器件库 BRANCH of the
+  // warehouse shell (see `features/warehouse/warehouse_routes.dart`). Defining
+  // it twice let the root-level copy win the match, so the library rendered
+  // outside the shell and switching sections away from it lost its stack.
   GoRoute(
     path: UnifiedRoutes.itemDetailPath,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedItemDetail',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
@@ -149,6 +146,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
   ),
   GoRoute(
     path: UnifiedRoutes.receipt,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedReceipt',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
@@ -162,6 +160,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
   ),
   GoRoute(
     path: UnifiedRoutes.issue,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedIssue',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
@@ -173,6 +172,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
   ),
   GoRoute(
     path: UnifiedRoutes.returnGoods,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedReturn',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
@@ -183,6 +183,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
   ),
   GoRoute(
     path: UnifiedRoutes.labels,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedLabels',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,
@@ -194,6 +195,7 @@ final List<RouteBase> unifiedRoutes = <RouteBase>[
   ),
   GoRoute(
     path: UnifiedRoutes.history,
+    parentNavigatorKey: rootNavigatorKey,
     name: 'unifiedHistory',
     builder: (context, state) => LabPageFrame(
       fallbackLocation: UnifiedRoutes.isOffline(state.uri.queryParameters) ? UnifiedRoutes.offlineCatalog : UnifiedRoutes.catalog,

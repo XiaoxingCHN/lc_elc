@@ -1,0 +1,24 @@
+{
+  "file": "clients/windows/releases/1.3.5+22/LC_ELC-Windows-1.3.5+22-x64.zip",
+  "bytes": 37739348,
+  "sha256": "7e5b6a72acdf6bf2db6da6fd6839bd08093847bebe04b9bd6d47b46dc900e6fa",
+  "version": "1.3.5+22",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-22-20261119.json",
+  "source_tree_sha256": "b643c3d00887fc02b8c7dcf9b2f2300f84b8f6869df618708bd4399c380793fe",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 510 passed / 5 skipped",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 22,
+  "files": 30,
+  "executable_sha256": "d632efe60a559d1fb700e5ec2581135d7692202cd03359f4dd31e74251d386d3",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "changes_in_this_build": [
+    "作业页（入库/领料/归还/标签/历史）不再带着分区切换器：7 条根级路由加 parentNavigatorKey，总是覆盖外壳",
+    "删掉 /catalog 在 unifiedRoutes 里的重复定义，器件库回到 shell 分支内、切换分区不再丢页面栈"
+  ],
+  "unverified": [
+    "Android 实机",
+    "真实打印与扫码",
+    "应用内更新"
+  ]
+}

@@ -227,6 +227,48 @@ void main() {
     },
   );
 
+  testWidgets(
+    'an operational page covers the shell (no section switcher on it)',
+    (tester) async {
+      useDesktopSurface(tester);
+      final container = buildAuthContainer(
+        backend: backend,
+        gateway: gateway,
+        now: now,
+        apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+      );
+      addTearDown(container.dispose);
+
+      await seedRememberedLogin(
+        store: container.read(loginMemoryStoreProvider),
+        lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+        password: password,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await pumpUntil(tester, find.byType(StockOverviewScreen));
+      await settleRoute(tester);
+
+      final router = container.read(appRouterProvider);
+      for (final job in <String>['/receipt/prepare', '/receipt', '/labels']) {
+        router.push(job);
+        await settleRoute(tester);
+
+        // 入库 / 标签 are full-screen jobs. They used to be pushed onto the
+        // shell branch's navigator, so the section switcher stayed visible
+        // underneath and the page never really covered the app.
+        expect(
+          find.byType(WarehouseSectionSwitcher),
+          findsNothing,
+          reason: '$job must cover the shell, not sit inside it',
+        );
+        expect(find.byType(StockOverviewScreen), findsNothing, reason: job);
+      }
+    },
+  );
+
   testWidgets('the library is one tap away and still renders captured rows', (
     tester,
   ) async {
