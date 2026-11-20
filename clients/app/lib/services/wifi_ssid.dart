@@ -21,17 +21,28 @@ class WifiSsidService {
 
   static const MethodChannel _channel = MethodChannel('lab/wifi_ssid');
 
-  /// Platform probe, injectable so a test can exercise the Android branch of
-  /// the MethodChannel contract on any host.
+  /// Platform probe, injectable so a test can exercise any branch on any host.
+  ///
+  /// Setting ANY field makes the override REPLACE the real platform detection
+  /// rather than OR-ing with it. OR-ing was wrong: on a Linux test host,
+  /// `platformOverride = (android: true, ...)` still matched `Platform.isLinux`
+  /// and ran `nmcli`, so the Android contract tests failed on exactly one
+  /// platform - the one CI runs Linux builds on.
   @visibleForTesting
   static ({bool android, bool windows, bool linux}) platformOverride =
       const (android: false, windows: false, linux: false);
 
+  static bool get _overrideActive =>
+      platformOverride.android ||
+      platformOverride.windows ||
+      platformOverride.linux;
+
   static bool get _isAndroid =>
-      platformOverride.android || Platform.isAndroid;
+      _overrideActive ? platformOverride.android : Platform.isAndroid;
   static bool get _isWindows =>
-      platformOverride.windows || Platform.isWindows;
-  static bool get _isLinux => platformOverride.linux || Platform.isLinux;
+      _overrideActive ? platformOverride.windows : Platform.isWindows;
+  static bool get _isLinux =>
+      _overrideActive ? platformOverride.linux : Platform.isLinux;
 
   /// The current SSID, or null when unknown/not on Wi-Fi.
   ///
