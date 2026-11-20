@@ -1,10 +1,11 @@
-# 方案：管理员维护入口（自有 UI 替代 Odoo 原生后台）
+# 方案：把所有管理员维护操作收进「管理」页
 
 - Status: **待审核**（未改任何源码）
-- 用户诉求：
-  > 必须把管理员维护入口做出来…不想继续使用 odoo 原生后台 UI 来管理整个账户和库存相关的，
-  > 一是不统一，二是门户太乱不好管理，只需要提供一个特定入口或者是只有管理员账号登录时
-  > 才有完全管理的界面
+- 用户需求（本轮澄清后）：
+  > 我们现在要把所有的管理员相关的东西（注意边界主要是维护的相关内容我们没有在自己的
+  > UI 里做）全部拉出来放在管理里
+
+即：**「管理」页 = 维护操作的唯一入口**，不再需要去 Odoo 原生后台。
 
 ## 一、为什么以前没做（先认账）
 
@@ -13,159 +14,138 @@
 > 原生后台供管理员低频维护，接受保留 `/odoo` 路径；成员日常流程使用自有页面。
 > **若用户要求连管理员维护也完全重做，属于额外明确范围，不能默认纳入首轮。**
 
-这条把「管理员维护」划到了首轮范围外，之后没人回头复查。我此前也按文档判断
-「公网 `/web` 404 = 后台已关」，没意识到管理员仍要走内网 8069 的原生后台。
+这条把「管理员维护」划到了首轮范围外，之后没人回头复查。
 
-## 二、现状：管理员现在必须用原生后台做的事
-
-| 任务 | 现有自有 UI | 现在怎么办 |
-|---|---|---|
-| 建用户 | ❌ | 内网 8069 → `/web` → 设置 → 用户 |
-| 改密码 / 重置密码 | ❌ | 同上 |
-| 停用账号 | ❌ | 同上 |
-| 系统管理员 / ERP 权限组 | ❌ | 同上 |
-| 编辑器件（名称/型号/封装/参数） | ❌ 只能绑 C 码、建档 | 同上 |
-| 分类树维护 | ❌ | 同上 |
-| 库存盘点 / 报废 / 调拨 | ❌ 后端刻意不提供 | 同上 |
-| 模块安装 / 数据库 / 备份 | ❌ | CLI 脚本 |
-
-**已有的**（`/team/lab/settings`）：只能开关「只读 / 操作员 / 管理员」三个库存角色。
-
-## 三、方案：扩展现有「管理」页（不新建页面）
-
-**按用户确认：维护界面放在原有的「管理」里，只给管理员显示。**
-
-### 3.1 入口与门禁：**已经是管理员专属，无需任何改动**
-
-核实结果（`controllers/common.py:304` + `WORKFLOW_NAV`）：
+## 二、前提已成立：管理页本来就是管理员专属
 
 ```python
-'can_manage_members': manager      # manager = is_lab_manager(user)
-('settings', 'can_manage_members', False),   # 导航项
+# controllers/common.py:304
+'can_manage_members': manager          # manager = is_lab_manager(user)
+# WORKFLOW_NAV
+('settings', 'can_manage_members', False),
 ```
 
-也就是说：
-- **「管理」页现在就只有 `group_lab_manager` 能看见**，普通操作员导航里没有这一项；
-- 页面本身也走 `render_denied`，直接访问 URL 会被拒。
+非管理员导航里没有这一项，直接访问 URL 也会 `render_denied`。
+**本次不改权限、不加路由、不加导航，只往这个页面里填功能。**
 
-**所以「只给管理员显示」这条已经成立，本次不改权限、不加路由、不加导航。**
-要做的只是往这个页面里填功能。
+## 三、边界：原生后台里到底有什么
 
-### 3.2 现有页面结构（`views/workflow_inventory.xml:332`）
+生产实际顶层菜单：
 
 ```
-workflow_inventory_settings
-├─ 未决提交恢复区（data-lc-inv-locks="settings"）
-├─ 成员库存角色说明面板
-├─ 搜索工具条（query / only_with_role / 刷新）
-├─ 账号与角色表格（姓名 登录名 用户 操作员 管理员 状态）
-└─ 「不在本页的配置」面板   ← 这一段就是要被替换掉的
+实验室库存   ← 我们自己的，已全部指向 /team/*
+Website      ← 门户，本次不关心
+Settings     ← ★ 维护面主体
+Apps         ← 模块安装
+Discuss      ← 聊天，不用
+Inventory    ← ★ 库存维护主体
+Link Tracker ← 营销，不用
+Manufacturing← 制造，不用（mrp 0 数据）
 ```
 
-最后那个「不在本页的配置」面板现在写着：
+### 3.1 需要搬的：`Settings` 里与我们相关的
 
-> 系统管理员、ERP 管理员的授权仍走原生后台…
-> 数据库、模块安装、密码复位不在本页；密码请走管理员复位或原生流程。
-
-**这三条就是本次要消灭的缺口。**
-
-### 3.3 在「管理」页内新增三块
-
-#### 页签 1：账号管理
-
-| 功能 | 需要的新端点 | 说明 |
+| 原生路径 | 内容 | 是否搬 |
 |---|---|---|
-| 列出账号 | 复用 `members` | **已有** |
-| 角色开关 | 复用 `member_set_role` | **已有** |
-| 建用户 | `POST /lab/api/admin/user_create` | 新增：login/name/password/初始角色 |
-| 改密码 | `POST /lab/api/admin/user_set_password` | 新增：管理员代设 |
-| 停用/启用 | `POST /lab/api/admin/user_toggle_active` | 新增：不能停用自己、不能停用最后一个管理员 |
-| 系统权限组 | `POST /lab/api/admin/user_set_system_group` | 新增：仅 `base.group_system` 持有者可用 |
+| Users & Companies → **Users** | 建用户、改密码、停用 | ✅ 搬 |
+| Users & Companies → **Groups** | 组与权限 | ⚠️ 部分（库存三组 + 系统管理员开关） |
+| Users & Companies → **Companies** | 公司信息 | ✅ 搬（只读 + 改名） |
+| **General Settings** | 站点标题等 | ✅ 搬 |
+| Technical → **System Parameters** | `lab_team_web.*` 等配置 | ✅ 搬（键白名单） |
+| Technical → **Sequences** | 编码序列 | ✅ 搬（只读 + 重置） |
+| Technical → 其它（Views/Actions/Menus/…） | 开发调试 | ❌ 不搬（内网保留） |
 
-#### 页签 2：器件档案
+### 3.2 需要搬的：`Inventory` 里与我们相关的
 
-| 功能 | 需要的新端点 |
-|---|---|
-| 编辑产品字段 | `POST /lab/api/admin/product_update`（名称/型号/封装/品牌/参数） |
-| 分类树 | `POST /lab/api/admin/category_create` / `category_update` / `category_delete` |
+| 原生路径 | 内容 | 是否搬 |
+|---|---|---|
+| Products → **Products** | 编辑器件 | ✅ 搬 |
+| Products → **Product Categories** | 分类树 | ✅ 搬 |
+| Operations → **Physical Inventory** | 盘点 | ✅ 搬（走 stock.move） |
+| Operations → **Scrap** | 报废 | ⚠️ 待确认 |
+| Reporting → **Stock** | 库存报表 | ✅ 搬（只读） |
+| Configuration → Warehouses/Locations | 仓库/库位 | ✅ 已有（`/team/lab/locations`） |
 
-#### 页签 3：库存调整（**最后做，风险最高**）
+### 3.3 明确不搬的
 
-| 功能 | 实现方式 |
-|---|---|
-| 盘点 | 建 `stock.move` → `_action_done()`，**绝不直接写 `stock.quant`** |
-| 报废 | 走 `stock.scrap` |
-| 库位调拨 | 建两笔 `stock.move`（出+入） |
+- `Apps`（模块安装）→ 继续用 `upgrade_modules.sh`
+- `Website` / `Link Tracker` / `Manufacturing` / `Discuss` → 不用
+- `Settings → Technical` 里的 Views/Actions/Menus/User Interface → 开发调试，内网保留
+- 备份/恢复 → 继续用 `odoo_backup.py` / `odoo_restore.py`
 
-**约束**：全部复用 `lab_workflow_common._lab_move`（`lab_workflow_common.py:1053`），
-它是现有所有库存变动的唯一通道，保证批次/并发/UoM 语义一致。
-
-### 3.5 需要改动的文件（**不新建页面**）
-
-```
-server/ubuntu22.04/odoo_addons/lab_workflow/controllers/lab_admin_api.py   # 新：管理端点
-server/ubuntu22.04/odoo_addons/lab_workflow/models/lab_admin.py            # 新：业务逻辑
-server/ubuntu22.04/odoo_addons/lab_workflow/controllers/__init__.py        # 注册
-server/ubuntu22.04/odoo_addons/lab_workflow/models/__init__.py             # 注册
-server/ubuntu22.04/odoo_addons/lab_team_web/controllers/common.py          # 加端点映射
-server/ubuntu22.04/odoo_addons/lab_team_web/views/workflow_inventory.xml   # 改：扩 settings 模板
-server/ubuntu22.04/odoo_addons/lab_team_web/static/src/js/pages/settings.js # 改：加三块交互
-```
-
-**不新增** `workflow_admin.xml`、`admin.js`、路由、导航项——全部并入现有「管理」页。
-
-## 四、安全约束（必须先写进实现）
-
-1. **不能用 sudo 绕过业务规则**。现有 `_lab_member_set_role_once` 用了
-   `env['res.users'].sudo()`，但那是「管理员已过门禁、只是绕过记录规则」的场景。
-   新建用户同理，但**必须在服务端校验**：不能建 `base.group_system` 用户除非操作者自己
-   就是系统管理员。
-2. **不能停用最后一个管理员**（沿用现有 `_lab_manager_remaining_by_company` 的 fail-closed 逻辑）。
-3. **不能停用自己**。
-4. **库存调整必须留审计**：`lab.operation` 里记一条，含操作人、目标库位、数量、原因。
-5. **密码不落日志**（沿用 `redactForLog`）。
-
-## 五、分批与工期估算
-
-| 批次 | 内容 | 风险 | 估算 |
-|---|---|---|---|
-| A | `/team/admin` 骨架 + 页签 1（账号管理） | 低 | 主要工作量 |
-| B | 页签 2（器件档案） | 中（改 product.template） | 中等 |
-| C | 页签 3（库存调整） | **高**（直接动库存） | 需要最谨慎 |
-
-建议：**A 先做并验收，B、C 分开做**。
-
-## 六、待你确认
-
-1. ~~入口形式~~ → **已确认：扩展现有「管理」页，只给管理员显示**
-2. ~~谁算管理员~~ → **已确认：「管理」页现在就是 `group_lab_manager` 专属，
-   沿用即可**。唯一要额外考虑的是「系统权限组」这块——授予 `base.group_system`
-   是 Odoo 系统级操作，建议这一项额外要求操作者自己就是系统管理员。
-3. **库存调整要不要做**？这是唯一会直接改库存的入口，风险最高。
-   可以只做「盘点」，不做「报废/调拨」。
-4. **`mrp` / `website` 清理**：你说「也可以不管」，那我先跳过，只做管理员入口？
-
-## 七、页面布局（扩展现有「管理」页后的样子）
+## 四、改造后的「管理」页结构
 
 ```
-/team/lab/settings  「管理」
+/team/lab/settings  「管理」（group_lab_manager 专属）
+│
 ├─ [现有] 未决提交恢复区
-├─ [现有] 成员库存角色说明
-├─ [现有] 搜索工具条
-├─ [现有] 账号与角色表格
+├─ [现有] 成员库存角色（勾选框）
 │
-├─ [新增] 账号管理
-│    ├─ 新建账号（登录名 / 姓名 / 初始密码 / 初始角色）
-│    ├─ 重置密码（选账号 → 输入新密码）
-│    └─ 停用 / 启用
+├─ [新] 账号
+│    ├─ 新建账号：登录名 / 姓名 / 初始密码 / 初始库存角色
+│    ├─ 重置密码：选账号 → 新密码
+│    ├─ 停用 / 启用
+│    └─ 系统管理员开关（仅 base.group_system 持有者可改）
 │
-├─ [新增] 器件档案维护
-│    ├─ 搜索器件 → 编辑名称/型号/封装/品牌/参数
-│    └─ 分类树（新增 / 改名 / 删除）
+├─ [新] 器件与分类
+│    ├─ 搜索器件 → 编辑 名称/型号/封装/品牌/参数
+│    └─ 分类树：新增 / 改名 / 删除（有库存的分类禁止删）
 │
-└─ [新增] 库存调整（若确认要做）
-     └─ 选库位 → 选器件 → 盘点数量 / 报废
-        （全部走 stock.move，不直写 stock.quant）
+├─ [新] 库存
+│    ├─ 盘点：选库位 + 器件 → 实际数量 → 生成 stock.move
+│    ├─ 报废：（待确认）
+│    └─ 库存报表：按库位/器件查看 quant（只读）
+│
+├─ [新] 系统参数
+│    ├─ 站点标题、管理 Host 等白名单键
+│    └─ 编码序列（只读 + 重置）
+│
+└─ [删除] 「不在本页的配置」说明块
+     （它列的三条缺口正是本次要填的）
 ```
 
-原来那段「不在本页的配置」删除或改写——它列的三条缺口正是本次要消灭的。
+## 五、需要新增的端点
+
+全部 `POST /lab/api/admin/*`，`auth='user'`，**`_lab_require_manager` 门禁**：
+
+| 端点 | 用途 | 备注 |
+|---|---|---|
+| `user_create` | 建账号 | 校验登录名唯一、密码强度 |
+| `user_set_password` | 重置密码 | 不落日志 |
+| `user_toggle_active` | 停用/启用 | 不能停用自己、不能停用最后一个管理员 |
+| `user_set_system_group` | 系统管理员开关 | **额外要求操作者是 `base.group_system`** |
+| `product_update` | 编辑器件 | 白名单字段 |
+| `category_create/update/delete` | 分类树 | 有库存的分类禁止删 |
+| `stock_adjust` | 盘点 | **必须走 `stock.move` + `_action_done()`** |
+| `stock_report` | 库存报表 | 只读 quant |
+| `config_get/set` | 系统参数 | 键白名单 |
+| `sequence_list/reset` | 编码序列 | 只读 + 重置 |
+
+## 六、安全约束（实现时必须遵守）
+
+1. **库存调整只能走 `stock.move`**，复用 `lab_workflow_common._lab_move`
+   （`lab_workflow_common.py:1053`），绝不直接写 `stock.quant`。
+2. **不能停用最后一个管理员**（沿用 `_lab_manager_remaining_by_company` 的 fail-closed）。
+3. **不能停用自己**。
+4. **授予 `base.group_system` 要求操作者自己就是系统管理员**（不能靠库存管理员提权）。
+5. **密码不落日志**（沿用 `redactForLog`）。
+6. **所有写操作记审计**：`lab.operation` 或 `_logger.info`，含操作人/目标/变更内容。
+7. **系统参数白名单**：只允许改 `lab_team_web.*`、`lab_workflow.*` 前缀的键，
+   不允许改 `database.*`、`auth.*` 等。
+
+## 七、分批建议
+
+| 批次 | 内容 | 风险 | 说明 |
+|---|---|---|---|
+| **A** | 账号（建/改密/停用/系统组） | 低 | 最急迫，现在完全缺失 |
+| **B** | 器件与分类 | 中 | 改 product.template，需白名单字段 |
+| **C** | 系统参数 + 序列 | 低 | 白名单键 |
+| **D** | 库存报表（只读） | 低 | 先只读，建立信心 |
+| **E** | 库存调整（盘点/报废） | **高** | 唯一直接改库存的，最后做 |
+
+## 八、待确认
+
+1. **报废**要不要做？（盘点我建议做，报废风险更高）
+2. **系统参数**允许改哪些键？我建议只开 `lab_team_web.*` 和 `lab_workflow.*`。
+3. **分类树删除**：有库存的分类禁止删，没库存的允许删——这样行吗？
+4. **批次顺序**：A（账号）先做？
