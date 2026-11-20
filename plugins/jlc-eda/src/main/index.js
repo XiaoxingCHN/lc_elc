@@ -29,7 +29,7 @@ import { createImageLoader } from './images.js';
 import { getEda, resolveEda, scanProjectBom, scanSchematic, toast } from './eda.js';
 import { installBridge, makeNonce, openOdooAction, openPanel } from './panel.js';
 
-export const VERSION = '3.1.0';
+export const VERSION = '3.1.1';
 
 /**
  * The host re-executes the whole bundle on every menu click, so module state is

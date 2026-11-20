@@ -27,12 +27,12 @@ const INCLUDED = [
   'LICENSE',
 ];
 
-const INSTALL_TEXT = `实验室库存插件 3.1.0 安装说明
+const installText = (version) => `实验室库存插件 ${version} 安装说明
 
 一、安装 EDA 插件
 1. 打开嘉立创 EDA 专业版。
 2. 进入「高级 → 扩展管理器 → 导入」。
-3. 选择本压缩包内的 lab-inventory-odoo_v3.1.0.eext。
+3. 选择本压缩包内的 lab-inventory-odoo_v${version}.eext。
 4. 启用「实验室库存联动（Odoo 19）」，并开启「外部交互」权限。
 5. 顶部菜单出现「库存联动」。
 
@@ -164,7 +164,7 @@ async function stageBundle(eextPath, extension) {
   await ensureClean(BUNDLE_STAGE);
   await fs.copyFile(eextPath, path.join(BUNDLE_STAGE, path.basename(eextPath)));
   await fs.copyFile(path.join(ROOT, 'README.md'), path.join(BUNDLE_STAGE, 'README.md'));
-  await fs.writeFile(path.join(BUNDLE_STAGE, '安装说明.txt'), INSTALL_TEXT, 'utf8');
+  await fs.writeFile(path.join(BUNDLE_STAGE, '安装说明.txt'), installText(extension.version), 'utf8');
   const bridgeDir = path.join(BUNDLE_STAGE, 'bridge');
   await fs.mkdir(path.join(bridgeDir, 'runtime'), { recursive: true });
   for (const rel of ['server.mjs', 'start-windows.cmd', 'start-linux.sh', '快速启动.txt']) {

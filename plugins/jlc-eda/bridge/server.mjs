@@ -296,7 +296,11 @@ export function createRelayServer(options = {}) {
   const db = String(options.db || DEFAULT_DB);
   const host = String(options.host || DEFAULT_HOST);
   const port = Number.isInteger(options.port) ? options.port : DEFAULT_PORT;
-  const token = String(options.token || crypto.randomBytes(32).toString('base64url'));
+  // A fixed token (`--token` / LAB_RELAY_TOKEN) keeps the pairing valid across
+  // restarts; otherwise one is minted per start (see parseRelayArgs).
+  const token = String(
+    options.token || process.env.LAB_RELAY_TOKEN || crypto.randomBytes(32).toString('base64url'),
+  );
   const logger = options.logger || console;
   const jar = new CookieJar();
   let sequence = 0;
@@ -593,11 +597,21 @@ export function parseRelayArgs(argv) {
   const seen = new Set();
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i];
-    if (!['--port', '--upstream', '--db'].includes(key) || seen.has(key)) throw new Error('未知或重复的启动参数：' + key);
+    if (!['--port', '--upstream', '--db', '--token'].includes(key) || seen.has(key)) throw new Error('未知或重复的启动参数：' + key);
     const value = argv[i + 1];
     if (!value || value.startsWith('--')) throw new Error(key + ' 缺少参数值');
     seen.add(key);
-    if (key === '--port') {
+    if (key === '--token') {
+      // A FIXED pairing token. Without one the relay mints a new random token
+      // on every start, so restarting it (or the EDA host re-running the
+      // extension) silently invalidates the token the plugin saved - every
+      // request then answers 401 and the panel says "未登录". Operators who
+      // keep the bridge running for days need the token to survive a restart.
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(value)) {
+        throw new Error('--token 必须是 16~128 位的字母、数字、下划线或短横线');
+      }
+      options.token = value;
+    } else if (key === '--port') {
       if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 65535) throw new Error('--port 必须是 1~65535 的整数');
       options.port = Number(value);
     } else if (key === '--db') {
@@ -615,9 +629,9 @@ export function parseRelayArgs(argv) {
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--help') || argv.includes('-h')) {
-    console.log('用法: node server.mjs [--port 49621] [--upstream http://lc.rm.com] [--db LcHardwareHouse]');
+    console.log('用法: node server.mjs [--port 49621] [--upstream http://lc.rm.com] [--db LcHardwareHouse] [--token <固定配对码>]');
     console.log('默认上游: ' + DEFAULT_UPSTREAM + '，默认数据库: ' + DEFAULT_DB);
-    console.log('每次启动生成新的配对码；只绑定 127.0.0.1。');
+    console.log('不给 --token（或环境变量 LAB_RELAY_TOKEN）时，每次启动生成新的配对码；只绑定 127.0.0.1。');
     return;
   }
   const relay = createRelayServer(parseRelayArgs(argv));
@@ -629,7 +643,11 @@ async function main() {
   console.log(' 上游: ' + relay.upstream + ' / ' + relay.db);
   console.log(' 配对码: ' + relay.token);
   console.log(' 把上面的配对码填到 EDA 插件「连接与账户」中。');
-  console.log(' 关闭此窗口即停止桥接；配对码每次启动都会变化。');
+  console.log(
+    options.token || process.env.LAB_RELAY_TOKEN
+      ? ' 关闭此窗口即停止桥接；配对码已固定，重启后不变。'
+      : ' 关闭此窗口即停止桥接；配对码每次启动都会变化（加 --token 可固定）。',
+  );
   console.log('============================================================');
   console.log('');
   const shutdown = async () => {

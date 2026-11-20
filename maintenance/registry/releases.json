@@ -126,27 +126,27 @@
     },
     {
       "id": "eda-eext",
-      "path": "plugins/jlc-eda/releases/3.1.0/lab-inventory-odoo_v3.1.0.eext",
-      "bytes": 98616,
-      "sha256": "fa20561d18410af504c67c86af4c0423ab4f134eb8fe9192b9346ddbd14aed3c",
-      "version": "3.1.0",
+      "path": "plugins/jlc-eda/releases/3.1.1/lab-inventory-odoo_v3.1.1.eext",
+      "bytes": 98809,
+      "sha256": "49a726c316695c1f89731be7e356505f634efc6bd57b07b9c442dae36d4853da",
+      "version": "3.1.1",
       "component": "eda",
-      "source_manifest": "maintenance/registry/source-eda-drawing-assistant-20261119.json",
-      "maintained_source_manifest": "maintenance/registry/source-eda-drawing-assistant-20261119.json",
-      "provenance": "built from this working tree on 2026-11-19 02:04 (build/ newer than all src/, extension.json, package.json, locales); node.exe SHA256 matches bundle-manifest",
-      "acceptance": "unit 123 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client install and real BOM issue NOT verified"
+      "source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "maintained_source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "provenance": "built from this working tree on 2026-11-20; unit 125 / package 15 pass, PACKAGE VERIFY OK",
+      "acceptance": "unit 125 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client session persistence NOT verified"
     },
     {
       "id": "eda-bundle",
-      "path": "plugins/jlc-eda/releases/3.1.0/lab-inventory-odoo_v3.1.0-bundle.zip",
-      "bytes": 92965355,
-      "sha256": "2376e4c47a4beb1199a37377d13885a30f770f0e38b15c5f07ece3aa27b20da2",
-      "version": "3.1.0",
+      "path": "plugins/jlc-eda/releases/3.1.1/lab-inventory-odoo_v3.1.1-bundle.zip",
+      "bytes": 92967258,
+      "sha256": "d1bc8a7d00f0b3bd59b9862348f420f3362befef7551cd9cd65f85e5b1d26e37",
+      "version": "3.1.1",
       "component": "eda",
-      "source_manifest": "maintenance/registry/source-eda-drawing-assistant-20261119.json",
-      "maintained_source_manifest": "maintenance/registry/source-eda-drawing-assistant-20261119.json",
-      "provenance": "built from this working tree on 2026-11-19 02:04 (build/ newer than all src/, extension.json, package.json, locales); node.exe SHA256 matches bundle-manifest",
-      "acceptance": "unit 123 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client install and real BOM issue NOT verified"
+      "source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "maintained_source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "provenance": "built from this working tree on 2026-11-20; unit 125 / package 15 pass, PACKAGE VERIFY OK",
+      "acceptance": "unit 125 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client session persistence NOT verified"
     }
   ]
 }

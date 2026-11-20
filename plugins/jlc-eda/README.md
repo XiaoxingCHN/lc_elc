@@ -1,8 +1,10 @@
 # 实验室库存联动（嘉立创 EDA 专业版 × Odoo 19）
 
-版本 **3.1.0**，扩展 UUID 沿用旧版 `1329a87d576b4b8cbb8592b1c1012b8b`，可在扩展管理器中按同一扩展升级。
+版本 **3.1.1**，扩展 UUID 沿用旧版 `1329a87d576b4b8cbb8592b1c1012b8b`，可在扩展管理器中按同一扩展升级。
 
 **定位：画图助手，不是第二个库存系统。** 插件只在画原理图/PCB 时提供三件事：这个器件有没有库存、有的话在哪个库位和袋、整张 BOM 一键出库。入库、归还、扫码追溯和单件领用在网页端与 Flutter 客户端办理。
+
+3.1.1 变更：**本机桥接的配对码可以固定了**——`start-windows.cmd` / `start-linux.sh` 会把配对码存到同目录的 `relay-token.txt`（首次运行自动生成），重启桥接不再变化，插件里保存的配对码不会失效（此前每次重启都换新码，表现为「切页面回来显示未登录」）。也可用 `--token <码>` 或环境变量 `LAB_RELAY_TOKEN` 自行指定。
 
 3.1.0 变更：移除「入库」「手动领用」「归还」「袋/库位追溯」四个页签与菜单（网页端/客户端已有）；「BOM 对比」更名为「原理图库存」并默认以**选中器件**为范围；对比表在库位后新增**袋追溯码**列（最多 3 个，超出显示 `+N`），复制 TSV 与导出 CSV 同步。
 3.0.3 修复：真机 BOM 对比报「消息总线调用失败：undefined」——改为按当前编辑器优先用 `sch_ManufactureData.getBomFile`（原理图 BOM 导出）再试 `pcb_ManufactureData`，每次导出限时 7 秒，超时即回退原理图读取，绝不再卡死面板；桥接错误信息改为带方法名与超时秒数。
@@ -41,10 +43,10 @@ relay 是零 npm 依赖的 Node 程序，自己管理 Odoo 会话 Cookie，因�
 
 ### 3.1 解压完整包
 
-使用 `lab-inventory-odoo_v3.1.0-bundle.zip`，解压后应有：
+使用 `lab-inventory-odoo_v3.1.1-bundle.zip`，解压后应有：
 
 ```
-lab-inventory-odoo_v3.1.0.eext
+lab-inventory-odoo_v3.1.1.eext
 bridge/
   start-windows.cmd
   start-linux.sh
@@ -58,7 +60,7 @@ README.md
 ### 3.2 安装 EDA 插件
 
 1. EDA 专业版 → **高级 → 扩展管理器 → 导入**（旧入口：设置 → 扩展 → 扩展管理器）。
-2. 导入 `lab-inventory-odoo_v3.1.0.eext`。
+2. 导入 `lab-inventory-odoo_v3.1.1.eext`。
 3. 启用「实验室库存联动（Odoo 19）」，并开启 **外部交互** 权限。
 4. 顶部菜单出现 **库存联动**。
 
@@ -183,7 +185,7 @@ catalog detail 的 `image_url` 通常是外部商城 CDN。插件会把它转换
 
 旧包使用 `/api/auth/login` + 硬编码 `admin/admin123` + Bearer token + `LAB-` 内部码，和当前 Odoo 19 的 `lcsc:C123` / `lab:42` 契约完全不同，不能复用其登录或 token。
 
-升级到 3.1.0 后：
+升级到 3.1.1 后：
 
 - 不导入旧 token 或旧服务器配置；插件忽略旧 `lab_inventory_token`。
 - 旧版默认管理员登录已移除；必须用真实 Odoo 账号。
@@ -205,8 +207,8 @@ npm run verify        # 校验 eext/bundle、资源、禁止项、hash
 
 产物：
 
-- `build/lab-inventory-odoo_v3.1.0.eext`
-- `build/lab-inventory-odoo_v3.1.0-bundle.zip`（含 eext、relay、node.exe、启动脚本、中文安装说明）
+- `build/lab-inventory-odoo_v3.1.1.eext`
+- `build/lab-inventory-odoo_v3.1.1-bundle.zip`（含 eext、relay、node.exe、启动脚本、中文安装说明）
 - `build/package-manifest.json`
 - `build/bundle-manifest.json`
 

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,8 @@ async function loadPackage() {
 
 test('package exists at the expected deterministic name', async () => {
   const { extension, buffer } = await loadPackage();
-  assert.equal(extension.version, '3.1.0');
+  const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
+  assert.equal(extension.version, pkg.version);
   assert.ok(buffer.length > 50000);
 });
 
@@ -36,7 +38,11 @@ test('package SHA-256 matches build manifest', async () => {
   const { manifest, buffer } = await loadPackage();
   assert.equal(sha256(buffer), manifest.sha256);
   assert.equal(manifest.uuid, EXPECTED_UUID);
-  assert.equal(manifest.version, '3.1.0');
+  // Read the version from package.json instead of hard-coding it: this
+  // assertion is about extension.json MATCHING the package, not about which
+  // version happens to be current.
+  const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.version, pkg.version);
 });
 
 test('ZIP root contains extension.json and all runtime resources', async () => {
@@ -80,7 +86,11 @@ test('extension.json keeps the upgrade UUID and the four retained menus', async 
   const { zip } = await loadPackage();
   const manifest = JSON.parse(await zip.file('extension.json').async('string'));
   assert.equal(manifest.uuid, EXPECTED_UUID);
-  assert.equal(manifest.version, '3.1.0');
+  // Read the version from package.json instead of hard-coding it: this
+  // assertion is about extension.json MATCHING the package, not about which
+  // version happens to be current.
+  const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.version, pkg.version);
   assert.equal(manifest.entry, './dist/index');
   assert.equal(manifest.name, 'lab-inventory');
   assert.ok(Array.isArray(manifest.headerMenus.sch));
@@ -157,7 +167,8 @@ test('iframe is self-contained, Chinese and uses the trusted bridge', async () =
 test('README documents Odoo 19, CORS, session cookie and permissions', async () => {
   const { zip } = await loadPackage();
   const readme = await zip.file('README.md').async('string');
-  for (const phrase of ['Odoo 19', '3.1.0', '本机桥接', '配对码', 'LcHardwareHouse', 'group_lab_operator', '外部交互']) {
+  const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
+  for (const phrase of ['Odoo 19', pkg.version, '本机桥接', '配对码', 'LcHardwareHouse', 'group_lab_operator', '外部交互']) {
     assert.ok(readme.includes(phrase), 'README missing ' + phrase);
   }
 });
