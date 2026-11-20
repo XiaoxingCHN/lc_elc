@@ -1,5 +1,26 @@
 # 变更记录
 
+## 2026.11.20 修「内网加速后检测不到更新」
+
+- **问题**（用户："为啥我内网加速后就检测不到更新了"）。
+- **根因**：`/lab/client/updates/manifest` 是 `auth='none'` 路由，Odoo 必须先确定
+  数据库才能处理它。
+  - 公网链路：Cloudflare Tunnel → nginx `18443` → Odoo，nginx 的 `location /` 里
+    写死了 `X-Odoo-Database: LcHardwareHouse`（配置注释：「固定 X-Odoo-Database，
+    避免 fresh 会话 "No database is selected" 的 404」），所以能选中库；
+  - **内网加速直连 `http://192.168.31.105:8069` 绕过了 nginx**，没有这个 header，
+    `/etc/odoo.conf` 里又既没有 `db_name` 也没有 `dbfilter` → 「No database is
+    selected」→ 404 → 客户端判定「没有更新」。
+  - 同一个原因也解释了更早那次「内网 `/web/login` 303 跳到库选择器」。
+- **修法**：`/etc/odoo.conf` 增加 `dbfilter = ^LcHardwareHouse$`（原文件备份为
+  `/etc/odoo.conf.bak-20261120`），重启 Odoo。这样直连也能选中库，不再依赖 nginx
+  注入的 header。
+- **实测**（改后）：内网 `8069` 的 manifest / health / root 连续 **3/3 全部 200**；
+  公网 manifest 连续 **3/3 全部 200**；`/team/login` 200。
+- **未验证**：客户端在内网加速状态下点「关于与更新」的完整流程（需实机）；
+  公网 `https://team.l-creation.club/` 偶发 000，属 Cloudflare Tunnel 链路抖动，
+  与本次改动无关（改动前后都存在）。
+
 ## 2026.11.20 三端 1.3.5+25 发布到应用内更新通道
 
 - **问题**（用户："更新各个客户端能不能直接通过服务器更新啊"）。可以——项目里本来就有
