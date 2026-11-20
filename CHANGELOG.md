@@ -1,5 +1,31 @@
 # 变更记录
 
+## 2026.11.20 三端 1.3.5+25 发布到应用内更新通道
+
+- **问题**（用户："更新各个客户端能不能直接通过服务器更新啊"）。可以——项目里本来就有
+  应用内更新通道（`/lab/client/updates/manifest` + 签名清单 + `/assets/` 下载），
+  「关于与更新」按钮在登录页、器件库、内网加速页都有。问题是**服务器上的通道停在
+  Android 1.1.3+6（10-19）**，比客户端实际版本落后 20 多个版本，所以只能手动装包。
+- **本次发布**（`key_id=release-20261019`，Ed25519 签名）：
+  | 平台 | 版本 | 大小 | release_id |
+  |---|---|---|---|
+  | Windows x64 | 1.3.5 build 25 | 37,739,160 B | `windows-1.3.5-build25-20261120` |
+  | Android universal | 1.3.5 build 25 | 108,025,748 B | `android-1.3.5-build25-20261120` |
+  | Linux x64 | 1.3.5 build 25 | 16,600,460 B | `linux-1.3.5-build25-20261120` |
+- **顺带修掉的客户端 bug**：`WifiSsidService.platformOverride` 原先与 `Platform.isX` 做
+  `||`，在 Linux 主机上即使强制 Android 分支也仍走 `nmcli`，导致 4 条 Android 契约测试
+  在 Linux 上必失败。改为「只要设置了 override 就完全取代平台检测」。
+- **Linux 构建的两个环境坑**（记入交接）：
+  - 必须 `PKG_CONFIG_PATH` 指向归档 sysroot，否则 `flutter_secure_storage_linux`
+    找不到 libsecret；
+  - **不能**设 `PKG_CONFIG_SYSROOT_DIR`，否则 GTK 头文件路径被重复前缀、CMake 报
+    「non-existent path」。
+- **发布过程中修的服务端问题**：发布用 `sudo bash -c` 创建的文件归 root，Odoo 进程
+  （用户 `odoo`）读不到，manifest 一直 404。`chown -R odoo:odoo` 后恢复正常。
+- **验证**：三端公网 `https://team.l-creation.club/lab/client/updates/manifest` 均返回
+  `1.3.5 build 25` 与正确的 release_id/大小；三端 `flutter test` 各 **515 passed / 5 skipped**。
+- **未验证**：客户端「关于与更新」里的实际下载与安装流程（需在装了旧版的机器上点一次）。
+
 ## 2026.11.20 客户端 1.3.5+25：入库改为「先扫库位，再连续扫袋码」
 
 - 版本：`clients/app` `1.3.5+24 → 1.3.5+25`。
