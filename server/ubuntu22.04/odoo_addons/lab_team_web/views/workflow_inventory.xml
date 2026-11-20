@@ -419,16 +419,115 @@
                 </div>
             </section>
 
+            <!-- ================= 账号维护 =================
+                 这些操作以前只能在 Odoo 原生后台完成。全部走
+                 /lab/api/admin/*，安全边界在服务端模型方法里。 -->
             <section class="lc-panel">
                 <div class="lc-panel-head">
-                    <h2 class="lc-section-title">不在本页的配置</h2>
+                    <h2 class="lc-section-title">新建账号</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-toolbar">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-new-login">登录名</label>
+                            <input class="lc-input" id="lc-admin-new-login" type="text"
+                                   autocomplete="off" data-lc-field="new_login"
+                                   placeholder="邮箱或用户名"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-new-name">姓名</label>
+                            <input class="lc-input" id="lc-admin-new-name" type="text"
+                                   autocomplete="off" data-lc-field="new_name"
+                                   placeholder="显示名称"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-new-password">初始密码</label>
+                            <input class="lc-input" id="lc-admin-new-password" type="password"
+                                   autocomplete="new-password" data-lc-field="new_password"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-new-role">初始角色</label>
+                            <select class="lc-input" id="lc-admin-new-role" data-lc-field="new_role">
+                                <option value="">（不授予库存角色）</option>
+                                <option value="lab_user">库存用户</option>
+                                <option value="lab_operator">操作员</option>
+                                <option value="lab_manager">管理员</option>
+                            </select>
+                        </div>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="admin-create-user">新建账号</button>
+                    </div>
+                    <p class="lc-hint">
+                        新账号默认只有「内部用户」权限，没有任何库存角色；
+                        密码由操作员首次登录后自行修改。
+                    </p>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">重置密码 / 停用账号</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-toolbar">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-target">目标账号</label>
+                            <select class="lc-input" id="lc-admin-target" data-lc-field="admin_target">
+                                <option value="">（先在上方列表里搜索，再选择）</option>
+                            </select>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-newpw">新密码</label>
+                            <input class="lc-input" id="lc-admin-newpw" type="password"
+                                   autocomplete="new-password" data-lc-field="admin_password"/>
+                        </div>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="admin-set-password">重置密码</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="admin-toggle-active">停用 / 启用</button>
+                    </div>
+                    <p class="lc-hint">
+                        不能停用自己；停用管理员时，若该公司会因此没有任何管理员，服务端会拒绝。
+                    </p>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">系统管理员</h2>
+                    <span class="lc-badge" data-tone="warn">需系统管理员身份</span>
+                </div>
+                <div class="lc-panel-body">
+                    <div class="lc-toolbar">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-sys-target">目标账号</label>
+                            <select class="lc-input" id="lc-admin-sys-target"
+                                    data-lc-field="system_target">
+                                <option value="">（先在上方列表里搜索，再选择）</option>
+                            </select>
+                        </div>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="admin-grant-system">授予</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="admin-revoke-system">撤销</button>
+                    </div>
+                    <p class="lc-hint">
+                        系统管理员可以进入 Odoo 原生后台。只有当前账号本身是系统管理员时才能授予或撤销；
+                        库存管理员不能给自己提权。
+                    </p>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">仍需在原生后台完成</h2>
                 </div>
                 <div class="lc-panel-body">
                     <ul class="lc-inv-plain">
-                        <li>项目参数（站点标题、根级别名开关、管理 Host）只在维护端配置，本页不提供修改入口。</li>
-                        <li>系统管理员、ERP 管理员的授权仍走原生后台，且不属于库存角色的范围。</li>
-                        <li>数据库、模块安装、密码复位不在本页；密码请走管理员复位或原生流程。</li>
-                        <li>每次库存角色变更由系统记录操作人、目标账号、角色与开关值。</li>
+                        <li>模块安装与升级：运维脚本 <span class="lc-mono">upgrade_modules.sh</span>。</li>
+                        <li>数据库备份与恢复：<span class="lc-mono">odoo_backup.py</span> / <span class="lc-mono">odoo_restore.py</span>。</li>
+                        <li>开发调试项（视图、动作、菜单定义）：内网原生后台保留。</li>
+                        <li>每次库存角色与账号变更由系统记录操作人、目标账号与变更内容。</li>
                     </ul>
                 </div>
             </section>
