@@ -140,11 +140,19 @@ class LabStockLocation {
   String get labelPayload => locationPayload(code);
 
   factory LabStockLocation.fromJson(Map<String, dynamic> json) {
+    // Some endpoints (the catalog detail overlay) send only a `location`
+    // display string. Reading it into `path` keeps the row readable instead of
+    // rendering 「未命名库位」 for a location the server DID name.
+    final fallbackLabel =
+        firstString(json, const ['location', 'display', 'label']) ?? '';
     return LabStockLocation(
       id: firstInt(json, const ['id', 'location_id']),
-      code: firstString(json, const ['code', 'location_code', 'barcode', 'name']) ?? '',
-      name: firstString(json, const ['name', 'display_name', 'location_name']) ?? '',
-      path: firstString(json, const ['path', 'complete_name', 'location_path']) ?? '',
+      code: firstString(json, const ['code', 'location_code', 'barcode', 'name']) ??
+          '',
+      name: firstString(json, const ['name', 'display_name', 'location_name']) ??
+          '',
+      path: firstString(json, const ['path', 'complete_name', 'location_path']) ??
+          fallbackLabel,
       quantity: firstDouble(json, const ['quantity', 'qty', 'on_hand', 'available']),
       bagCount: firstInt(json, const ['bag_count', 'bagCount']),
       bagQuantity: firstDouble(json, const ['bag_quantity', 'bagQuantity']),

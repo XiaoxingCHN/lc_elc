@@ -1,5 +1,28 @@
 # 变更记录
 
+## 2026.11.20 详情页库位显示「未命名库位」；客户端 1.3.5+24 / lab_catalog 19.0.2.0.18
+
+- **问题**（用户截图）：器件详情页「库位分布」一栏全部显示「未命名库位」，尽管该库位在
+  系统里有库码和名称。
+- **根因**：`lab_catalog_item._workflow_overlay` 构造库位分布时，只从
+  `stock.quant.search_read` 的 `location_id` 里取了 `display_name`
+  （`q['location_id'][1]`），发出去的是 `{'location': '名字'}` 一个字符串——
+  **没有 id、没有库码、没有完整路径**。客户端 `LabStockLocation.fromJson` 认不出
+  `location` 这个键，`code`/`name`/`path` 全为空，`display` 就落到兜底文案
+  「未命名库位」。
+- **修法（服务端，主修）**：改为按 `location_id` 解析真实记录，发送与
+  `/inventory/locations` 一致的形状：`id` / `code`（库码）/ `name` / `path`
+  （完整路径）/ `location`（保留给旧客户端）。
+- **修法（客户端，兜底）**：`LabStockLocation.fromJson` 现在会把 `location` 读进
+  `path`——即使服务端只发一个字符串，也不会再显示「未命名库位」。
+- **实测**：在服务器上用真实数据验证 `_workflow_overlay` 的返回：
+  `id=17 code='K000004' name='R1' path='WH/库存/R区/R1' qty=100.0`，
+  客户端会显示 `K000004 · R1`。`lab_catalog` 已升级到 `19.0.2.0.18` 并重启，
+  服务 active、`/web/health` 200。
+- **客户端**：`flutter test` **514 passed / 5 skipped / 0 failed**；
+  `flutter analyze` 0 error / 0 warning。新增 2 条测试：只发字符串时仍能显示名称、
+  完整形状时优先用库码。
+
 ## 2026.11.20 EDA 插件 3.1.1：修「切页面回来显示未登录」
 
 - 版本：`plugins/jlc-eda` `3.1.0 → 3.1.1`。

@@ -47,6 +47,36 @@ void main() {
     });
   });
 
+  group('a detail-overlay location row', () {
+    test('a bare display string still renders as a name, not 未命名库位', () {
+      // `_workflow_overlay` used to send only `{'location': display_name}`.
+      // The client could not read any of code/name/path from that, so every
+      // row rendered 「未命名库位」 for a location the server HAD named.
+      final location = LabStockLocation.fromJson(<String, dynamic>{
+        'location': 'Lab/R03',
+        'quantity': 100.0,
+      });
+      expect(location.display, isNot('未命名库位'));
+      expect(location.display, contains('R03'));
+    });
+
+    test('the full shape the server now sends wins over the fallback', () {
+      final location = LabStockLocation.fromJson(<String, dynamic>{
+        'id': 7,
+        'code': 'K000003',
+        'name': 'R03',
+        'path': 'Lab/R03',
+        'location': 'R03',
+        'quantity': 100.0,
+      });
+      expect(location.id, 7);
+      expect(location.code, 'K000003');
+      expect(location.display, 'K000003 · R03');
+      expect(location.path, 'Lab/R03');
+      expect(location.labelPayload, 'LABL:K000003');
+    });
+  });
+
   group('LabBag from /inventory/bags', () {
     test('reads the live quant figures and the location path', () {
       final bag = LabBag.fromJson(<String, dynamic>{

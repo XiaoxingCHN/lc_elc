@@ -390,9 +390,27 @@ class LabCatalogItem(models.Model):
                 [('product_id.product_tmpl_id', 'in', tids),
                  ('location_id.usage', '=', 'internal'), ('quantity', '!=', 0)],
                 ['product_id', 'location_id', 'quantity', 'available_quantity']):
-            loc = q['location_id'][1] if q['location_id'] else '?'
-            slot = locations.setdefault(loc, {'location': loc, 'quantity': 0.0,
-                                              'available_quantity': 0.0})
+            # `location_id` arrives as (id, display_name) only. That is NOT
+            # enough for the client: it renders 库码 · 名称 and needs the code,
+            # so sending the bare display name made every row show
+            # 「未命名库位」. Resolve the real record and send the same shape
+            # `/inventory/locations` uses.
+            loc_id = q['location_id'][0] if q['location_id'] else False
+            slot = locations.get(loc_id)
+            if slot is None:
+                if not loc_id:
+                    continue
+                location = self.env['stock.location'].browse(loc_id)
+                slot = locations[loc_id] = {
+                    'id': loc_id,
+                    'code': location.lab_code or '',
+                    'name': location.name or '',
+                    'path': location.complete_name or location.display_name or '',
+                    # Kept for older clients that only read `location`.
+                    'location': location.display_name or '',
+                    'quantity': 0.0,
+                    'available_quantity': 0.0,
+                }
             slot['quantity'] += q.get('quantity') or 0.0
             slot['available_quantity'] += q.get('available_quantity') or 0.0
 
@@ -411,7 +429,7 @@ class LabCatalogItem(models.Model):
             ['id', 'bag_id', 'operation_id', 'quantity', 'create_date'],
             order='create_date desc', limit=200)
 
-        return sorted(locations.values(), key=lambda x: x['location']), bags, issues, history
+        return sorted(locations.values(), key=lambda x: (x['path'] or x['location'])), bags, issues, history
 
     # ------------------------------------------------------------------ cursor
     @api.model

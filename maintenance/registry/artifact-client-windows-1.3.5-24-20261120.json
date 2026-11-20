@@ -1,0 +1,22 @@
+{
+  "file": "clients/windows/releases/1.3.5+24/LC_ELC-Windows-1.3.5+24-x64.zip",
+  "bytes": 37739482,
+  "sha256": "db8b7e7b7686e1ce18213262557ca07de58bf36b47ccf9c99c2ffafa18078fcc",
+  "version": "1.3.5+24",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-24-20261120.json",
+  "source_tree_sha256": "433969d36488e4f60c1995467be93ac4f63db71fca8e0623f561a53a138dd788",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 514 passed / 5 skipped",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 24,
+  "files": 30,
+  "executable_sha256": "9cb49088c49694695663cbe3707960b6a04899bbced85b880e49d20386efbd22",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "changes_in_this_build": [
+    "详情页「库位分布」不再显示「未命名库位」：客户端会把服务端的 location 字符串读进 path 作为兜底（主修在服务端 lab_catalog 19.0.2.0.18，已部署）"
+  ],
+  "unverified": [
+    "真机详情页观感",
+    "Android 实机"
+  ]
+}
