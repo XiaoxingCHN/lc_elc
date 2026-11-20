@@ -35,11 +35,21 @@
 
 **按用户确认：维护界面放在原有的「管理」里，只给管理员显示。**
 
-### 3.1 入口与门禁（现状已满足）
+### 3.1 入口与门禁：**已经是管理员专属，无需任何改动**
 
-- 页面：`/team/lab/settings`（导航里的「管理」），**已存在**
-- 现有门禁：`can_manage_members`（= `group_lab_manager`），非管理员导航里看不到
-- 无需新增路由、无需新增导航项
+核实结果（`controllers/common.py:304` + `WORKFLOW_NAV`）：
+
+```python
+'can_manage_members': manager      # manager = is_lab_manager(user)
+('settings', 'can_manage_members', False),   # 导航项
+```
+
+也就是说：
+- **「管理」页现在就只有 `group_lab_manager` 能看见**，普通操作员导航里没有这一项；
+- 页面本身也走 `render_denied`，直接访问 URL 会被拒。
+
+**所以「只给管理员显示」这条已经成立，本次不改权限、不加路由、不加导航。**
+要做的只是往这个页面里填功能。
 
 ### 3.2 现有页面结构（`views/workflow_inventory.xml:332`）
 
@@ -128,9 +138,9 @@ server/ubuntu22.04/odoo_addons/lab_team_web/static/src/js/pages/settings.js # �
 ## 六、待你确认
 
 1. ~~入口形式~~ → **已确认：扩展现有「管理」页，只给管理员显示**
-2. **谁算「管理员」**：只有 `group_lab_manager`，还是 `base.group_system` 也算？
-   （现状是 `can_manage_members` = `group_lab_manager`；建议沿用，系统权限组
-   单独要求 `base.group_system`）
+2. ~~谁算管理员~~ → **已确认：「管理」页现在就是 `group_lab_manager` 专属，
+   沿用即可**。唯一要额外考虑的是「系统权限组」这块——授予 `base.group_system`
+   是 Odoo 系统级操作，建议这一项额外要求操作者自己就是系统管理员。
 3. **库存调整要不要做**？这是唯一会直接改库存的入口，风险最高。
    可以只做「盘点」，不做「报废/调拨」。
 4. **`mrp` / `website` 清理**：你说「也可以不管」，那我先跳过，只做管理员入口？
