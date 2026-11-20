@@ -9,6 +9,7 @@ import '../../../models/lab_api_exception.dart';
 import '../../../services/lab_api_client.dart';
 import '../../../widgets/lab_ui.dart';
 import '../models/detail_models.dart';
+import '../models/inventory.dart';
 import '../models/json_read.dart';
 import '../models/pending_receipt.dart';
 import '../models/unified_item.dart';
@@ -92,6 +93,23 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
   PendingReceipt? _resolved;
   List<Map<String, dynamic>> _recommendations = [];
   int? _locationId;
+
+  /// The STICKY putaway location chosen by scanning a location code.
+  ///
+  /// The operator's flow chart is explicit: scan the shelf's QR once, then keep
+  /// scanning bags into it until that shelf is done - "一直扫袋码入库一直到当前
+  /// 仓库所属器件录完". This is the bin-first putaway pattern shipped by Oracle
+  /// WMS Cloud (scan location 1/3, then LPN 2/3, location persists) and
+  /// Acumatica ("put away another item from the current destination location?"
+  /// loops back to the ITEM scan, never the location scan).
+  ///
+  /// Holding it separately from [_locationId] matters: [_locationId] is the
+  /// per-bag choice the operator can still override, while this remembers what
+  /// the shelf scan locked in. Null means "not in a putaway session yet", which
+  /// is what makes the screen ask for a location code first.
+  int? _putawayLocationId;
+  String _putawayLocationLabel = '';
+
   String? _error;
   String? _notice;
   bool _busy = false;
@@ -422,12 +440,62 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
     await _reload();
   });
 
+  /// One scan field serves BOTH steps, exactly as the flow chart draws it.
+  ///
+  /// Before a location is chosen the only thing a scan can usefully be is a
+  /// shelf code, so it is interpreted that way; afterwards the same field takes
+  /// bag codes and keeps the shelf. That avoids the "scan bag, then scan
+  /// location, then scan bag again" ping-pong the operator rejected.
+  Future<void> _handleScan(String raw) async {
+    final text = raw.trim();
+    if (text.isEmpty) return;
+
+    // A `LABL:` payload is unambiguously a location, whatever the current step.
+    final looksLikeLocation = text.toUpperCase().startsWith('LABL:');
+    if (_putawayLocationId == null || looksLikeLocation) {
+      final started = await _scanLocation(text);
+      // If it was not a location code, fall through to the bag path so a
+      // mistyped first scan still does something useful.
+      if (started) return;
+      if (looksLikeLocation) return;
+    }
+    await _resolve(text);
+  }
+
+  /// Reads a location code and enters (or re-targets) the putaway session.
+  ///
+  /// Returns true when [raw] really was a location, so the caller knows whether
+  /// to fall back to treating it as a bag code.
+  Future<bool> _scanLocation(String raw) async {
+    ResolvedCode code;
+    try {
+      code = await _api.resolveCode(raw);
+    } catch (_) {
+      return false;
+    }
+    if (!code.isLocation || code.location == null) return false;
+    final location = code.location!;
+    if (!mounted) return true;
+    setState(() {
+      _putawayLocationId = location.id;
+      _putawayLocationLabel = location.display;
+      _locationId = location.id;
+      _error = null;
+      _notice = '已选定库位 ${location.display}，现在可以连续扫描袋码入库。';
+      _scan.clear();
+      _scanCycle++;
+    });
+    return true;
+  }
+
   Future<void> _resolve(String raw) => _run(() async {
     _confirmAttempt = null;
     setState(() {
       _resolved = null;
       _recommendations = [];
-      _locationId = null;
+      // The shelf scan is what persists across bags; do NOT clear it here or
+      // the operator is forced back to scanning the location for every bag.
+      _locationId = _putawayLocationId;
     });
     final data = await _api.resolvePending(raw);
     if (!mounted) return;
@@ -494,9 +562,14 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
       setState(() {
         _resolved = null;
         _confirmAttempt = null;
-        _locationId = null;
+        // The shelf stays selected: this is the "keep scanning bags into the
+        // same bin" loop (Oracle: location 1/3, then LPN 2/3, repeat).
+        _locationId = _putawayLocationId;
         _scan.clear();
-        _notice = '$code 已入库，请扫描下一袋。';
+        _scanCycle++;
+        _notice = _putawayLocationId == null
+            ? '$code 已入库，请扫描下一袋。'
+            : '$code 已入库到 $_putawayLocationLabel，请扫描下一袋。';
       });
       await _reload();
     });
@@ -961,12 +1034,57 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                   ]),
                 ] else ...[
                   _section([
+                    // ---- step 1: the shelf (scanned ONCE) -------------------
+                    if (_putawayLocationId == null) ...[
+                      const Text('第 1 步 · 扫描库位码'),
+                      const SizedBox(height: 6),
+                      Text(
+                        '先扫货架上的库位二维码，选定这次入库放到哪里。'
+                        '选定后可以连续扫袋码，不用再扫库位。',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      Row(
+                        children: <Widget>[
+                          Icon(Icons.location_on,
+                              size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '入库库位：$_putawayLocationLabel',
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _busy || attempt != null
+                                ? null
+                                : () => setState(() {
+                                      _putawayLocationId = null;
+                                      _putawayLocationLabel = '';
+                                      _locationId = null;
+                                      _scan.clear();
+                                      _scanCycle++;
+                                    }),
+                            child: const Text('换库位'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '继续扫描袋码即可，每袋确认后自动清空，直到这个库位录完。',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     ScanInputField(
                       key: ValueKey(_scanCycle),
                       controller: _scan,
                       enabled: !_busy && attempt == null,
-                      label: '扫描袋追溯码',
-                      onSubmit: _resolve,
+                      label: _putawayLocationId == null
+                          ? '扫描库位码（如 LABL:K000004）'
+                          : '扫描袋追溯码',
+                      onSubmit: _handleScan,
                     ),
                     if (_resolved != null) ...[
                       const SizedBox(height: 20),
@@ -1036,22 +1154,31 @@ class _ReceiptWorkspaceState extends ConsumerState<_ReceiptWorkspace> {
                                 .toList(),
                             onChanged: _busy || attempt != null
                                 ? null
-                                : (value) =>
-                                      setState(() => _locationId = value),
+                                : (value) => setState(() {
+                                      _locationId = value;
+                                      // Picking from the list starts the same
+                                      // sticky session a shelf scan does, so the
+                                      // next bag does not ask again.
+                                      _putawayLocationId = value;
+                                      _putawayLocationLabel = items
+                                          .where((l) => l.id == value)
+                                          .map((l) => l.display)
+                                          .join();
+                                    }),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ScanInputField(
-                          enabled: !_busy && attempt == null,
-                          autofocus: false,
-                          label: '或扫描库位码',
-                          onSubmit: (raw) => _run(() async {
-                            final code = await _api.resolveCode(raw);
-                            if (!mounted) return;
-                            if (!code.isLocation) throw StateError('请扫描库位标签。');
-                            setState(() => _locationId = code.location!.id);
-                          }),
-                        ),
+                        // No second "scan a location" field here any more: the
+                        // shelf is chosen once, at the top of this tab. A
+                        // per-bag location scan was what made the operator
+                        // re-scan the shelf for every bag.
+                        if (_putawayLocationId == null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '还没有选定库位：请在上方扫描库位码，或从上面的列表里选一个。',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: theme.colorScheme.error),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         FilledButton(
                           onPressed: _busy ? null : _confirm,

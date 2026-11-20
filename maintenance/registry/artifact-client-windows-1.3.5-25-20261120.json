@@ -1,0 +1,26 @@
+{
+  "file": "clients/windows/releases/1.3.5+25/LC_ELC-Windows-1.3.5+25-x64.zip",
+  "bytes": 37739160,
+  "sha256": "297a605d73414b04f74a382c021e1ad0475eda3b826c270a4a4f73afc145085a",
+  "version": "1.3.5+25",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-25-20261120.json",
+  "source_tree_sha256": "f463e3c7fbec93a77baff5f43dbc5e38fe76a35ad0fa29da564451b0be2278ce",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 515 passed / 5 skipped",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 25,
+  "files": 30,
+  "executable_sha256": "cb3198766ffd234a333c04683522714b3977cfb0fdce6067dcf995c8f42cf93e",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "changes_in_this_build": [
+    "入库改为「先扫库位，再连续扫袋码」：扫一次库位后一直有效，扫袋码不再清空库位",
+    "一个扫描框承担两步：未选库位提示扫库位，选定后变为扫袋码",
+    "每袋确认后自动清空输入框、保留库位，提示已入库到哪个库位",
+    "顶部常驻「入库库位」与「换库位」按钮",
+    "删掉袋码表单里重复的「或扫描库位码」输入框"
+  ],
+  "unverified": [
+    "真机连续扫码手感",
+    "Android 实机"
+  ]
+}
