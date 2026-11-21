@@ -511,8 +511,6 @@ th.num {
 }
 
 .table-wrap {
-  max-height: 440px;
-  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -1058,7 +1056,16 @@ textarea:focus {
   border-radius: 18px;
   background: var(--panel-2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  overflow: hidden;
+  /* 表格随内容自然展开，滚动交给外层 .view。
+     以前这里写的是 overflow: hidden —— BOM 一多就被裁掉，而且外层
+     滚动条也带不动它，用户看到「下面还有东西但滚不下去」。
+     横向溢出仍然要能滚（列多的时候）。 */
+  overflow-x: auto;
+  /* 纵向不设限：表格多高就多高，滚动条在外层 .view 上。
+     （overflow-y: visible 配 overflow-x: auto 会被浏览器强制成 auto，
+     那样又变成内层滚动；clip 才是真的「不裁也不滚」。） */
+  overflow-y: clip;
+  max-height: none;
 }
 
 table {
