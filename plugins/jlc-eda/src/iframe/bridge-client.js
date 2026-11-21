@@ -11,7 +11,9 @@
  */
 
 export const BRIDGE_TAG = 'lab-odoo-v3';
-export const PANEL_STORAGE_KEY = 'lab_odoo_v3_panel_payload';
+// 必须与 src/main/config.js 的 STORAGE.panel 一致：面板靠这个 key
+// 从 sys_Storage 取 nonce，不一致就整个插件不可用。
+export const PANEL_STORAGE_KEY = 'lab_eda_panel_payload';
 export const MESSAGE_TOPIC = 'lab.odoo.v3.rpc';
 export const BRIDGE_KEY = '__LAB_ODOO_V3_BRIDGE__';
 
