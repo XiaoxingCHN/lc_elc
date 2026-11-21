@@ -712,8 +712,10 @@
 
     function loadEdaTokens() {
       if (!adminNodes.edaRows) return;
-      LC.rpc('edaTokens', {}).then(function (res) {
-        renderEdaTokens((res && res.data && res.data.tokens) || []);
+      // LC.rpc 已经把 result.data 解包出来了；再取 .data 会得到 undefined。
+      // （LC.submit 不同，它返回 {data, replayed, requestKey}。）
+      LC.rpc('edaTokens', {}).then(function (data) {
+        renderEdaTokens((data && data.tokens) || []);
       }).catch(function (err) {
         showEdaError((err && err.message) || '读取密钥列表失败。');
       });
@@ -746,10 +748,9 @@
         name: adminValue(adminNodes.edaName) || undefined,
         days: adminNodes.edaDays && adminNodes.edaDays.value !== ''
           ? LC.parse.int(adminNodes.edaDays.value, null) : undefined
-      }).then(function (res) {
-        var data = (res && res.data) || {};
-        showEdaNew(data.token || '');
-        adminDone('已为「' + (data.user_name || userId) + '」发放 EDA 密钥。');
+      }).then(function (data) {
+        showEdaNew((data && data.token) || '');
+        adminDone('已为「' + ((data && data.user_name) || userId) + '」发放 EDA 密钥。');
         loadEdaTokens();
       }).catch(function (err) {
         showEdaError((err && err.message) || '发放失败。');
