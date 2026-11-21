@@ -4,6 +4,8 @@
 
 这是旧一致性快照，不是当前服务器695217器件/4110477参数的最新数据库。生产完整备份仍只在服务器；路径/hash见SERVER.md。不要把本目录直接恢复到生产。
 
+同一快照在旧工作区曾有多份 components.sqlite3 原件。2026-11-14 复核 lcscmigration/components.sqlite3 与本目录副本全量 SHA256 一致（同为 3547037696 字节 / ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823），该旧工作区原件已随退役删除；本机对该快照的权威引用仍是本目录一份，local/archive/data/lcsc_cn_archive 为既有归档原库，未删除。复核记录见 local/manifests/merge-recheck-20261114.json。
+
 旧Windows中文JSONL/CSV导出、状态和日志在local/archive/data/lcsc_cn_archive，国际发现历史在local/archive/data/international；相同大库经全量hash确认后只保存一个新副本并建立来源别名，原文件没有删除。
 
 ## 怎样获得这些文件

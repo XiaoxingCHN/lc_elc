@@ -18,13 +18,14 @@ lib/features/unified是统一器件展示、详情和收/领/还/标签；lib/se
 
 ## 器件库按需抓取
 
-搜索零结果且服务端在 `fetch_suggestion` 中明确给出精确 C 码/完整 MPN 时，目录页的 `EmptyView` 显示“立即从立创商城抓取”。抓取是异步的：`CatalogNotifier.startFetch()` 调用 `/lab/api/catalog/fetch` 入队，随后每秒轮询 `/lab/api/catalog/fetch_status`（最多 60 次），`done` 后自动 `refresh()`；换查询或销毁 notifier 时取消轮询。
+搜索零结果且服务端在 `fetch_suggestion` 中给出可抓取项时，**三个入口**都能当场抓取：整库搜索的空结果页、入库/待入库表单的搜索建议面板（“立即从立创商城抓取”）、以及器件详情页的「刷新资料」（只对带 C 码的卡片显示）。可抓取项有两种：精确 C 码/完整 MPN（直接抓取），以及**规范化后大于 5 个字符且含字母的关键词**（只换候选，选定后才抓取）。
 
-- 只有精确 C 码/MPN 会得到建议；名称、品牌、短关键词不发请求，也不由客户端自行判断。
-- `candidates` 是终态：必须由用户点选某一条（带 `catalog_code` 重新提交），不能自动取第一条。
-- 失败、非电子、待复核、未找到都显示服务端中文原因，状态卡同时带图标与文字，不只靠颜色。
+- `CatalogFetchController`（`providers/catalog_fetch_controller.dart`）负责一次请求：`POST /lab/api/catalog/fetch`（`sync` 默认 true，服务端在 15 秒预算内当场抓），非终态才每秒轮询 `fetch_status`（最多 60 次）。`done` 后由页面自己重查：整库搜索走 `CatalogNotifier.refresh()`；入库/待入库重跑建议检索（`CatalogSuggestFieldState.research()`），新行由操作员自己点选，不自动填入；详情页 `ref.invalidate(catalogDetailProvider/catalogRowProvider)`。
+- 页面各自持有控制器：整库搜索用 `CatalogNotifier.startFetch(query:, catalogCode:, refresh:)`，入库/待入库/详情各自创建；换查询或销毁时取消轮询，互不影响。
+- 「刷新资料」只刷新当前打开的这一个 C 码（`refresh: true` + `catalog_code`）；没有列表级/全库刷新按钮，服务端也没有批量刷新接口。内容未变化时服务端不写库、不 bump revision，面板显示“资料未变化，无需更新。”。
+- 关键词候选只来自立创**搜索接口**：`CatalogFetchCandidate` 显示 `name`（立创显示名，如 `TI TLV9001IDBVR`）、品牌、封装和 C 码；服务端在候选阶段不打开中文详情页、不写库。`candidates` 是终态，必须由用户点「选这个」后带 `catalog_code` 重新提交，不能自动取第一条。短关键词（≤5 字符）、纯数字、名称片段不发请求，也不由客户端自行判断。失败、非电子、待复核、未找到都显示服务端中文原因，状态卡同时带图标与文字，不只靠颜色。
 - 抓取只影响器件资料与供应商库存，不创建本地档案、不改实验室库存；离线模式下不出现该按钮。
-- 客户端测试 `test/features/unified/catalog_fetch_test.dart` 用 `FakeLabApi` 覆盖建议、轮询、候选、限流失败、清空与终态集合；不访问网络。
+- 客户端测试 `catalog_fetch_test.dart`（显式 query/refresh、关键词候选、候选名称）、`catalog_suggest_search_test.dart`（零结果按钮只在服务端建议时出现）、`pending_receipt_test.dart`（表单内进度与完成）用 `FakeLabApi` 覆盖，不访问网络。
 
 ## 依赖与路径
 
@@ -39,6 +40,12 @@ Linux在开发机按平台README安装原生构建依赖，恢复sdk/flutter_lin
 build_client.py以脚本自身推导仓库根，复制源码到local/build/client-<平台>-<时间>/source，写独立日志和results.json；最多2个原生并行job。不会覆盖已发布文件。仅适配普通可用本机工具链，portable VS及旧WSL私有sysroot需要对应环境适配，历史配方可参考但不能盲跑旧绝对路径。
 
 先dry-run核对计划，再实际--test。客户端测试必须记录非零数量；实体打印/扫码和OS安全存储按平台区分，没有执行就记未验证。Android必须核对最终APK公开证书，匹配local/private受控key；不允许自动生成新签名。
+
+Windows 原生构建的三个已知前提（2026-11-08 实测）：
+
+1. **pdfium 离线包**：`printing` 插件默认从 GitHub release 下载 pdfium，国内网络不可达。把本机包路径传给 `PDFIUM_LOCAL_ARCHIVE`（例如 `F:/…/dependencies/windows/pdfium-win-x64-5200.tgz`），插件 CMake 会直接解压、跳过 ExternalProject；不要在 URL 里写 `file:///`，Windows 上会被解析成 `/F:/…`。
+2. **短工作根**：MSBuild 的 tlog 路径会超过 260 字符（`FTK1011`）。用 `--work-root` 指一个短目录（如 `C:/lcw`），产物再拷回 `local/build/`；默认仍是 `local/build`。
+3. **ATL**：`flutter_secure_storage_windows` 引用了 `atlstr.h` 与 `CA2W/CW2A`，需要 VS 的「C++ ATL for v143」组件；未安装时只能在本机 pub 缓存副本里用 Win32 转换替换（仅本机补丁，不入 Git）。
 
 当前业务源的66文件与各平台原构建副本一致；完整源树由归档新manifest另冻，非66文件包含项不要冒称原构建证据已覆盖。归档本轮不全量重编译三端，具体当前状态见CURRENT_STATE。
 

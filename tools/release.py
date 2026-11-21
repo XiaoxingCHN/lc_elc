@@ -4,6 +4,8 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE={'client':['clients/app'],'server':['server/ubuntu22.04'],'eda':['plugins/jlc-eda']}
 SKIP={'.git','node_modules','build','dist','ephemeral','.dart_tool','.gradle','.cxx','__pycache__','releases','runtime','.idea'}
+def write_text_lf(p,text):
+ with p.open('w',encoding='utf-8',newline='\n') as f:f.write(text)
 def digest(p):
  h=hashlib.sha256()
  with p.open('rb') as f:
@@ -27,7 +29,7 @@ def main():
  if x.action=='snapshot':result=snapshot(x.component)
  else:
   file=Path(x.file).resolve();source=Path(x.source_manifest).resolve();assert file.is_relative_to(ROOT) and source.is_relative_to(ROOT);m=json.loads(source.read_text(encoding='utf-8'));result={'file':file.relative_to(ROOT).as_posix(),'bytes':file.stat().st_size,'sha256':digest(file),'version':x.version,'source_manifest':source.relative_to(ROOT).as_posix(),'source_tree_sha256':m['tree_sha256'],'validation':'pending; add actual build/test environment and results before release'}
- out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');print(str(out.relative_to(ROOT)))
+ out.parent.mkdir(parents=True,exist_ok=True);write_text_lf(out,json.dumps(result,ensure_ascii=False,indent=2)+'\n');print(str(out.relative_to(ROOT)))
  if x.action=='snapshot' and x.activate:
-  index=ROOT/'maintenance/registry/active-sources.json';active=json.loads(index.read_text(encoding='utf-8')) if index.exists() else {};active[x.component]=out.relative_to(ROOT).as_posix();index.write_text(json.dumps(active,indent=2)+'\n',encoding='utf-8');print('Active source pointer updated: '+x.component)
+  index=ROOT/'maintenance/registry/active-sources.json';active=json.loads(index.read_text(encoding='utf-8')) if index.exists() else {};active[x.component]=out.relative_to(ROOT).as_posix();write_text_lf(index,json.dumps(active,indent=2)+'\n');print('Active source pointer updated: '+x.component)
 if __name__=='__main__':main()

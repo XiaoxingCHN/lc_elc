@@ -74,6 +74,13 @@
     // 多档案里出现"事实完全相同"的档案时为 true：不许自动选，也不许拿 id 冒充区分依据
     ambiguousInsufficient: false,
     searchBox: null,       // 候选组件句柄：锁定出现时立即收起面板
+    searchContainer: null, // 候选组件容器：抓取候选面板挂在它下面
+    fetchPanel: null,      // 立创候选面板（关键词抓取返回多行时使用）
+    fetchSuggestion: null, // 最近一次零结果检索的服务端建议，只对应当前输入
+    fetching: false,       // 抓取进行中：不允许重复触发
+    autoFetchTimer: null,  // 无感抓取的静默计时器：输入一变立刻取消
+    autoFetchPending: null,// 上一笔抓取还没结束时被推迟的关键词：结束后补一次自动接续
+    autoFetched: {},       // 本次页面内已自动抓过的关键词（小写）：同一输入不反复打立创
     searchDenied: false,  // 目录检索无权限时不再重复请求候选（编号/SN 扫码路径仍可用）
     pendingPick: null     // 刚从候选点选的器件事实：解析回来没有名称时用它兜底，别把已选器件说成"未命名档案"
 
@@ -588,6 +595,21 @@
     setSlot('material-key', picked.item_key || '—');
     // 名称缺失只说明"这个编号暂时读不到名称"，不能把整个器件说成未命名档案
     setSlot('material-name', picked.name || '（名称待补）');
+    var detailBox = q('data-slot', 'material-detail');
+    var detailLink = q('data-slot', 'material-detail-link');
+    if (detailBox && detailLink) {
+      var detailKey = picked.item_key || '';
+      if (detailKey) {
+        // 与 team.js itemHref / 后端 quote_item_key 对齐：保留冒号，
+        // 地址栏是 /lab/items/lcsc:C123 而不是 lcsc%3AC123。
+        var encodedKey = encodeURIComponent(detailKey).replace(/%3A/gi, ':');
+        detailLink.href = (LC.urls && LC.urls.item ? LC.urls.item : '/lab/items/') + encodedKey;
+        LC.show(detailBox, true);
+      } else {
+        detailLink.removeAttribute('href');
+        LC.show(detailBox, false);
+      }
+    }
 
     var rows = picked.candidates || [];
     var multi = rows.length > 1;
@@ -1658,6 +1680,284 @@
       : '';
   }
 
+  /* --------------------------------------------------- 按需抓取（立创官方通道）
+   * 只在"本地零结果 + 服务端给出 fetch_suggestion"时出现入口，点一下才发请求。
+   * 抓到的只是器件资料（名称/型号/品牌/封装/价格/参数），不写库存、不建袋。
+   * 关键词只换候选（名称/型号/封装/C 码），人选定某个 C 码后才抓完整资料。
+   */
+  var FETCH_POLL_MS = 1500;
+  var FETCH_POLL_LIMIT = 40;      // 约 60 秒后如实告知"后台仍在排队"
+
+  function bareQuery(text) {
+    return String(text || '').trim().replace(/^lcsc\s*:\s*/i, '');
+  }
+
+  /* 服务端把查询规范化成"去空白 + 大写"（normalize_mpn/normalize_query）。
+   * 这里必须用同一口径比较，否则输入 "STM32 G437" 与服务端返回的
+   * "STM32G437" 会被判成两个词：建议挂不上、自动抓取永远不触发。 */
+  function normQuery(text) {
+    var value = bareQuery(text);
+    if (typeof value.normalize === 'function') {
+      value = value.normalize('NFKC');
+    }
+    return value.replace(/\s+/g, '').toUpperCase();
+  }
+
+  function sameQuery(a, b) {
+    return normQuery(a) === normQuery(b);
+  }
+
+  function currentInputValue() {
+    var input = q('data-lc-field', 'item_key');
+    return input ? String(input.value || '') : '';
+  }
+
+  function rememberSuggestion(bare, suggestion) {
+    // 晚到的响应不能给新关键词挂旧按钮：只记与当前输入一致的建议
+    state.fetchSuggestion = (suggestion && sameQuery(bare, currentInputValue()))
+      ? suggestion : null;
+  }
+
+  function ensureFetchPanel() {
+    if (state.fetchPanel && document.contains(state.fetchPanel)) return state.fetchPanel;
+    var host = state.searchContainer;
+    if (!host || !host.parentNode) return null;
+    var panel = LC.el('div', {
+      class: 'lc-fetch-panel',
+      'data-lc-slot': 'fetch-candidates',
+      role: 'group',
+      'aria-label': '立创商城候选'
+    });
+    panel.hidden = true;
+    host.parentNode.insertBefore(panel, host.nextSibling);
+    state.fetchPanel = panel;
+    return panel;
+  }
+
+  function hideFetchCandidates() {
+    var panel = state.fetchPanel;
+    if (!panel) return;
+    LC.clear(panel);
+    panel.hidden = true;
+  }
+
+  function candidateLabel(row) {
+    var code = row.catalog_code || '';
+    var facts = [
+      code,
+      row.mpn ? '型号 ' + row.mpn : '',
+      row.package ? '封装 ' + row.package : '',
+      row.brand || ''
+    ].filter(Boolean).join(' · ');
+    return {
+      primary: row.name || row.mpn || code || '未命名器件',
+      meta: facts
+    };
+  }
+
+  function renderCandidates(rows) {
+    var panel = ensureFetchPanel();
+    if (!panel) return;
+    // 候选面板与"没有匹配的器件 / 立即抓取"按钮是互相矛盾的提示：
+    // 候选一出现就收起下拉，只留下可点的候选列表。
+    if (state.searchBox) state.searchBox.close();
+    LC.clear(panel);
+    panel.appendChild(LC.el('p', {
+      class: 'lc-fetch-panel-title',
+      text: '立创商城候选：选定一个之后才会抓取它的完整资料。'
+    }));
+    rows.forEach(function (row) {
+      var view = candidateLabel(row);
+      var button = LC.el('button', {
+        type: 'button',
+        class: 'lc-fetch-candidate'
+      }, [
+        LC.el('span', { class: 'lc-fetch-primary', text: view.primary }),
+        LC.el('span', { class: 'lc-fetch-meta', text: view.meta })
+      ]);
+      button.addEventListener('click', function () {
+        var code = row.catalog_code || '';
+        if (!code) return;
+        if (state.locks.create) {
+          // 建袋结果未知时输入已被锁定：此时抓资料会改输入、也会让
+          // finishFetch 把结果写到与提交内容不符的界面上。
+          notify('上一次建袋结果未知：档案已锁定，请先重试查询结果。');
+          return;
+        }
+        var input = q('data-lc-field', 'item_key');
+        if (input) {
+          input.value = 'lcsc:' + code;
+          state.pendingPick = null;
+        }
+        hideFetchCandidates();
+        startFetch(code, { kind: 'c_code' });
+      });
+      panel.appendChild(button);
+    });
+    panel.hidden = false;
+    LC.status.show({
+      kind: 'empty',
+      message: '本地库尚未收录，已在立创商城找到 ' + rows.length + ' 个候选：请选定一个。'
+    });
+  }
+
+  function startFetch(text, suggestion) {
+    if (state.locks.create) return;
+    if (state.fetching) {
+      notify('上一笔抓取还在进行，请稍候再试。');
+      return;
+    }
+    var query = bareQuery(text);
+    if (!query) return;
+    state.fetching = true;
+    hideFetchCandidates();
+    // 下拉里还留着"没有匹配的器件 / 立即抓取"的旧空态，和"正在抓取…"的
+    // 状态条互相矛盾；抓取一开始就收起下拉，只留状态条。
+    if (state.searchBox) state.searchBox.close();
+    LC.status.show({
+      kind: 'loading',
+      message: (suggestion && suggestion.kind === 'keyword')
+        ? '正在到立创商城查询候选…'
+        : '正在从立创商城抓取资料，最多约 20 秒…'
+    });
+    LC.rpc('catalogFetch', { query: query, sync: true }, { timeoutMs: 30000 })
+      .then(pollFetch)
+      .then(function (result) { finishFetch(result, query); })
+      .catch(function (err) {
+        LC.status.show({
+          kind: 'error',
+          message: '抓取失败：' + resolveErrorText(err)
+            + '。可以稍后重试，或继续用编号 / SN 扫码。'
+        });
+      })
+      .then(function () {
+        state.fetching = false;
+        resumeAutoFetch();
+      });
+  }
+
+  /* 无感接续：本地零结果、服务端又给出 fetch_suggestion 时，静默一小会儿就自动
+   * 去立创查（关键词只列候选；精确 C 码/MPN 直接抓资料）。用户不再需要为了
+   * "搜一下立创"专门点按钮，但**选择哪个候选仍然由人决定**。
+   * 约束：
+   *   - 输入一变立刻取消计时器，慢速打字不会在半截关键词上打接口；
+   *   - 同一个关键词本次页面只自动打一次，失败后由页面按钮显式重试；
+   *   - 抓取进行中或建袋锁定时不触发。 */
+  var AUTO_FETCH_DELAY_MS = 800;
+
+  function cancelAutoFetch() {
+    if (state.autoFetchTimer) {
+      window.clearTimeout(state.autoFetchTimer);
+      state.autoFetchTimer = null;
+    }
+  }
+
+  function scheduleAutoFetch(bare, suggestion) {
+    cancelAutoFetch();
+    if (!suggestion || !sameQuery(bare, currentInputValue())) return;
+    var key = normQuery(bare);
+    if (!key || state.autoFetched[key]) return;
+    if (state.fetching) {
+      // 上一笔抓取还在进行（可能正是用户刚改掉的那一词）：此刻把计时器丢掉，
+      // 用户就只能再点一次按钮。记下来，等它结束后按"当时的输入 + 建议"重排。
+      state.autoFetchPending = key;
+      return;
+    }
+    if (state.locks.create) return;
+    state.autoFetchTimer = window.setTimeout(function () {
+      state.autoFetchTimer = null;
+      if (state.fetching || state.locks.create) return;
+      if (!sameQuery(bare, currentInputValue())) return;
+      var current = state.fetchSuggestion;
+      if (!current || !sameQuery(bare, current.query)) return;
+      state.autoFetched[key] = true;
+      startFetch(bare, current);
+    }, AUTO_FETCH_DELAY_MS);
+  }
+
+  /* 上一笔抓取结束时补一次：期间用户可能已经停在另一个关键词上，而那次自动接续
+   * 因为"抓取中"被推迟。仍然只查当前输入对应的建议，且同一关键词不重复。 */
+  function resumeAutoFetch() {
+    if (!state.autoFetchPending) return;
+    state.autoFetchPending = null;
+    if (state.fetching || state.locks.create) return;
+    var current = state.fetchSuggestion;
+    if (!current) return;
+    scheduleAutoFetch(current.query, current);
+  }
+
+  /* 同步预算（15 秒）内没抓完时退回轮询：cron 每分钟接手，前端不假装成功。
+   * 只有"仍在处理"的三个状态才继续等；done/failed/not_found/candidates 等
+   * 已经是终态（或需要人选择），立刻停。 */
+  var FETCH_ACTIVE_STATES = { queued: 1, resolving: 1, fetching: 1 };
+
+  function pollFetch(result) {
+    if (!result) return Promise.resolve(result);
+    var status = String(result.state || '');
+    var requestId = result.request_id;
+    if (!requestId || !FETCH_ACTIVE_STATES[status]) return Promise.resolve(result);
+    var waits = 0;
+    return new Promise(function (resolve) {
+      function tick() {
+        waits += 1;
+        if (waits > FETCH_POLL_LIMIT) { resolve(result); return; }
+        window.setTimeout(function () {
+          LC.rpc('catalogFetchStatus', { request_id: requestId }, { timeoutMs: 8000 })
+            .then(function (next) {
+              var name = String((next && next.state) || '');
+              if (!FETCH_ACTIVE_STATES[name]) resolve(next);
+              else tick();
+            }, function () { tick(); });
+        }, FETCH_POLL_MS);
+      }
+      tick();
+    });
+  }
+
+  function finishFetch(result, query) {
+    // 抓取可能持续十几秒；期间用户已经改了输入时，旧结果既不覆盖输入，
+    // 也不弹出属于旧关键词的候选/错误。
+    if (!sameQuery(query, currentInputValue())) return;
+    var status = String((result && result.state) || '');
+    if (status === 'done') {
+      var itemKey = result.item_key || '';
+      var input = q('data-lc-field', 'item_key');
+      if (!itemKey || !input || state.locks.create) {
+        // 输入已被锁定或服务端没给 item_key：只如实提示，不拿旧输入
+        // 去解析（否则会把上一个器件的结果当成这一次的）。
+        LC.status.show({
+          kind: 'success',
+          message: result.message || '已抓到资料。'
+        });
+        return;
+      }
+      input.value = itemKey;
+      LC.status.show({
+        kind: 'success',
+        message: result.message || '已抓到资料，正在重新检索…'
+      });
+      if (state.searchBox) state.searchBox.refresh();
+      resolveItem();
+      return;
+    }
+    if (status === 'candidates' && result.candidates && result.candidates.length) {
+      renderCandidates(result.candidates);
+      return;
+    }
+    if (status === 'not_found' || status === 'skipped_non_electronic' || status === 'review') {
+      LC.status.show({
+        kind: 'empty',
+        message: (result && result.message) || '立创没有可用资料，请改用完整型号或 C 编号。'
+      });
+      return;
+    }
+    LC.status.show({
+      kind: status === 'failed' ? 'error' : 'unknown',
+      message: (result && result.message)
+        || '这条资料还没有抓完，后台会继续处理；稍后再搜一次即可。'
+    });
+  }
+
   function wireItemSearch(root) {
     var input = q('data-lc-field', 'item_key');
     if (!input || !LC.combobox) return null;
@@ -1667,6 +1967,7 @@
       if (input.parentNode) input.parentNode.insertBefore(container, input);
       container.appendChild(input);
     }
+    state.searchContainer = container;
     var box = LC.combobox({
       input: input,
       container: container,
@@ -1685,6 +1986,15 @@
       },
       loadingText: '正在检索器件资料…',
       emptyText: '没有匹配的器件。可以继续用编号 / SN 扫码，或直接填下方「新建器件档案」。',
+      // 零结果时的下一步：只有服务端确认"这条能抓"才给按钮，且点一下才发请求
+      emptyAction: function (text) {
+        var suggestion = state.fetchSuggestion;
+        if (!suggestion || !sameQuery(text, suggestion.query)) return null;
+        return {
+          label: suggestion.kind === 'keyword' ? '到立创商城查候选' : '立即从立创商城抓取',
+          onClick: function () { startFetch(text, suggestion); }
+        };
+      },
       errorText: function (err) {
         if (err && (err.code === 'ACCESS_ERROR' || err.code === 'FORBIDDEN')) {
           state.searchDenied = true;
@@ -1703,7 +2013,10 @@
         return LC.rpc('catalogSearch', { query: bare, limit: 8 },
           { timeoutMs: 8000 }).then(function (data) {
           showParamIndexHint(!!(data && data.param_index_ready === false));
-          return (data && data.items) || [];
+          rememberSuggestion(bare, data && data.fetch_suggestion);
+          var rows = (data && data.items) || [];
+          if (!rows.length) scheduleAutoFetch(bare, data && data.fetch_suggestion);
+          return rows;
         });
       },
       describe: function (item) {
@@ -1754,6 +2067,10 @@
         if (state.locks.create) return;
         // 输入一改，旧的"已选"必须立刻作废：不能让旧档案跟着新关键词提交
         if (state.selected) resetSelection();
+        // 抓取按钮与候选只对原关键词有效，输入一变立刻作废
+        state.fetchSuggestion = null;
+        cancelAutoFetch();
+        hideFetchCandidates();
         areaError('resolve', '');
       }
     });

@@ -12,7 +12,7 @@
 对应验收：
   * 退出必须是原生 POST 表单 + CSRF 隐藏域（浏览器自己跟随 303）；
   * lc_logout_url / lc_login_action 必须尊重 current_base() 且是站内相对路径；
-  * 模块版本与页面展示版本一致（19.0.1.1.0）。
+  * 模块版本与页面展示版本一致（19.0.1.2.7）。
 """
 import ast
 import importlib.util
@@ -128,7 +128,7 @@ class ModuleVersionTest(unittest.TestCase):
     """候选版本独立递增到 19.0.1.1.0，且页面展示版本与 manifest 一致。"""
 
     def test_manifest_version(self):
-        self.assertEqual(_manifest()["version"], "19.0.1.1.0")
+        self.assertEqual(_manifest()["version"], "19.0.1.2.7")
 
     def test_lc_version_matches_manifest(self):
         match = re.search(r"'lc_version':\s*'([^']+)'", COMMON_PY)

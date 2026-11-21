@@ -287,6 +287,14 @@
                     <span class="lc-detail-code" t-esc="lc_item.get('catalog_code') or lc_item.get('item_key')"/>
                 </div>
 
+                <!-- 仅有本地档案（索引里还没有这个 C 编号）：不能把空参数页
+                     当成"器件资料就这些"。如实说明缺的是抓取，不是器件本身。 -->
+                <p t-if="lc_item.get('local_only')" class="lc-note" role="status"
+                   data-lc-slot="local-only-note">
+                    这个 C 编号还没有从立创抓取资料：下面只有实验室档案与流水，暂时没有参数与文档。
+                    请到「采购入库」重新输入该编号并抓取一次；抓取成功后这里会显示完整参数。
+                </p>
+
                 <div class="lc-detail-main">
                     <div class="lc-detail-media">
                         <t t-if="lc_image_src">

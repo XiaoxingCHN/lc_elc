@@ -14,12 +14,13 @@
 import hashlib
 import json
 import logging
+import time
 
 from odoo import api, fields, models
 
 from odoo.addons.lab_inventory.tools.param_search import build_search_params
 
-from ..tools import lcsc_remote
+from ..tools import lcsc_openapi, lcsc_remote
 
 _logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ ACTIVE_STATES = ('queued', 'resolving', 'fetching')
 TERMINAL_STATES = ('done', 'failed', 'skipped_non_electronic', 'review',
                    'not_found', 'candidates')
 MAX_ATTEMPTS = 3
+INLINE_BUDGET = 15          # 同步抓取的总预算（秒）
+INLINE_TIMEOUT = 6          # 同步抓取时单次 HTTP 超时（秒）
 
 
 def _clean_scalar(value):
@@ -138,7 +141,7 @@ class LabCatalogFetchRequest(models.Model):
     query_raw = fields.Char(string='原始查询', required=True)
     query_norm = fields.Char(string='规范化查询', required=True, index=True)
     query_kind = fields.Selection(
-        [('c_code', 'C 编号'), ('mpn', '型号')],
+        [('c_code', 'C 编号'), ('mpn', '型号'), ('keyword', '关键词')],
         string='查询类型', required=True, default='c_code')
     state = fields.Selection([
         ('queued', '排队中'),
@@ -238,7 +241,34 @@ class LabCatalogFetchRequest(models.Model):
         finally:
             cr.execute('SELECT pg_advisory_unlock(%s)', [LOCK_ID])
 
-    def _process_one(self):
+    @api.model
+    def _process_inline(self, record, budget_seconds=INLINE_BUDGET):
+        """Process one just-created request inside the HTTP request.
+
+        The caller's worker pays for the fetch, so it is bounded twice: a wall
+        clock budget stops any *new* HTTP call, and the advisory lock falls
+        back to the per-minute cron when another fetch is already running.
+        Anything unfinished stays ``queued`` for the cron to pick up.
+        """
+        if not record or record.state != 'queued':
+            return record
+        cr = self.env.cr
+        # Transaction-scoped lock: PostgreSQL releases it at COMMIT/ROLLBACK,
+        # even if the worker is killed mid-request, so a pooled connection can
+        # never keep the fetch lock forever. It still conflicts with the cron's
+        # session-scoped lock on the same key.
+        cr.execute('SELECT pg_try_advisory_xact_lock(%s)', [LOCK_ID])
+        if not cr.fetchone()[0]:
+            return record
+        deadline = time.monotonic() + max(1.0, float(budget_seconds))
+        try:
+            with cr.savepoint():
+                record._process_one(timeout=INLINE_TIMEOUT, deadline=deadline)
+        except Exception:                       # noqa: BLE001 - never fail the API
+            _logger.exception('lab_catalog: inline fetch %s failed', record.id)
+        return record
+
+    def _process_one(self, timeout=None, deadline=None):
         self.ensure_one()
         if self.state != 'queued':
             return
@@ -248,7 +278,7 @@ class LabCatalogFetchRequest(models.Model):
                     'attempts': self.attempts + 1,
                     'finished_at': False})
         try:
-            self._run()
+            self._run(timeout=timeout, deadline=deadline)
         except lcsc_remote.LcscRemoteError as exc:
             self._handle_remote_error(exc)
         except Exception as exc:                       # noqa: BLE001 - report to operator
@@ -259,9 +289,17 @@ class LabCatalogFetchRequest(models.Model):
         state = 'failed'
         if exc.code == 'not_found':
             state = 'not_found'
+        if exc.code == 'budget_exhausted':
+            # 同步请求的时间预算用完：不算失败，交回队列让 cron 接着抓。
+            # 这次尝试没有真正发出完整的抓取，不能吃掉 cron 的重试次数。
+            self.write({'state': 'queued', 'message': exc.message,
+                        'attempts': max(0, self.attempts - 1),
+                        'finished_at': False})
+            return
         message = {
             'not_found': '立创未找到该型号或 C 编号。',
-            'verification_page': '立创返回了验证页，请稍后重试。',
+            'verification_page': '立创中文详情页触发了访问验证（风控，不是实验室系统故障）；'
+                                 '官方接口资料不受影响，稍后重试即可。',
             'network_error': '无法连接立创，请稍后重试。',
         }.get(exc.code, exc.message)
         if state == 'failed' and self.attempts < MAX_ATTEMPTS:
@@ -271,10 +309,26 @@ class LabCatalogFetchRequest(models.Model):
             return
         self._set(state, message)
 
-    def _run(self):
+    def _run(self, timeout=None, deadline=None):
         query = self.query_norm
+        if self.query_kind == 'keyword':
+            # 片段/模糊关键词只做候选检索：用搜索接口返回的名称、型号、封装和
+            # C 码，不打开中文详情页，也不写库。人选定某个 C 码后会以
+            # query_kind='c_code' 重新提交，那一步才真正抓取。
+            candidates = lcsc_remote.search_candidates(
+                query, timeout=timeout, deadline=deadline)
+            if not candidates:
+                self._set('not_found',
+                          '立创没有找到匹配的器件，请改用完整型号或 C 编号。')
+            else:
+                self._set(
+                    'candidates',
+                    '找到 %d 个候选，请选择要入库的一个。' % len(candidates),
+                    candidates_json=json.dumps(candidates, ensure_ascii=False))
+            return
         if self.query_kind == 'mpn':
-            item, candidates = lcsc_remote.resolve_mpn(query)
+            item, candidates = lcsc_remote.resolve_mpn(
+                query, timeout=timeout, deadline=deadline)
             if item is None:
                 if candidates:
                     self._set(
@@ -295,7 +349,10 @@ class LabCatalogFetchRequest(models.Model):
                 self._set('failed', 'C 编号无效。')
                 return
 
-        detail = lcsc_remote.fetch_product_detail(code)
+        official = self._official_item(code, deadline=deadline)
+
+        detail = lcsc_remote.fetch_product_detail(
+            code, timeout=timeout, deadline=deadline)
         parent_id = detail.get('parentCatalogId')
         self.write({'parent_catalog_id': parent_id or 0})
         decision = lcsc_remote.classify_root(
@@ -311,23 +368,136 @@ class LabCatalogFetchRequest(models.Model):
             return
 
         product_id = detail.get('productId')
-        parsed = lcsc_remote.parse_cn_page(
-            lcsc_remote.fetch_cn_page(product_id), expected=code)
+        degraded = False
+        try:
+            parsed = lcsc_remote.parse_cn_page(
+                lcsc_remote.fetch_cn_page(product_id, timeout=timeout,
+                                          deadline=deadline),
+                expected=code)
+        except lcsc_remote.LcscRemoteError as exc:
+            # 中文详情页可能被立创风控验证页拦截。官方 SMT 通道若已经给出
+            # 名称/型号/品牌/封装/库存/价格/参数，就只有分类细分与文档缺失，
+            # 让整条资料失败等于把已经拿到的参数一起丢掉（用户看到的就是
+            # "详情里什么都没有"）。这里按官方事实先入库，如实告知缺什么。
+            if exc.code != 'verification_page' or not official:
+                raise
+            parsed = self._parsed_from_official(official, code, detail, product_id)
+            degraded = True
+        if official and not degraded:
+            parsed = lcsc_openapi.merge_into_parsed(parsed, official)
         self.write({'product_id_ext': parsed['product_id']})
 
         leaf, root_id, category_name, category_path = self._resolve_category(parsed)
         if not leaf:
-            self._set('review', '中文分类无法映射到现有分类树，已跳过入库。')
+            self._set('review', '分类无法映射到现有分类树，已跳过入库。')
             return
         if root_id is not None and root_id not in self._allowed_roots():
             self._set('skipped_non_electronic',
                       '该商品不属于电子元器件，未加入资料库。')
             return
 
-        catalog_item = self._upsert_item(parsed, leaf, category_name,
-                                         category_path)
-        self._set('done', '已收录，正在刷新。', result_item_id=catalog_item.id)
-        self.env['lab.catalog.item']._revision('catalog', bump=True)
+        catalog_item, changed = self._upsert_item(parsed, leaf, category_name,
+                                                  category_path)
+        if changed:
+            if degraded:
+                message = ('已按官方接口收录（中文详情页被立创风控拦截：'
+                           '名称/型号/品牌/封装/库存/价格/参数已到位，'
+                           '分类细分与文档暂时缺失）。')
+            else:
+                message = '已收录，正在刷新。'
+            self._set('done', message, result_item_id=catalog_item.id)
+            self.env['lab.catalog.item']._revision('catalog', bump=True)
+        else:
+            # 单条刷新没有新内容时不做任何写入，也不触发全库 revision 变化。
+            self._set('done', '资料未变化，无需更新。',
+                      result_item_id=catalog_item.id)
+
+    # ----------------------------------------------------------------- official
+    @api.model
+    def _parsed_from_official(self, official, code, detail, product_id):
+        """官方 SMT 通道事实 → ``_upsert_item`` 需要的形状。
+
+        仅在中文详情页不可用时使用：分类优先按官方 ``componentType`` 名称
+        匹配本地分类树（与中文商城同一套分类名），匹配不到再退回 wmsc
+        详情给出的 ``parentCatalogId``（一级分类），最后由 ``_resolve_category``
+        统一复核根分类白名单。
+        """
+        product_id = str(product_id or official.get('product_id') or '')
+        parameters = []
+        for entry in official.get('parameters') or []:
+            name = (entry.get('parameterName') or '').strip()
+            if not name:
+                continue
+            parameters.append({
+                'parameterCode': '',
+                'parameterName': name,
+                'parameterValue': entry.get('parameterValue') or '',
+                'parameterDetailValue': '',
+            })
+        return {
+            'code': code,
+            'product_id': product_id,
+            'mpn': official.get('mpn') or detail.get('productModel') or '',
+            'name': official.get('name') or '',
+            'brand': official.get('brand') or '',
+            'package': official.get('package') or '',
+            'price': official.get('price'),
+            'price_basis': official.get('price_basis') or '',
+            'currency': official.get('currency') or 'CNY',
+            'stock': official.get('stock'),
+            'parameters': parameters,
+            'catalog': self._official_category(official, detail),
+            'files': [],
+            'image_url': '',
+            'source_url': (lcsc_remote.ITEM_URL % product_id)
+                          if product_id.isdigit() else '',
+        }
+
+    @api.model
+    def _official_category(self, official, detail):
+        """官方分类名 → 本地分类记录（``_resolve_category`` 的输入形状）。"""
+        Cat = self.env['lab.catalog.category'].sudo()
+        type_name = (official.get('category_name') or '').strip()
+        record = Cat.browse()
+        if type_name:
+            matches = Cat.search([('name', '=', type_name)])
+            if len(matches) > 1:
+                # 分类名可能在不同子树重名：优先带上级（叶子）的那条
+                matches = matches.filtered(lambda c: bool(c.parent_id)) or matches
+            record = matches[:1]
+        parent_id = detail.get('parentCatalogId')
+        if not record and parent_id:
+            try:
+                record = Cat.search(
+                    [('catalog_id', '=', int(parent_id))], limit=1)
+            except (TypeError, ValueError):
+                record = Cat.browse()
+        if not record:
+            return {}
+        return {
+            'catalogId': record.catalog_id,
+            'parentId': record.parent_id.catalog_id if record.parent_id else None,
+            'catalogName': record.name,
+        }
+    def _official_item(self, code, deadline=None):
+        """官方 SMT 通道（只读）。未配置凭据、超预算或出错时返回 None。
+
+        官方接口只提供器件资料/价格/库存，**不写库存**；分类与文档仍由页面
+        解析给出，拿到结果后覆盖名称、型号、品牌、封装、库存、价格与中文参数。
+        """
+        if deadline is not None and time.monotonic() >= deadline:
+            return None
+        try:
+            client = lcsc_openapi.client_from_env(timeout=INLINE_TIMEOUT)
+        except lcsc_openapi.LcscOpenApiError:
+            return None                       # 未配置凭据：静默跳过
+        try:
+            rows = client.smt_components([code])
+        except lcsc_openapi.LcscOpenApiError as exc:
+            _logger.warning('立创官方接口不可用（%s），本轮继续用页面解析。',
+                            exc.code)
+            return None
+        return lcsc_openapi.item_from_smt(rows[0]) if rows else None
 
     # ------------------------------------------------------------------ policy
     @api.model
@@ -436,7 +606,9 @@ class LabCatalogFetchRequest(models.Model):
         }
         if item:
             if item.source_fingerprint == fingerprint:
-                return item
+                # 资料没变也要补档案：占位档案可能在抓取之后才建立。
+                self._enrich_stub_templates(code)
+                return item, False
             item.write(vals)
             item.param_ids.unlink()
         else:
@@ -449,7 +621,26 @@ class LabCatalogFetchRequest(models.Model):
                 for index, (param_code, param_name, param_value, detail_value)
                 in enumerate(params)
             ])
-        return item
+        self._enrich_stub_templates(code)
+        return item, True
+
+    @api.model
+    def _enrich_stub_templates(self, code):
+        """把资料库事实补进该 C 编号已有的本地档案。
+
+        入库现场按 ``lcsc:Cxxx`` 建的最小档案名是
+        "立创物料 Cxxx（待补全）"；资料抓取成功后如果不回填，袋标签与库存
+        卡片会一直显示占位名。``_lab_apply_catalog_facts`` 只填空字段，
+        手填值优先，不覆盖人工修改。
+        """
+        templates = self.env['product.template'].sudo().search(
+            [('lab_lcsc_code_norm', '=', code)])
+        if not templates:
+            return
+        applied = templates._lab_apply_catalog_facts(code)
+        if applied:
+            # 标签/卡片读的是模板字段：补上了就让客户端缓存失效
+            self.env['lab.catalog.item']._touch_inventory_revision()
 
     # ------------------------------------------------------------------ misc
     def _searchable_text(self):

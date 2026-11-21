@@ -57,24 +57,31 @@ CATEGORY_LIMIT = 4000
 
 
 def _fetch_suggestion(params, clean_params, brands, packages, total):
-    """Offer an on-demand fetch only for an exact query with no other filters.
+    """Offer an on-demand fetch only for a bare query with no other filters.
 
-    Filters would hide the fetched row anyway, and a fuzzy keyword cannot be
-    resolved deterministically - both cases return ``None``.
+    Filters would hide the fetched row anyway, so they return ``None``.
+    An exact C code / full MPN can be fetched directly; a keyword of at least
+    five characters only produces a CANDIDATE LIST (name, model, package, C
+    code), and the real fetch waits for the operator to pick one.
     """
     if total:
         return None
     if (params.get('category_id') or brands or packages or clean_params
             or params.get('stock_only') or params.get('cursor')):
         return None
-    kind, norm = lcsc_remote.normalize_query(params.get('query') or '')
+    raw = params.get('query') or ''
+    kind, norm = lcsc_remote.normalize_query(raw)
     if not kind:
-        return None
+        norm = lcsc_remote.normalize_keyword(raw)
+        if not norm:
+            return None
+        kind = 'keyword'
     return {
         'kind': kind,
         'query': norm,
         'can_fetch': True,
-        'message': '本地库尚未收录，可立即抓取。',
+        'message': ('本地库尚未收录，可立即抓取。' if kind != 'keyword'
+                    else '本地库尚未收录，可到立创商城查候选后选择。'),
     }
 
 
@@ -124,12 +131,33 @@ class LabCatalogController(http.Controller):
     @http.route('/lab/api/catalog/fetch', type='jsonrpc', auth='user', methods=['POST'])
     @api_route
     def catalog_fetch(self, params):
-        """入队一条按需抓取；只接受精确 C 编号或完整 MPN。
+        """入队并（默认）当场抓取一条。
 
-        用户仍可选择候选：带 ``catalog_code`` 再次提交即可。
+        精确 C 编号或完整 MPN 会直接抓取；大于 5 个字符的关键词只做**候选
+        检索**（名称/型号/封装/C 码，不打开详情页、不写库），选定某个 C 码后
+        再提交一次才真正抓取。
+
+        ``sync``（默认 true）：在这次请求里直接把这条抓完，最多 15 秒；
+        锁被占用或预算用完时如实返回 ``queued``，由每分钟 cron 接力，
+        客户端继续轮询即可。
+        ``refresh``（默认 false）：为已收录的条目重抓一次。必须带
+        ``catalog_code``，且**只处理这一条**，没有批量刷新入口。
         """
         raw = (params.get('query') or '').strip()
         selected = (params.get('catalog_code') or '').strip()
+        sync = params.get('sync', True)
+        if isinstance(sync, str):
+            sync = sync.strip().lower() not in ('0', 'false', 'no', '')
+        else:
+            sync = bool(sync)
+        refresh = params.get('refresh', False)
+        if isinstance(refresh, str):
+            refresh = refresh.strip().lower() in ('1', 'true', 'yes')
+        else:
+            refresh = bool(refresh)
+        if refresh and not selected:
+            raise LabApiError(VALIDATION_ERROR, '刷新必须指定 C 编号。',
+                              {'catalog_code': 'required'})
         if selected:
             kind, norm = lcsc_remote.normalize_query(selected)
             if kind != 'c_code':
@@ -138,28 +166,35 @@ class LabCatalogController(http.Controller):
             raw = selected
         else:
             kind, norm = lcsc_remote.normalize_query(raw)
+            if not kind:
+                # 片段/模糊查询只换候选，不直接抓详情；人选定 C 码后才会走到
+                # 上面的 c_code 分支。
+                norm = lcsc_remote.normalize_keyword(raw)
+                kind = 'keyword' if norm else None
         if not kind:
             raise LabApiError(
                 VALIDATION_ERROR,
-                '请输入完整 C 编号（如 C32445874）或完整型号（如 TLV77333PDBVR）。',
+                '请输入完整 C 编号（如 C32445874）、完整型号（如 TLV77333PDBVR），'
+                '或至少 5 个字符的关键词/型号片段。',
                 {'query': 'not_exact'})
 
         Item = request.env['lab.catalog.item']
-        if kind == 'c_code':
-            existing = Item.search([('catalog_code', '=', norm),
-                                    ('market', '=', 'cn')], limit=1)
-        else:
-            existing = Item.search([('mpn', '=ilike', norm),
-                                    ('market', '=', 'cn')], limit=1)
-        if existing:
-            return {
-                'request_id': None, 'state': 'done', 'query': raw,
-                'query_kind': kind,
-                'catalog_code': existing.catalog_code,
-                'item_key': 'lcsc:%s' % existing.catalog_code,
-                'message': '资料库已有该器件。', 'candidates': [],
-                'created_at': '', 'finished_at': '',
-            }
+        if not refresh and kind != 'keyword':
+            if kind == 'c_code':
+                existing = Item.search([('catalog_code', '=', norm),
+                                        ('market', '=', 'cn')], limit=1)
+            else:
+                existing = Item.search([('mpn', '=ilike', norm),
+                                        ('market', '=', 'cn')], limit=1)
+            if existing:
+                return {
+                    'request_id': None, 'state': 'done', 'query': raw,
+                    'query_kind': kind,
+                    'catalog_code': existing.catalog_code,
+                    'item_key': 'lcsc:%s' % existing.catalog_code,
+                    'message': '资料库已有该器件。', 'candidates': [],
+                    'created_at': '', 'finished_at': '',
+                }
 
         user = request.env.user
         Fetch = request.env['lab.catalog.fetch.request'].sudo()
@@ -177,6 +212,7 @@ class LabCatalogController(http.Controller):
                                ('create_date', '>=', since)]) >= FETCH_HOURLY_LIMIT:
             raise LabApiError(RATE_LIMITED, '本小时抓取次数已达上限，请稍后再试。',
                               {'limit': 'hourly'})
+        created = False
         try:
             with request.env.cr.savepoint():
                 record = Fetch.create({
@@ -185,12 +221,16 @@ class LabCatalogController(http.Controller):
                     'query_kind': kind,
                     'requested_by': user.id,
                 })
+                created = True
         except Exception:
             # 并发提交违反活动唯一索引：复用已经创建的那一条。
             record = Fetch.search([('query_norm', '=', norm),
                                    ('state', 'in', FETCH_ACTIVE_STATES)], limit=1)
             if not record:
                 raise
+        if created and sync:
+            # 只处理自己刚创建的这条；复用别人的活动请求时交给 cron。
+            record = Fetch._process_inline(record)
         return record.status_payload()
 
     @http.route('/lab/api/catalog/fetch_status', type='jsonrpc', auth='user',

@@ -1,5 +1,92 @@
 # 当前状态与已知限制
 
+## 2026-11-18 Linux 客户端 1.3.2+10 构建（WSL；未实机验收）
+
+- 三端补齐：Linux `1.3.2+10` 已在 WSL Ubuntu 22.04 用归档工具链构建，三步 exit 0，`flutter test` **340 passed / 5 skipped**；产物 `clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，16,503,485 B，sha256 `4f20594c…f78e5a`，bundle 内 `client-install.json` = 1.3.2 / build 10 / linux。
+- 未附 `deps/` 离线 DEB，运行时依赖系统 GTK3/libsecret/cups；真实登录、打印、扫码、SecretService、桌面实机与签名发布清单仍未验证；未推送。
+
+## 2026-11-14 旧工作区审核与退役（F:\lc_elc_workspace 已删除；补档 2,870 文件；`repo_check` exit 0）
+
+- **结论**：旧工作区 `F:\lc_elc_workspace`（原 178,156 文件 / 49,676,894,303 B）经审核补档后于 **2026-11-14** 删除，目录已不存在；合并早在 2026-10-19 完成（commit `3b3c3af`、tag `archive-2026.10.19`、`original_files_deleted: 0`）。本轮未改源码、未提交/推送、未接触生产。
+- **审核**：138,294 个已迁移目标中 138,107 个仍在；缺失 187 个全为 `dependencies/sdk/windows/flutter/.pub-preload-cache/*.tar.gz`；820 个抽查哈希中 51 个因迁移后源码演进不同，旧修订已补档。`lcscmigration/components.sqlite3` 与 `data/catalog/checkpoint-20261015/components.sqlite3` 全量 SHA256 一致（`ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823`，各 3,547,037,696 B）。
+- **补档**：2,870 文件 / 1,402,575,621 B 进入 Git 排除目录 `local/archive/workspace-candidates`（570）、`local/archive/eda/workspace-intermediates`（30）、`local/archive/evidence/analysis-workspace-20261014`（2,219）、`local/archive/source-import-before-format`（新增 51）。
+- **记录路径**：逐文件来源与哈希 `local/manifests/workspace-retirement-20261114.json`；退役说明 `workspace-retirement-20261114.md`；复核 `merge-recheck-20261114.{json,log}`；删除日志 `workspace-purge-20261114.log`。
+- **空间与检查**：删除 176,743 文件 / 46.243 GB（`robocopy /MIR /XJ`，0 失败），F: 可用 64.1 GB → 109 GB；`python tools/repo_check.py` exit 0。未归档：可重建缓存/运行时状态、`output\` 接线图、`.workbuddy` 会话状态。
+
+## 2026-11-10 修复制袋贴标“选择器件无反应”，客户端 1.3.2+10（Windows / Android；未上更新通道）
+
+- **版本**：`clients/app 1.3.1+9 → 1.3.2+10`（`pubspec.yaml`、`components.json` 一致）；服务端未动，生产仍 `lab_catalog 19.0.2.0.17` / `lab_team_web 19.0.1.2.7` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2`。
+- **为什么**：用户实测“选择器件无反应”——输入 `STM32F401CCU` 提交仍提示“请选择器件”。三个静默路径：选中走 `_run()`，`_busy` 时直接 return；档案读取完成前不改界面，失败还丢弃选中；面板被外部点击关闭后再次点输入框不重新搜索。另修选中后改词不清除旧选中（详情把 `lcsc:C…` 换成 `lab:…` 时键比对失效）。
+- **修复**：选中当帧提交并显示“已选中，正在读取内部档案…”，读取中禁止建袋；失败保留选中并说明原因；按“是否来自建议”清除选中；输入框 `onTap` 重开面板/重搜，回写标签不再当查询。
+- **测试**：定向测试 28 passed（新增 6 条回归）；全量 `flutter test` **340 passed / 5 skipped**；`flutter analyze` **0 error / 0 warning / 119 info**。
+- **产物**：Windows `clients/windows/releases/1.3.2+10/LC_ELC-Windows-1.3.2+10-x64.zip`（18,391,710 B，sha256 `35695044…92ba0`，19 文件，exe `d9d5be41…1764`，Authenticode 未签名，冒烟 RUNNING→STOPPED）；Android `clients/android/releases/1.3.2+10/LC_ELC-Android-1.3.2+10.apk`（74,876,669 B，sha256 `ae6df079…c493`，1.3.2 / code 10 / minSdk 24，证书 SHA-256 `8b4c2409…9ff43` 与已登记 keystore 一致）。
+- **构建**：Windows 三步 exit 0（68.9s），Android 三步 exit 0（Gradle 175.6s）。Windows 构建需 `PDFIUM_LOCAL_ARCHIVE=<repo>/dependencies/windows/pdfium-win-x64-5200.tgz` 与本工作区 `local/pub-cache-windows`（带补丁的 printing 插件）；`--pub-cache` 必须传绝对路径。
+- **清单/登记**：active `source-client-1.3.2-10-20261110.json`（180 文件，tree `d7aca661…cfdb`）；`artifact-client-windows-1.3.2-10-20261110.json`、`artifact-client-android-1.3.2-10-20261110.json`；交接 [客户端 1.3.2+10 选择修复](../../maintenance/handoffs/2026-11-10-client-1.3.2-selection-fix.md)。
+- **未做/边界**：签名发布清单缺真实 `source_commit`（源码仍在工作区）；客户端更新通道未发布（生产写入需授权）；真实登录后的搜索/档案读取、实机安装与升级、打印、扫码、DPAPI、应用内更新未验证；未提交/推送。
+
+## 2026-11-10 Flutter 客户端 1.3.1+9 打包发布（Windows / Android；未上更新通道）
+
+- **版本**：客户端保持 `1.3.1+9`（`pubspec.yaml`、`components.json` 一致）；服务端未动，生产仍 `lab_catalog 19.0.2.0.17` / `lab_team_web 19.0.1.2.7` / `lab_inventory 19.0.1.1.0` / `lab_workflow 19.0.2.0.2`。
+- **为什么**：此前只有源码与 11-08 的 `local/build` 候选，`clients/windows/releases` 仍停 1.0.1、`clients/android/releases` 仍停 1.1.3+6；器件库按需抓取面板、详情页「刷新资料」等改动没有可安装包。
+- **产物**：Windows `clients/windows/releases/1.3.1+9/LC_ELC-Windows-1.3.1+9-x64.zip`（18,386,856 B，sha256 `c0b2e2f0…88df73`，19 文件，exe `0e9a9bd8…`，Authenticode 未签名）；Android `clients/android/releases/1.3.1+9/LC_ELC-Android-1.3.1+9.apk`（74,876,669 B，sha256 `87c0f8cd…e34594`，1.3.1 / code 9 / minSdk 24，证书 SHA-256 `8b4c2409…9ff43` 与已登记 keystore 一致）。
+- **构建/测试**：两平台 `build_client.py` 三步 exit 0；`flutter test` 各 334 passed / 5 skipped；Gradle 602.1s；Windows 冒烟 RUNNING→STOPPED；包内 AOT 含“立即从立创商城抓取/刷新资料/选这个”。`repo_check.py` exit 0。
+- **默认地址**：包内 `LAB_ODOO_URL=http://192.168.31.105:8069`、`LAB_ODOO_DB=LcHardwareHouse`，新装走内网直连；登录页可改。
+- **清单/登记**：active `source-client-1.3.1-9-20261110.json`（180 文件，tree `c8057727…bd2160`）；`artifact-client-windows-1.3.1-9-20261110.json`、`artifact-client-android-1.3.1-9-20261110.json`；交接 [客户端 1.3.1+9 发布](../../maintenance/handoffs/2026-11-10-client-1.3.1-release.md)。
+- **未做/边界**：签名发布清单缺真实 `source_commit`（源码仍在工作区）；客户端更新通道未发布（生产写入需授权）；真实登录/打印/扫码/DPAPI/实机安装未验证；未提交/推送。
+
+## 2026-11-09 器件详情链路修复（已部署：19.0.2.0.17 / 19.0.1.2.7）
+
+- **根因**：立创中文详情页 `item.szlcsc.com` 现在返回阿里云 WAF 的 JS 验证页，旧代码把"中文页不可用"当成整条抓取失败，官方 SMT 接口已给出的名称/型号/品牌/封装/库存/价格/参数被一起丢弃；网页入库建的"立创物料 Cxxx（待补全）"占位档案又不会回填，详情页只显示本地档案、没有任何参数。
+- **行为（现在）**：中文页被风控拦截且官方通道有数据时，按官方事实入库（分类按官方 `componentType` 名称匹配，匹配不到退回 wmsc 一级分类），请求置 `done` 并注明"中文详情页被立创风控拦截"；没有官方数据时仍按可重试错误处理。入库后自动回填该 C 编号下的占位档案（名称/型号/品牌/封装/文档/规格，只填空字段）。搜索与详情按"绑定表 ∪ 档案自身 C 码"取档案，没有 binding 行的网页入库档案也能看到库存/袋/流水。详情页对只有本地档案的编号显示"资料还没有抓取"的说明。
+- **前端修正**：候选与旧空态不再同屏（`renderCandidates`、`startFetch` 都会收起下拉）；查询比较与服务端同口径（`normQuery`：去空白 + NFKC + 大写），`STM32 G437` 这类输入也能触发自动接续；建袋锁定时点候选只提示、不改输入、不抓取；`done` 但无 `item_key` 时不拿旧输入去解析。
+- **生产实测（2026-11-09 22:12–22:28 CST）**：`C503071` 由官方兜底收录为 `STM32F407IGH6 / ST / UFBGA-201 / 13 条参数 / 单片机(MCU/MPU/SOC)`，`detail('lcsc:C503071')` 返回参数与档案 #10；占位档案名称已回填。四次部署 `-u` 退出码 0、0 条 ERROR/CRITICAL/Traceback；DB `lab_catalog|19.0.2.0.17`、`lab_team_web|19.0.1.2.7`；服务 active、`/web/login` 带库头 200、日志 0 错误。备份 `20261109T141243Z / 142322Z / 142603Z / 142847Z`（filestore sha256 `4ac71554…`、`7dfc749b…`、`85cd4dea…`、`da583eee…`）。
+- **测试**：`test_p3_ui_consistency.py` 27/27、`test_p3_web_contract.py` 28/28、`test_entry_contract.py` 11/11、`test_lcsc_remote.py` 25/25、`test_lcsc_openapi.py` 23/23、Node 23/23 与 19/19、`repo_check.py`/`generate_routes.py --check`/`git diff --check` 均 exit 0；新增的两条 Odoo ORM 用例需数据库，本机未跑，已用生产 `odoo shell` 复核等价结果。
+- **清单**：active `source-server-web-fetch-entry-20261109-r9.json`（274 文件，tree `4144e419…c9b6`）；`…-r6/r7/r8.json` 与更早清单保留。
+- **仍未验证/边界**：不破解立创验证码，中文分类细分与文档等待 WAF 自行解除；官方兜底路径未做浏览器手测；`C503071` 的 PDF 文档暂缺；请求 17（`STM32F103C8T6` → `C8734`）是修复前失败记录，未自动重跑。
+## 2026-11-09 采购入库无感接续检索 + 器件详情入口（已部署：19.0.1.2.4 / 19.0.2.0.15）
+
+- **行为**：采购入库的料号下拉仍先查本地库；本地零结果且服务端给出 `fetch_suggestion` 时，输入静默 800ms 后**自动**接续立创——关键词只列候选（选定某个 C 码后才抓资料），精确 C 码/完整 MPN 直接抓取。同一关键词本页只自动打一次，输入一变取消，抓取中/建袋锁定不触发；原空态按钮保留为显式重试。
+- **详情入口**：选中物料后卡片显示「查看器件详情（参数 / 文档 / 档案与流水）」，新标签页打开 `/lab/items/<item_key>`（如 `/lab/items/lcsc:C54110218`）。
+- **版本/部署**：`lab_team_web 19.0.1.2.4`、`lab_catalog 19.0.2.0.15`（`lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2` 未变），**已于 2026-11-09 14:21 CST 部署生产**（19.0.1.2.4 修正：抓取未结束时改词不再丢掉自动接续，旧结果不覆盖已改输入；备份 `/var/backups/lc-elc/20261109T062109Z-before-upgrade`，归档 sha256 `898baf77…34aa9a`） → `-u lab_team_web` 退出码 0、0 条 ERROR/CRITICAL/Traceback；DB `lab_team_web|19.0.1.2.4|installed`；服务 active、`/web/login` 带库头 200、Odoo 返回的 `receipts.js`（86,734 B）已含补排与旧结果保护、视图 arch 含详情入口；重启后日志 0 错误。
+- **抓取慢的根因（19.0.2.0.15，17:21 CST 部署）**：`wmsc.lcsc.com` 的 AAAA（CloudFront）在本机不可达，`urllib` 逐条尝试 IPv6 使单次搜索耗时 120 秒，同步抓取必然超预算转后台、cron 也被拖住。已改为只解析 IPv4（`_IPv4HTTPSConnection`）并在读响应时逐块核对预算；生产实测搜索 0.55s / 详情 0.48s / 中文页 0.36s。部署后原先排队的 `STM32F427IIH6` 由 cron 在 14 秒内完成，`lab_catalog_item` 已收录 `C503072`（13 条参数，`fetched_at 2026-11-09 09:23:49Z`）；此前每 120 秒被 Odoo 杀掉的 cron worker 超时不再出现。部署备份 `/var/backups/lc-elc/20261109T092100Z-before-upgrade`（归档 sha256 `6bc3cf32…c701c`），`-u lab_catalog` 退出码 0、0 错误；DB `lab_catalog|19.0.2.0.15|installed`。
+- **测试**：`test_p3_ui_consistency.py` 21/21（新增 6 条）、`test_lcsc_remote.py` 25/25（新增 IPv4 断言）、`test_p3_web_contract.py` 28/28、`test_entry_contract.py` 11/11、`test_combobox.mjs` 23/23、`test_workflow_core.mjs` 19/19、`node --check` OK、`repo_check.py`/`generate_routes.py --check`/`git diff --check` 均 exit 0。
+- **清单**：active server 清单 `source-server-web-fetch-entry-20261109-r5.json`（274 文件，tree `18007fa1…14b48`，清单 sha256 `460ff5ae…f5e4`）；`…-r4.json`、`…-r3.json`、`…-r2.json` 与更早清单保留。
+- **未验证/风险**：手机端自动接续的真实手感、`not_found`/失败态、限流（5 个进行中 / 每小时 20 次）与"锁被占用退回 cron"均未实测；自动关键词查询会提高立创接口调用量，需观察命中质量与频次。
+
+## 2026-11-09 网页端采购入库按需抓取入口（已部署：19.0.2.0.14 / 19.0.1.2.2）
+
+- **行为**：网页端「采购入库」料号输入零结果时，服务端给出 `fetch_suggestion` 才显示按钮——C 号/完整 MPN 是「立即从立创商城抓取」，≥5 字符含字母的关键词是「到立创商城查候选」。点击后同步抓取（15 秒服务端预算），未完成则前端每 1.5 秒轮询 `fetch_status`（最多 60 秒）；抓到后输入收敛为 `lcsc:Cxxxx` 并走既有解析；关键词只列候选，选定某个 C 码后才抓完整资料。不写库存、不自动建袋。
+- **版本**：`lab_catalog 19.0.2.0.14`、`lab_team_web 19.0.1.2.2`（`components.json` 已同步）；**已于 2026-11-09 00:27 CST 部署到生产**（备份 → 停服务 → 换两模块代码 → `-u` 退出码 0、0 条 ERROR/CRITICAL/Traceback → 起服务；DB 复核 `lab_catalog|19.0.2.0.14|installed`、`lab_team_web|19.0.1.2.2|installed`；`lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2` 未变；`odoo.service` active、`/web/login` 带库头 200、10 分钟日志 0 错误；备份 `/var/backups/lc-elc/20261108T162707Z-before-upgrade`，归档 sha256 `35d17e9e…9ce4d`）。部署脚本新增 `--modules` 参数（原来只认三个业务模块，`lab_team_web` 无法随批部署）。
+- **变化点**：关键词候选门槛 6 → 5 字符（仍要求含字母），用户截图里的 `tlv77` 因此可以走候选；`common.py` 登记 `catalogFetch`/`catalogFetchStatus`，并把 `lc_version` 修正为 `19.0.1.2.2`（原来显示 `19.0.1.1.0`，与 manifest 不符）。
+- **测试**：`test_lcsc_remote.py` 24/24、`test_lcsc_openapi.py` 23/23、`test_p3_web_contract.py` 28/28、`test_p3_ui_consistency.py` 15/15、`test_entry_contract.py` 11/11、`test_combobox.mjs` 23/23、`test_workflow_core.mjs` 19/19、`node --check receipts.js` OK。
+- **清单/检查**：active server 清单切到 `source-server-web-fetch-entry-20261109.json`（274 文件，tree `a3ee3678…a899472`，清单 sha256 `b204f65c…39cbbeb`），本轮早先的 `…-20261108.json` 与 `…-r2.json` 原样保留；`repo_check.py` exit 0、`generate_routes.py --check` exit 0、`git diff --check` 0。
+- **公网入口修复**：首次实测时抓取返回 `INTERNAL_ERROR`，原因是公网网关 allowlist 未登记 `catalog/fetch`、`catalog/fetch_status`（Netlify→bore 网关直接 404，请求未到 Odoo）。已新建并切换到网关 release `p3-web-20261109T010500Z`（旧 release 原样复制 + 两条 location，`nginx -t` 通过、`nginx -T` 确认、reload；回滚点 `rollback/project-include.before`，原 include sha `34289f26…08ef` → 新 `7e9566d6…2371`）。公网两个端点现均 200 并到达 Odoo。仓库模板与契约测试同步补齐。旧的直连公网网关 release `20261027-a2` 未改。
+- **官方接口边界**：C 码走官方 SMT 通道；官方关键词搜索接口对当前账号返回"接口权限不足"，关键词候选仍走 LCSC 网页搜索（只读），选定 C 码后才走官方 SMT。
+- **清单/检查**：active server 清单已切到 `source-server-web-fetch-entry-20261109-r2.json`（274 文件，tree `6946414f…3cb4c2`，清单 sha256 `fb459a5f…3469f9`），`…20261109.json` 与更早清单保留；`repo_check.py` exit 0、`generate_routes.py --check` exit 0、`git diff --check` 0。
+- **浏览器实测**：2026-11-09 01:0x CST 用户在手机端重试 `tlv77`，抓取/候选入口已正常。仍未验证限流、"锁被占用退回 cron"、`not_found`/失败态的真实呈现；未提交/推送。
+
+## 2026-11-08 接入立创官方 OpenAPI（19.0.2.0.13 已部署；凭据已注入 systemd）
+
+- **行为**：按 C 编号抓取资料时先查官方 SMT 通道 `/smtOpenApi/smtComponent/selectComponentInfoByCodes`，用官方返回的名称/型号/品牌/封装/库存/阶梯价/中文参数（`paramTextAll`）覆盖页面解析结果；分类与文档仍由中文页解析给出。未配置 `LCSC_OPENAPI_*` 环境变量或官方接口报错时静默回退页面解析，行为与 `19.0.2.0.12` 相同。官方接口只读，**不写本地库存**。
+- **版本**：`lab_catalog 19.0.2.0.13`（`components.json` 已同步），客户端 `1.3.1+9`；**`19.0.2.0.13` 已于 2026-11-08 09:16Z 部署到生产**——`upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261108c/modules`，备份 → 停服务 → 换三模块代码 → `-u` 退出码 0、输出 0 条 ERROR/CRITICAL/Traceback；`ir_module_module` 复核 `lab_catalog|19.0.2.0.13|installed`（`lab_inventory 19.0.1.1.0`、`lab_workflow 19.0.2.0.2` 同批）；部署目录与暂存副本源码哈希一致（排 `__pycache__` 后均 `132338bc…7f6ae3`）；`odoo.service` active、`/web/login` 带库头 200、`Modules loaded` 09:18:00Z、09:16Z 起 0 条 ERROR/CRITICAL/Traceback、cron 25 正常；备份 `/var/backups/lc-elc/20261108T091631Z-before-upgrade/`（归档 sha256 `087c2fe7…ff79fe`）。
+- **实测**：本机只读探针 `--probe C17414` → `PROBE_OK`（名称/型号/封装/库存 49,946,661/首档价 0.0202/中文参数 7 条）；签名已与官方文档示例对拍一致。凭据在 `local/private/`（Git 排除）。
+- **生产凭据（2026-11-08 09:26–09:29Z 已注入）**：`/etc/lc-elc/openapi.env`（`root:odoo 0640`，4 个键）+ `/etc/systemd/system/odoo.service.d/10-lc-elc-openapi.conf`（`EnvironmentFile=-/etc/lc-elc/openapi.env`），`daemon-reload` + `restart odoo` 退出码 0。复核 `EnvironmentFiles` 已加载、odoo 主进程环境四个变量齐备（只记长度 24/18/32/32，不记值）、重启后 `odoo.service` active、`/web/login` 带库头 **200**、09:27Z 起日志 **0 条 ERROR/CRITICAL/Traceback**。服务器侧用同一 env 跑签名探针：`--probe C17414` → `CHANNEL smt`，`stock=49,948,000`、`price=0.0202`、`params=7`，`rc=0`。临时传输文件已清理。
+- **测试**：`test_lcsc_openapi.py` **23/23**、`test_lcsc_remote.py` **24/24**；**Odoo 运行时用例未跑**（本机无 Odoo/PG）。
+- **清单/检查**：active server 清单切到 `source-server-lcsc-openapi-20261108.json`（274 文件，tree `740bc540…56e903e`，清单 sha256 `f1754c79…a4121e0`），旧清单未改写；`repo_check.py` **exit 0 / PASS / 52 项 / 0 错误**（16 条既有 payload 警告照旧）；`generate_routes.py --check` exit 0（94 条）。
+- **Odoo 运行时实测（2026-11-08 13:0xZ，生产库，只读 + `rollback`）**：在 `odoo shell` 里构造 `Environment` 后调 `_official_item('C17414')` → `OFFICIAL_OK True`，`stock=49,941,126`、`price=0.0202`、`params=7`、`tiers=6`、`source=openapi_smt`；同一探针不加载 `LCSC_OPENAPI_*` 时返回 `False`（静默回退），行为符合设计。探针用 `set -a; . /etc/lc-elc/openapi.env` 加载与服务单元同一份文件；未写库，日志无新增错误。
+- **未做**：未通过网页端/客户端做一次真实抓取入库（只直接调了模型方法）；Odoo ORM/HttpCase 用例未跑；客户端 Windows 候选包在 `local/build/windows-1.3.1/candidate-20261108-r1/`（未进发布目录）；未提交/推送。
+- **交接**：[官方接口与 Windows 构建](../../maintenance/handoffs/2026-11-08-windows-1.3.1-and-openapi.md)｜[任务单](../../maintenance/tasks/2026-11-08-lcsc-openapi-integration.md)。
+
+## 2026-11-08 立创资料改为纯按需抓取（19.0.2.0.12 已部署；客户端包待构建）
+
+- **行为**：整库搜索、入库/待入库建议面板、器件详情页三个入口都能对精确 C 码/完整 MPN 当场抓取（服务端 15 秒预算；锁被占用或超预算退回每分钟 cron，前端继续轮询）。详情页「刷新资料」只刷新当前这一条（`refresh: true` + 单个 `catalog_code`），没有列表级/全库刷新。**规范化后大于 5 个字符且含字母的关键词**只做候选检索：只调用一次立创搜索接口，候选带 `name`/`mpn`/`brand`/`package`/`catalog_code`，不打开中文详情页、不写库；人选定后才抓取。≤5 字符关键词、纯数字仍不发请求。
+- **版本**：源码为 `lab_catalog 19.0.2.0.12`、客户端 `1.3.1+9`（`components.json` 已同步）；**`19.0.2.0.12` 已于 2026-11-08 04:37Z 部署到生产**（备份 → 停服务 → 换代码 → `-u` 退出码 0、输出 0 条 ERROR/CRITICAL/Traceback → 起服务；部署后三模块树哈希与暂存副本一致，`lab_catalog/__manifest__.py` = `19.0.2.0.12`，04:38:52Z `Modules loaded`，`/web/login` 带 DB 头 200，04:37Z 起时间戳行 0 条 ERROR/CRITICAL/Traceback，两个 `lcsc-*.timer` 仍 `disabled`/`inactive`；备份 `/var/backups/lc-elc/20261108T043724Z-before-upgrade/`，`db.dump` 119,023,251 B / `a6ad4c1b…4b55c3`，`filestore.tar.gz` 12,819,190 B / `08670f20…4e0ea3`）。上一版 `lab_catalog 19.0.2.0.11` 的部署记录（2026-11-08 01:00 本地）仍在下面保留：`19.0.2.0.11` 已于 2026-11-08 01:00（本地）部署到生产：`upgrade_modules.sh --code-dir /home/hbut/lc-deploy-20261108/modules`，`-u` 完成、`odoo.service` active、55 模块加载、`/web/login` 带 DB 头 200、17:00Z 起日志 0 条 ERROR/CRITICAL/Traceback；三个模块的树哈希与暂存副本一致。备份 `/var/backups/lc-elc/20261107T170002Z-before-upgrade/`（`db.dump` 119,011,646 B / `2654a241…cb4ca5`，`filestore.tar.gz` 12,819,190 B / `ae429c94…f9f414`）。
+- **夜间批量已停用（2026-11-08 01:00 本地）**：`lcsc-crawler.timer` / `lcsc-crawler-stop.timer` 现均 `disabled`/`inactive`，`lcsc-crawler.service` 与 `lcsc-catalog-import.service` 均 inactive；unit 与采集器源码保留，手工全量重建仍可用。停用前已核实它们长期空转（`cn_queue` 无 pending 行，2 秒退出、0 条抓取、库行数不变）。
+- **测试**：`test_lcsc_remote.py` **24/24**（含关键词门槛、候选名称与非电子过滤）；真实候选检索已试（`TLV9001`/`STM32F103` 各 10 条，带名称与封装，未打开详情页）；新增 Odoo 用例 `test_catalog_fetch_inline.py` 已注册但**未运行**（本机无 Odoo/PG）；`flutter test --no-pub` **334 passed / 5 skipped / 0 failed**；`flutter analyze` **0 error / 0 warning / 120 info（exit 1）**。
+- **清单/检查**：active 清单已切到 `source-server-keyword-candidates-20261108.json`（272 文件，tree `21a6800c…31c8e`）与 `source-client-keyword-candidates-20261108.json`（180 文件，tree `c8057727…bd2160`），上一版 `source-*-on-demand-fetch-20261108.json` 原样保留；`repo_check.py` **exit 0 / PASS / 0 错误**，16 条既有 payload 警告照旧；`git diff --check` exit 0。旧清单未改写，指针回指即可回滚。
+- **未做/阻塞**：未构建客户端 `1.3.1+9` 包（现网客户端尚无关键词候选界面）；真实网络端到端手测（两个搜索入口 ≤20 秒、关键词候选、详情页只改目标行 `fetched_at`、锁占用退回队列）；DB 侧 `ir_module_module.latest_version` 未查；Odoo ORM 用例未运行；未提交/推送。首次部署尝试因暂存 ops 目录缺 `lc_archive.py` 在备份步骤中止（未停服务、未换代码），补齐后重试成功。
+- **交接**：[按需抓取交接](../../maintenance/handoffs/2026-11-08-on-demand-only-fetch.md)｜[任务单](../../maintenance/tasks/2026-11-08-on-demand-only-fetch.md)。
+
 ## 2026-11-07 按需抓取源码已冻结（repo_check 归零）
 
 - **active 清单**：server → `maintenance/registry/source-server-catalog-fetch-20261106.json`（271 文件，tree `10c3aa4a…4cf7757f`，清单 sha256 `fd087000…dce555f0`）；client → `source-client-catalog-fetch-20261106.json`（178 文件，tree `a2d5d42c…6add70abeb`，清单 sha256 `dd872ded…8dbaedf250`）。旧 `source-server-param-search-20261104-r2.json` 与 `source-client-liquid-glass-20261106.json` 未改写，指针回指即可回滚。

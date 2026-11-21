@@ -31,7 +31,7 @@ Flutter只缓存公开资料和安全登录状态，没有第二套权威库存�
 | Node桥接 | plugins/jlc-eda/bridge/server.mjs | 127.0.0.1配对，代持Odoo会话，Linux宿主Node/Windows随包Node |
 | 采集器 | server/ubuntu22.04/crawler | 中文采集、去重、断点、过滤与一致性快照 |
 | 导入器 | server/ubuntu22.04/odoo_addons/lab_catalog/tools/import_catalog.py | SQLite到供应商资料模型，保留实验室库存语义 |
-| 服务编排 | services/lcsc/systemd-production | 每日03:30启动/05:30停止；成功结束后OnSuccess触发导入 |
+| 服务编排 | services/lcsc/systemd-production | 归档的每日03:30启动/05:30停止 unit；2026-11-08 起日常更新改为按需抓取，两个夜间 timer 已停用（disabled），采集器仅作手工全量重建 |
 
 保留crawler在server的内部相对布局，是为了安装脚本和依赖准备脚本能复用同一源，不在services再复制第二份可编辑源码。services只负责编排和运维入口。
 

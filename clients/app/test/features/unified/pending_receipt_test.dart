@@ -12,6 +12,7 @@ import 'package:lab_inventory_client/features/unified/models/session_scope.dart'
 import 'package:lab_inventory_client/features/unified/providers/unified_providers.dart';
 import 'package:lab_inventory_client/features/unified/screens/pending_receipt_screen.dart';
 import 'package:lab_inventory_client/services/lab_api_client.dart';
+import 'package:lab_inventory_client/features/unified/widgets/catalog_suggest_search.dart';
 import 'package:lab_inventory_client/features/unified/widgets/scan_input.dart';
 
 import 'support/fake_lab_api.dart';
@@ -378,4 +379,94 @@ void main() {
       expect(fake.countFor(LabApiRoutes.inventoryReceipt), 0);
     },
   );
+
+  testWidgets('a zero-result search fetches from LCSC inside the form', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    Map<String, dynamic> status(String state, {String message = ''}) {
+      return <String, dynamic>{
+        'request_id': 11,
+        'state': state,
+        'query': 'C32445874',
+        'query_kind': 'c_code',
+        'catalog_code': state == 'done' ? 'C32445874' : '',
+        'item_key': state == 'done' ? 'lcsc:C32445874' : '',
+        'message': message,
+        'candidates': <Map<String, dynamic>>[],
+      };
+    }
+
+    final fake = FakeLabApi(
+      onCall: (path, params) async {
+        switch (path) {
+          case LabApiRoutes.pendingList:
+            return <String, dynamic>{'records': <Map<String, dynamic>>[]};
+          case LabApiRoutes.catalogSearch:
+            return <String, dynamic>{
+              'items': <Map<String, dynamic>>[],
+              'total': 0,
+              'fetch_suggestion': <String, dynamic>{
+                'kind': 'c_code',
+                'query': 'C32445874',
+                'can_fetch': true,
+                'message': '本地库暂无该 C 编号，可立即从立创商城抓取。',
+              },
+            };
+          case LabApiRoutes.catalogFetch:
+            return status('queued');
+          case LabApiRoutes.catalogFetchStatus:
+            return status('done', message: '已收录，正在刷新。');
+          case LabApiRoutes.inventoryLocations:
+            return <String, dynamic>{'locations': <Map<String, dynamic>>[]};
+          default:
+            throw StateError(path);
+        }
+      },
+    );
+    addTearDown(fake.calls.clear);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          labApiProvider.overrideWithValue(fake.client),
+          sessionScopeSourceProvider.overrideWithValue(
+            const LabSessionScope(uid: 7),
+          ),
+        ],
+        child: const MaterialApp(home: PendingReceiptScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.descendant(
+      of: find.byType(CatalogSuggestField),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(field, 'C32445874');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 260));
+    await tester.pump();
+
+    expect(find.text('立即从立创商城抓取'), findsOneWidget);
+    await tester.tap(find.text('立即从立创商城抓取'));
+    await tester.pump();
+    await tester.pump();
+
+    final fetch = fake.onlyParams(LabApiRoutes.catalogFetch);
+    expect(fetch['query'], 'C32445874');
+    expect(fetch.containsKey('refresh'), isFalse);
+    expect(find.text('已加入抓取队列'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('已抓取并入库'), findsOneWidget);
+    expect(find.text('已收录，正在刷新。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

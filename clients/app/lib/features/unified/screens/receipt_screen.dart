@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:lab_inventory_client/widgets/lab_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +10,12 @@ import '../models/detail_models.dart';
 import '../models/identity.dart';
 import '../models/inventory.dart';
 import '../models/unified_item.dart';
+import '../providers/catalog_fetch_controller.dart';
 import '../providers/catalog_providers.dart';
 import '../providers/inventory_providers.dart';
+import '../providers/unified_providers.dart';
 import '../unified_routes.dart';
+import '../widgets/catalog_fetch_panel.dart';
 import '../widgets/catalog_suggest_search.dart';
 import '../widgets/item_picker.dart';
 import '../widgets/scan_input.dart';
@@ -54,6 +59,14 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   final TextEditingController _note = TextEditingController();
   bool _prefilled = false;
 
+  /// Handle on the suggestion field, so a finished fetch can re-run its search.
+  final GlobalKey<CatalogSuggestFieldState> _suggestKey =
+      GlobalKey<CatalogSuggestFieldState>();
+
+  /// The ONE on-demand fetch this form can start. It always carries a single
+  /// exact C code / MPN and never refreshes anything else.
+  late final CatalogFetchController _fetch;
+
   /// The card committed by the LAST inline suggestion pick.
   ///
   /// It lets a later keystroke in the same field drop that pick instead of
@@ -63,7 +76,21 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   @override
   void initState() {
     super.initState();
+    _fetch = CatalogFetchController(
+      api: ref.read(labApiProvider),
+      onDone: () async {
+        _suggestKey.currentState?.research();
+      },
+    )..addListener(_onFetchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _prefill());
+  }
+
+  void _onFetchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _startFetch(CatalogFetchSuggestion suggestion) {
+    unawaited(_fetch.start(query: suggestion.query));
   }
 
   void _prefill() {
@@ -88,6 +115,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
   @override
   void dispose() {
+    _fetch.dispose();
     _quantity.dispose();
     _note.dispose();
     super.dispose();
@@ -306,10 +334,23 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                   ),
                   const SizedBox(height: 8),
                   CatalogSuggestField(
+                    key: _suggestKey,
                     enabled: !state.isBusy,
                     onSelected: _commitSuggestion,
                     onQueryChanged: _releaseSuggestion,
+                    onFetchRequested: _startFetch,
                   ),
+                  if (_fetch.busy || _fetch.status != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _fetch.status == null
+                          ? const CatalogFetchRunning()
+                          : CatalogFetchPanel(
+                              status: _fetch.status!,
+                              onChoose: (candidate) =>
+                                  unawaited(_fetch.chooseCandidate(candidate)),
+                            ),
+                    ),
                   if (archivesLoading)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),

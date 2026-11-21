@@ -133,6 +133,10 @@
                                 <span data-slot="material-name">—</span>
                             </p>
                             <p class="lc-hint" data-slot="material-meta"></p>
+                            <p class="lc-hint" data-slot="material-detail" hidden="hidden">
+                                <a data-slot="material-detail-link" href="#" target="_blank"
+                                   rel="noopener noreferrer">查看器件详情（参数 / 文档 / 档案与流水）</a>
+                            </p>
                             <label class="lc-field">
                                 <span class="lc-field-label">本地档案（要入库的物料档案）</span>
                                 <select class="lc-input" name="product_template_id"

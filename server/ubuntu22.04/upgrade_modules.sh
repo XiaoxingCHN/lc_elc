@@ -9,6 +9,7 @@
 #   sudo bash upgrade_modules.sh                                   # 只升级已在位的代码
 #   sudo bash upgrade_modules.sh --code-dir /root/lc-elc-new       # 先换代码再升级
 #   sudo bash upgrade_modules.sh --no-service                      # 不碰 systemd（容器/chroot 测试）
+#   sudo bash upgrade_modules.sh --modules lab_inventory,lab_catalog,lab_team_web  # 指定随批升级的模块（默认前三）
 #   sudo bash upgrade_modules.sh --config /etc/odoo.conf --db LcHardwareHouse
 #
 # 退出码：0 成功；非 0 失败（回滚命令已打印）。
@@ -29,6 +30,7 @@ while [[ $# -gt 0 ]]; do
     --unit) UNIT="$2"; shift 2;;
     --code-dir) CODE_DIR="$2"; shift 2;;
     --addons) ADDONS="$2"; shift 2;;
+    --modules) MODULES_LIST="$2"; shift 2;;
     --no-service) MANAGE_SERVICE=0; shift;;
     -h|--help) sed -n '2,20p' "$0"; exit 0;;
     *) echo "未知参数: $1" >&2; exit 2;;
@@ -36,6 +38,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ $EUID -eq 0 ]] || { echo '请用 sudo 运行' >&2; exit 1; }
+IFS=',' read -r -a MODULES <<< "$MODULES_LIST"
+[[ ${#MODULES[@]} -gt 0 && -n "${MODULES[0]}" ]] || { echo '--modules 不能为空' >&2; exit 2; }
 
 PY=${LC_PYTHON:-}
 if [[ -z "$PY" ]]; then
@@ -81,10 +85,10 @@ echo "  db      $DB"
 echo "  addons  $ADDONS"
 echo "  service $([[ $MANAGE_SERVICE -eq 1 ]] && echo "$UNIT" || echo '不管理（--no-service）')"
 
-# ---------- 0) 预检：三个业务模块必须齐全（在位的；若换代码，换入的也必须齐全）
+# ---------- 0) 预检：指定模块必须齐全（在位的；若换代码，换入的也必须齐全）
 echo
-echo "---- 0) 预检（三模块齐全）----"
-for mod in lab_inventory lab_catalog lab_workflow; do
+echo "---- 0) 预检（指定模块齐全）----"
+for mod in "${MODULES[@]}"; do
   [[ -f "$ADDONS/$mod/__manifest__.py" ]] \
     || { echo "预检失败：$ADDONS/$mod 缺少 __manifest__.py（升级前必须齐全）" >&2; exit 1; }
   [[ -z "$CODE_DIR" || -f "$CODE_DIR/$mod/__manifest__.py" ]] \
@@ -147,7 +151,7 @@ code_failure() {
 if [[ -n "$CODE_DIR" ]]; then
   echo
   echo "---- 3) 替换代码（旧代码保留）----"
-  for mod in lab_inventory lab_catalog lab_workflow; do
+  for mod in "${MODULES[@]}"; do
     [[ -d "$CODE_DIR/$mod" ]] || { echo "  $CODE_DIR/$mod 不存在" >&2; exit 1; }
     if [[ -d "$ADDONS/$mod" ]]; then
       [[ ! -e "$CODE_BACKUP/$mod" ]] || { echo "旧代码保留目录已存在，拒绝覆盖" >&2; code_failure; }
@@ -157,7 +161,7 @@ if [[ -n "$CODE_DIR" ]]; then
     echo "  $mod 已替换（旧：$CODE_BACKUP/$mod）"
   done
   # 归属：存在 odoo 用户则修正并**校验生效**；chown 静默失败会让服务读不到新代码。
-  if ! $PY - "$SELF_DIR" "$ADDONS" <<'PYEOF'
+  if ! $PY - "$SELF_DIR" "$ADDONS" "$MODULES_LIST" <<'PYEOF'
 import pathlib, sys
 sys.path.insert(0, sys.argv[1])
 import odoo_restore as r
@@ -166,7 +170,7 @@ if not ids:
     print('  没有 odoo 用户，跳过归属修正（容器/以 root 运行）')
     sys.exit(0)
 uid, gid = ids
-for m in ('lab_inventory', 'lab_catalog', 'lab_workflow'):
+for m in [x for x in sys.argv[3].split(',') if x]:
     p = pathlib.Path(sys.argv[2]) / m
     if p.exists():
         r.chown_and_verify(p, uid, gid)
@@ -181,10 +185,10 @@ fi
 
 # ---------- 4) 升级模块
 echo
-echo "---- 4) 升级三个模块 ----"
+echo "---- 4) 升级指定模块 ----"
 LOG=$(mktemp)
 set +e
-$PY - "$CONFIG" "$DB" "$SELF_DIR" <<'PYEOF' >"$LOG" 2>&1
+$PY - "$CONFIG" "$DB" "$SELF_DIR" "$MODULES_LIST" <<'PYEOF' >"$LOG" 2>&1
 import os, pwd, shutil, subprocess, sys
 sys.path.insert(0, sys.argv[3])
 import lc_odoo_conf as c
@@ -192,7 +196,7 @@ conf, db, config_path = c.load(sys.argv[1]), sys.argv[2], sys.argv[1]
 # 必须 <venv python> <odoo-bin>：odoo-bin 的 shebang 是 env python3，
 # 直接执行会用到系统 python 而缺 babel 等依赖。
 cmd = [c.python_bin(conf), c.odoo_bin(conf), '-c', config_path, '-d', db,
-       '-u', 'lab_inventory,lab_catalog,lab_workflow',
+       '-u', sys.argv[4],
        '--stop-after-init', '--no-http', '--log-level=warn']
 # 以 root 直接跑 odoo-bin 会在 data_dir/filestore 留下 root 属主的文件，
 # 之后 systemd 用 odoo 用户启动就会权限失败 —— 存在 odoo 用户时先降权。

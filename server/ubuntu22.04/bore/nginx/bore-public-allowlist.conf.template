@@ -5,7 +5,7 @@
 #   POST /login  /team/login（表单回退）  /team/logout  /logout（CSRF）
 #   POST /web/session/authenticate（清 DB 头）  /web/session/get_session_info  /web/session/destroy
 #   POST /team/api/session  /api/team/session
-#   POST /lab/api/catalog/{search,detail,categories,facets}
+#   POST /lab/api/catalog/{search,detail,categories,facets,fetch,fetch_status}
 #   GET  /lab/api/asset  /lab/client/updates/manifest  /lab/client/updates/assets/<...>
 #   GET  /lab_team_web/static/...（仅本模块）
 # P3 业务页面（controllers/workflow_pages.py 实际注册，规范 /team/** 与根级别别名成对）：
@@ -21,8 +21,9 @@
 #   /lab/api/labels/{plan,preview}
 # P3 标签 PDF（operator，表单 POST + CSRF，浏览器直出 application/pdf + no-store）：
 #   POST /lab/labels/pdf
-# 目录 API（lab_catalog，POST + 统一信封）：只读 4 条 + 写 2 条
-#   /lab/api/catalog/{search,detail,categories,facets}
+# 目录 API（lab_catalog，POST + 统一信封）：只读 6 条 + 写 2 条
+#   /lab/api/catalog/{search,detail,categories,facets,fetch,fetch_status}
+#     （fetch/fetch_status 为按需抓取；服务端另有限流、锁与权限校验，网关只放行精确 POST）
 #   /lab/api/catalog/{bind,create_material}（materials 页使用；角色仍由后端 catalog 权限校验）
 # 旧 /lab/scan 兼容：只做站内相对 303 迁移，**没有** proxy_pass，旧 inline 控制台永不可达
 #   GET/HEAD /lab/scan[?raw=...]  ->  303 /team/scan$is_args$args
@@ -197,7 +198,7 @@ server {
     location = /team/api/session            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /api/team/session            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
 
-    # ---------- 目录 API（只读 4 条 + 写 2 条，全部精确 POST） ----------
+    # ---------- 目录 API（只读 6 条 + 写 2 条，全部精确 POST） ----------
     # 依据 lab_catalog/controllers/catalog_api.py 的实际 @http.route：type='jsonrpc' + auth='user'
     # + methods=['POST']。bind/create_material 给 materials 页用；**代理层不判断角色**，
     # 目录权限仍由后端 lab_catalog 角色校验（无目录角色 → FORBIDDEN），网关只放行路径与方法。
@@ -205,6 +206,8 @@ server {
     location = /lab/api/catalog/detail     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/catalog/categories { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/catalog/facets     { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/fetch        { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/catalog/fetch_status { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/catalog/bind            { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/catalog/create_material { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/asset              { limit_except GET HEAD { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }

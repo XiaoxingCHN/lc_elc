@@ -35,7 +35,7 @@
 
 最新客户端候选 **1.1.2+5** 修复[器件选择白屏和更新状态](maintenance/handoffs/2026-10-19-receipt-picker-fix.md)。此前客户端 **1.1.1+4** 三端候选新增[启动检查与下载更新](docs/development/CLIENT_UPDATE_IMPLEMENTATION.md)，服务端开发候选 **19.0.1.2.0**；该开发阶段未发布stable或部署新接口，彼时生产为 **lab_workflow 19.0.1.1.0**，完整备份与候选未验收项见[当前交接](maintenance/HANDOFF_CURRENT.md)。
 
-> 当前源码在本仓库，历史副本在local/archive。原F:/lc_elc_workspace保留用于来源追溯，不再作为新开发入口。初始归档没有上线；后续服务端按用户独立授权升级，未启动或重启采集器。
+> 当前源码在本仓库，历史副本在local/archive。原F:/lc_elc_workspace 已于 2026-11-14 审核补档后删除，不再作为来源或开发入口。初始归档没有上线；后续服务端按用户独立授权升级，未启动或重启采集器。
 
 ## 从这里开始
 
@@ -70,6 +70,7 @@ services/           采集/同步编排、生产service/timer快照
  archive/           历史资料索引
  local/             本机缓存、完整迁移记录、历史原物、私有签名、构建输出
 ```
+层级、体积与“不要动”清单见[工程目录权威说明](docs/architecture/PROJECT_LAYOUT.md)。
 
 英文目录、中文正文。`local/`、数据、成品和离线大文件均不提交Git；**只克隆Git不能立即拥有离线SDK和安装包**，按依赖登记下载或用离线载荷包恢复。项目源码中的字体、许可证、Gradle wrapper jar等必要小型运行资产保留。
 

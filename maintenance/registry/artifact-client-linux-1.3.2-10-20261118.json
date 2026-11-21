@@ -1,0 +1,51 @@
+{
+  "file": "clients/linux/releases/1.3.2+10\\LC_ELC-Linux-1.3.2+10.tar.gz",
+  "bytes": 16503485,
+  "sha256": "4f20594cfeadd040fa8d7116550560b9d4b314ec63e30eece8d036b64df78e5a",
+  "version": "1.3.2+10",
+  "source_manifest": "maintenance/registry/source-client-1.3.2-10-20261110.json",
+  "source_tree_sha256": "d7aca661f9949ee0dfa88a2636d7863423b9487d3c84e512ffebb3f42293cfdb",
+  "validation": "built and tested on this machine (WSL Ubuntu 22.04); runtime acceptance pending",
+  "platform": "linux",
+  "arch": "x86_64",
+  "build_number": 10,
+  "executable_sha256": "1f555b914f3c37af856eafba20f8388a9568454ed80922a39206e94f4551201e",
+  "client_install": {
+    "app_id": "com.example.lab_inventory_client",
+    "layout": 1,
+    "version": "1.3.2",
+    "build": 10,
+    "platform": "linux"
+  },
+  "build_environment": {
+    "flutter": "3.47.7 stable (abaf9c523780a608bd46686fd5e53740a07077f8), Dart 3.13.5",
+    "os": "WSL2 Ubuntu 22.04, clang 14.0.0, cmake 3.22.1, ninja 1.10.1",
+    "pub_cache": "WSL restored archive pubcache (dependencies/wsl-build-tools-20261019.tar.gz) + cryptography 2.9.0 via dart pub cache add",
+    "sysroot": "lc-elc-ui-linux-20261014-171408/sysroot (PKG_CONFIG_PATH)",
+    "pdfium": "printing plugin downloaded pdfium-linux-x64 (bundled libpdfium.so)",
+    "dart_defines": {
+      "LAB_ODOO_URL": "http://192.168.31.105:8069",
+      "LAB_ODOO_DB": "LcHardwareHouse"
+    }
+  },
+  "build_command": "bash local/build-linux-13210.sh (python3 tools/build_client.py --platform linux --flutter <wsl flutter> --pub-cache <wsl pubcache> --work-root /home/xiaoxingchn/lc-build --test)",
+  "test_results": {
+    "pub_get": 0,
+    "flutter_test": 0,
+    "flutter_build": 0,
+    "tests_passed": 340,
+    "tests_skipped": 5
+  },
+  "feature_strings_in_libapp_so": [
+    "已选中，正在读取内部档案",
+    "立即从立创商城抓取",
+    "刷新资料"
+  ],
+  "signed_release_manifest": "未生成：工作区源码尚未提交/推送，缺失真实 source_commit",
+  "unverified": [
+    "真实登录/入库/领用",
+    "实体打印与扫码",
+    "SecretService 安全存储",
+    "Linux 桌面实机运行"
+  ]
+}

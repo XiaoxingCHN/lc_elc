@@ -2264,7 +2264,8 @@ body.lc-body .lc-combobox-note[data-kind="loading"] {
   color: var(--lime);
 }
 
-/* 失败态里的"重试检索"：真按钮，键盘可达，不掉出暗色主题 */
+/* 空结果里的下一步（"立即从立创商城抓取"/"重试检索"）：真按钮，键盘可达 */
+body.lc-body .lc-combobox-note[data-kind="empty"] .lc-combobox-retry,
 body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry {
   margin-left: 8px;
   padding: 4px 10px;
@@ -2277,10 +2278,65 @@ body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry {
   cursor: pointer;
 }
 
+body.lc-body .lc-combobox-note[data-kind="empty"] .lc-combobox-retry:hover,
+body.lc-body .lc-combobox-note[data-kind="empty"] .lc-combobox-retry:focus-visible,
 body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:hover,
 body.lc-body .lc-combobox-note[data-kind="error"] .lc-combobox-retry:focus-visible {
   border-color: var(--lime);
   color: var(--lime);
+}
+
+/* 立创候选面板（关键词抓取返回多行时）：面板在表单里，失焦不会把它关掉 */
+body.lc-body .lc-fetch-panel {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.lc-body .lc-fetch-panel-title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+body.lc-body .lc-fetch-candidate {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+body.lc-body .lc-fetch-candidate:last-child {
+  margin-bottom: 0;
+}
+
+body.lc-body .lc-fetch-candidate:hover,
+body.lc-body .lc-fetch-candidate:focus-visible {
+  border-color: var(--lime);
+}
+
+body.lc-body .lc-fetch-primary {
+  display: block;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-fetch-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 /* 权限不足等常驻提示：不依赖候选面板是否打开 */

@@ -23,8 +23,8 @@ lab_workflow 19.0.1.2.0、lab_inventory 19.0.1.0.0。
 
 | 接口 | 方法/路由 | 权限 | 关键参数 | 返回要点 |
 |---|---|---|---|---|
-| 统一检索 | POST `/lab/api/catalog/search` | lab_catalog 读取组 / lab_catalog 管理组 / system | query, category_id, brands[], packages[], parameters{}, stock_only, cursor, limit(1..200) | items[], next_cursor, total, inventory_revision, catalog_revision, param_index_ready, fetch_suggestion（仅精确 C 码/MPN、无筛选、零结果时） |
-| 按需抓取 | POST `/lab/api/catalog/fetch` | 登录用户 | query（精确 C 码或完整 MPN）, catalog_code?（选择候选时） | request_id, state, query_kind, catalog_code, item_key, message, candidates[] |
+| 统一检索 | POST `/lab/api/catalog/search` | lab_catalog 读取组 / lab_catalog 管理组 / system | query, category_id, brands[], packages[], parameters{}, stock_only, cursor, limit(1..200) | items[], next_cursor, total, inventory_revision, catalog_revision, param_index_ready, fetch_suggestion（仅无筛选、零结果时：精确 C 码/MPN 为 kind=c_code/mpn，长关键词为 kind=keyword） |
+| 按需抓取 | POST `/lab/api/catalog/fetch` | 登录用户 | query（精确 C 码、完整 MPN，或**大于 5 个字符且含字母**的关键词——关键词只换候选）, catalog_code?（选择候选时；`refresh=true` 时必填）, sync?（默认 true：15 秒预算内当场抓）, refresh?（默认 false：重抓库中已有的一条，绝不批量） | request_id, state, query_kind ∈ c_code/mpn/keyword, catalog_code, item_key, message, candidates[]（每项含 name/mpn/brand/package/catalog_code）；锁被占用或预算用完时返回 queued，由每分钟 cron 接力，客户端继续轮询 |
 | 抓取状态 | POST `/lab/api/catalog/fetch_status` | 登录用户 | request_id | 同上；state ∈ queued/resolving/fetching/done/failed/skipped_non_electronic/review/not_found/candidates |
 | 器件详情 | POST `/lab/api/catalog/detail` | 同上 | item_key（`lcsc:C123` / `lab:42`） | item, parameters[], files[], lab_templates[], locations[], bags[], issues[], history[] |
 | 分类树 | POST `/lab/api/catalog/categories` | 同上 | — | categories[]（id/parent_id 均为 PG id，另给 catalog_id） |
@@ -42,11 +42,15 @@ lab_workflow 19.0.1.2.0、lab_inventory 19.0.1.0.0。
 `4.7Ω = 4R7`、`0.1Ω = R1`、`4.7kΩ = 4k7`）。`param_index_ready=false` 表示参数文本
 尚未全量回填，客户端应提示"参数索引未就绪"，不能用空结果推断不存在。
 
-按需抓取是**异步**的：`fetch` 只入队，Odoo cron 每分钟处理少量请求，客户端轮询
-`fetch_status`。只接受精确 C 码或完整 MPN；名称、品牌和短关键词返回 `VALIDATION_ERROR`。
-MPN 必须与立创 `productModel` 完全相等，模糊命中只作为 `candidates` 返回，必须由用户选择后
-带 `catalog_code` 重新提交。抓取只写 `lab.catalog.item` / `lab.catalog.param` 与
-`catalog_stock`，不创建产品、不写 `stock.quant` / `stock.move`；非电子一级分类不入库。
+按需抓取默认**同步**：`fetch` 在 15 秒预算内当场处理这一条；锁被占用或预算用完时如实返回
+`queued`，由 Odoo cron 每分钟接力，客户端继续轮询 `fetch_status`。精确 C 码或完整 MPN 直接抓取；
+规范化后**大于 5 个字符**且至少含一个字母的关键词只做**候选检索**——服务端只调用一次公开搜索
+接口，候选只含 `name`/`mpn`/`brand`/`package`/`catalog_code`，**不打开中文详情页、不写库**；
+人选定某个 C 码后带 `catalog_code` 重新提交，那一步才真正抓取。MPN 必须与立创 `productModel`
+完全相等，模糊命中同样只作为 `candidates` 返回。短关键词（≤5 字符）、纯数字与名称返回
+`VALIDATION_ERROR`。抓取只写 `lab.catalog.item` / `lab.catalog.param` 与
+`catalog_stock`，不创建产品、不写 `stock.quant` / `stock.move`；非电子一级分类不入库，
+也不会出现在候选列表里。
 
 ### 2.2 库存与作业（lab_workflow）
 

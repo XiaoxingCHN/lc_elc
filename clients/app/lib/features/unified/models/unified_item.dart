@@ -366,27 +366,43 @@ class CatalogFetchSuggestion {
   }
 }
 
-/// One selectable search hit when an MPN matches several packages/variants.
+/// One selectable search hit.
+///
+/// Rows come from LCSC's SEARCH response only (name, model, package, C code);
+/// no detail page is fetched until the operator picks one. [name] is the
+/// display title LCSC gives ("TI TLV9001IDBVR"), so a candidate can be
+/// recognised before anything is written to the library.
 class CatalogFetchCandidate {
   const CatalogFetchCandidate({
     required this.catalogCode,
     required this.mpn,
     required this.packageName,
+    this.name = '',
+    this.brand = '',
   });
 
   final String catalogCode;
   final String mpn;
   final String packageName;
+  final String name;
+  final String brand;
 
-  String get label => packageName.isEmpty
-      ? '$mpn ($catalogCode)'
-      : '$mpn · $packageName ($catalogCode)';
+  String get label {
+    final title = name.isNotEmpty
+        ? name
+        : (brand.isEmpty ? mpn : '$brand $mpn');
+    return packageName.isEmpty
+        ? '$title ($catalogCode)'
+        : '$title · $packageName ($catalogCode)';
+  }
 
   factory CatalogFetchCandidate.fromJson(Map<String, dynamic> json) {
     return CatalogFetchCandidate(
       catalogCode: asStringOr(json['catalog_code']),
       mpn: asStringOr(json['mpn']),
       packageName: asStringOr(json['package']),
+      name: asStringOr(json['name']),
+      brand: asStringOr(json['brand']),
     );
   }
 }

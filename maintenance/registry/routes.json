@@ -53,7 +53,7 @@
       "path": "/lab/api/catalog/bind",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_bind",
-      "line": 285,
+      "line": 325,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -66,7 +66,7 @@
       "path": "/lab/api/catalog/categories",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_categories",
-      "line": 228,
+      "line": 268,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -79,7 +79,7 @@
       "path": "/lab/api/catalog/create_material",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_create_material",
-      "line": 323,
+      "line": 363,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -92,7 +92,7 @@
       "path": "/lab/api/catalog/detail",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_detail",
-      "line": 214,
+      "line": 254,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -105,7 +105,7 @@
       "path": "/lab/api/catalog/facets",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_facets",
-      "line": 254,
+      "line": 294,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -118,7 +118,7 @@
       "path": "/lab/api/catalog/fetch",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_fetch",
-      "line": 126,
+      "line": 133,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -131,7 +131,7 @@
       "path": "/lab/api/catalog/fetch_status",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_fetch_status",
-      "line": 199,
+      "line": 239,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",
@@ -144,7 +144,7 @@
       "path": "/lab/api/catalog/search",
       "source": "server/ubuntu22.04/odoo_addons/lab_catalog/controllers/catalog_api.py",
       "handler": "catalog_search",
-      "line": 86,
+      "line": 93,
       "registration": {
         "type": "jsonrpc",
         "auth": "user",

@@ -135,6 +135,9 @@ WORKFLOW_ENDPOINTS = {
     'labelsPdf': '/lab/labels/pdf',
     # 目录（既有只读/写接口）
     'catalogSearch': '/lab/api/catalog/search',
+    # 按需抓取：本地零结果时由人点一下才请求；只补器件资料，不写库存
+    'catalogFetch': '/lab/api/catalog/fetch',
+    'catalogFetchStatus': '/lab/api/catalog/fetch_status',
     'catalogDetail': '/lab/api/catalog/detail',
     'catalogCategories': '/lab/api/catalog/categories',
     'catalogBind': '/lab/api/catalog/bind',
@@ -512,7 +515,7 @@ def shell_context(page_title='', extra=None, base=None, active_page=''):
         'lc_workflow_config_json': json.dumps(
             workflow_config(base, workflow_perms, active_page, '', anonymous),
             ensure_ascii=True, sort_keys=True, separators=(',', ':')),
-        'lc_version': '19.0.1.1.0',
+        'lc_version': '19.0.1.2.7',
         # 静态资源版本：内容哈希，文件一变 URL 就变，无需用户手动清缓存
         'lc_css_v': asset_version('static/src/css/team.css'),
         'lc_js_v': asset_version('static/src/js/team.js'),
