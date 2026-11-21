@@ -9,6 +9,9 @@ import {
   equivalentsRequestLines,
   groupUnmappedByValue,
   attachValueMatches,
+  pickValueCandidate,
+  valueSubstituteLines,
+  valueSubstitutionNote,
   attachEquivalents,
   substituteLines,
   substitutionNote,
@@ -1223,8 +1226,24 @@ function renderBom() {
  * Outbound lines. A row with an explicitly selected substitute issues ONLY the
  * candidate's C code for the gap; the original code is never issued as well.
  */
+/**
+ * 领用备注：既写明有编号行的等效替代，也写明无编号分组的替代。
+ *
+ * 用户要求「能选择并确定替代料」——选了什么必须留在领用单上，
+ * 否则事后没法追溯这批料是按什么替换发的。
+ */
+function buildOutboundNote() {
+  const parts = [substitutionNote(state.bom.rows)];
+  const valueNote = valueSubstitutionNote(state.bom.unmappedGroups);
+  if (valueNote) parts.push('无编号替代：' + valueNote);
+  return parts.filter(Boolean).join('；').slice(0, 500);
+}
+
 function bomOutboundSourceLines(rows) {
-  return substituteLines(rows);
+  // 两部分：有 C 编号的行（含勾选的等效件），以及无编号但用户勾了替代料的分组。
+  const lines = substituteLines(rows);
+  const valueLines = valueSubstituteLines(state.bom.unmappedGroups);
+  return lines.concat(valueLines);
 }
 
 async function openBomOutbound() {
@@ -1322,7 +1341,7 @@ async function confirmBomOutbound() {
     attempt = freezeOutboundAttempt({
       borrowerId,
       project: project.trim(),
-      note: substitutionNote(state.bom.rows),
+      note: buildOutboundNote(),
       plan: out.plan,
     });
   } catch (error) {
@@ -1471,16 +1490,36 @@ async function fetchDetailMap(codes) {
  * One batch equivalents request for the whole BOM (never per line). Failures
  * are recorded separately and never block the main stock comparison.
  */
-/** 一个分组的候选单元格：C 编号 + 名称 + 可用量，最多 3 条。 */
+/**
+ * 一个分组的候选单元格：每个候选可勾选。
+ *
+ * 用户要求「能选择并确定替代料」——勾选是唯一入口，绝不自动选。
+ * 同一组只能选一条，勾第二条自动替换第一条。
+ */
 function renderValueCandidates(group) {
   const candidates = Array.isArray(group && group.candidates) ? group.candidates : [];
   if (!candidates.length) {
     return el('span', { class: 'muted' },
-      group && group.query ? '库里没有匹配的现货' : '缺少值或封装，无法检索');
+      group && group.query ? '实验室没有这个规格的现货' : '缺少值或封装，无法检索');
   }
-  return el('div', {}, candidates.map((item) => el('div', { class: 'mono', style: 'line-height:1.6' },
-    (item.catalog_code || item.item_key || '—') + '  ' +
-    (item.name || '') + '  可用 ' + fmtQty(item.lab_available_quantity))));
+  const chosen = group.substitute && group.substitute.item_key;
+  return el('div', {}, candidates.map((item) => {
+    const picked = chosen === item.item_key;
+    const box = el('input', { type: 'checkbox', checked: picked });
+    box.addEventListener('change', () => {
+      state.bom.unmappedGroups = pickValueCandidate(
+        state.bom.unmappedGroups, group.key, box.checked ? item.item_key : null);
+      render();
+    });
+    // 实验室的识别主键是 SN，不是立创编号——后者只是给 EDA 做对应的辅助。
+    const label = item.sn
+      ? item.sn + '  ' + (item.name || '') + '  可用 ' + fmtQty(item.available)
+      : (item.catalog_code || item.item_key || '—') + '  ' +
+        (item.name || '') + '  可用 ' + fmtQty(item.lab_available_quantity);
+    return el('label', { class: 'check', style: 'line-height:1.7' }, [
+      box, el('span', { class: 'mono' }, label),
+    ]);
+  }));
 }
 
 /**
