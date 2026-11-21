@@ -118,6 +118,10 @@ WORKFLOW_ENDPOINTS = {
     'adminUserSetPassword': '/lab/api/admin/user_set_password',
     'adminUserToggleActive': '/lab/api/admin/user_toggle_active',
     'adminUserSetSystemGroup': '/lab/api/admin/user_set_system_group',
+    # EDA 插件密钥（管理页「EDA 密钥」区块）
+    'edaTokens': '/lab/api/eda/manage/tokens',
+    'edaIssue': '/lab/api/eda/manage/issue',
+    'edaRevoke': '/lab/api/eda/manage/revoke',
     # 扫码 / 两阶段入库
     'resolve': '/lab/api/inventory/resolve_code',
     'pendingList': '/lab/api/inventory/pending/list',

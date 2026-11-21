@@ -21,8 +21,8 @@ function transportWith(handler, options = {}) {
 }
 
 test('joinUrl normalizes slashes', () => {
-  assert.equal(joinUrl('http://lc.rm.com/', '/lab/api/catalog/search'), 'http://lc.rm.com/lab/api/catalog/search');
-  assert.equal(joinUrl('http://lc.rm.com', 'lab/api'), 'http://lc.rm.com/lab/api');
+  assert.equal(joinUrl('http://lab.example.test/', '/lab/api/catalog/search'), 'http://lab.example.test/lab/api/catalog/search');
+  assert.equal(joinUrl('http://lab.example.test', 'lab/api'), 'http://lab.example.test/lab/api');
 });
 
 test('sends POST and returns status/text/setCookie', async () => {
@@ -32,7 +32,7 @@ test('sends POST and returns status/text/setCookie', async () => {
     return response({ body: '{"ok":true}', headers: { 'set-cookie': 'session_id=abc; Path=/' } });
   });
   const result = await transport.request({
-    url: 'http://lc.rm.com/lab/api/catalog/search',
+    url: 'http://lab.example.test/lab/api/catalog/search',
     method: 'POST',
     body: '{"a":1}',
     headers: { 'Content-Type': 'application/json' },
@@ -50,7 +50,7 @@ test('classifies CORS/network errors explicitly', async () => {
     throw new Error('Failed to fetch: CORS');
   });
   await assert.rejects(
-    () => transport.request({ url: 'http://lc.rm.com/x', method: 'POST', body: '{}' }),
+    () => transport.request({ url: 'http://lab.example.test/x', method: 'POST', body: '{}' }),
     (error) =>
       error.code === 'NETWORK_OR_CORS' &&
       error.mayHaveBeenSent === true &&
@@ -63,7 +63,7 @@ test('classifies missing external interaction permission', async () => {
     throw new Error('external interaction permission not enabled');
   });
   await assert.rejects(
-    () => transport.request({ url: 'http://lc.rm.com/x', method: 'POST', body: '{}' }),
+    () => transport.request({ url: 'http://lab.example.test/x', method: 'POST', body: '{}' }),
     (error) => error.code === 'EXTERNAL_INTERACTION_DISABLED',
   );
 });
@@ -71,11 +71,11 @@ test('classifies missing external interaction permission', async () => {
 test('timeout is ambiguous for writes and not for reads', async () => {
   const transport = transportWith(() => new Promise(() => {}), { timeoutMs: 15 });
   await assert.rejects(
-    () => transport.request({ url: 'http://lc.rm.com/x', method: 'POST', body: '{}' }),
+    () => transport.request({ url: 'http://lab.example.test/x', method: 'POST', body: '{}' }),
     (error) => error.code === 'TIMEOUT_AMBIGUOUS' && error.mayHaveBeenSent === true,
   );
   await assert.rejects(
-    () => transport.request({ url: 'http://lc.rm.com/x', method: 'GET' }),
+    () => transport.request({ url: 'http://lab.example.test/x', method: 'GET' }),
     (error) => error.code === 'TIMEOUT_AMBIGUOUS' && error.mayHaveBeenSent === false,
   );
 });
@@ -83,14 +83,14 @@ test('timeout is ambiguous for writes and not for reads', async () => {
 test('missing sys_ClientUrl is explicit', async () => {
   const transport = createSdkTransport({ eda: {}, timeoutMs: 50 });
   await assert.rejects(
-    () => transport.request({ url: 'http://lc.rm.com/x', method: 'POST', body: '{}' }),
+    () => transport.request({ url: 'http://lab.example.test/x', method: 'POST', body: '{}' }),
     (error) => error.code === 'EXTERNAL_INTERACTION_DISABLED',
   );
 });
 
 test('requestBinary returns bytes and content type', async () => {
   const transport = transportWith(async () => response({ headers: { 'content-type': 'image/png' }, arrayBuffer: new Uint8Array([1, 2, 3]).buffer }));
-  const result = await transport.requestBinary({ url: 'http://lc.rm.com/lab/api/asset?url=x', method: 'GET' });
+  const result = await transport.requestBinary({ url: 'http://lab.example.test/lab/api/asset?url=x', method: 'GET' });
   assert.equal(result.contentType, 'image/png');
   assert.deepEqual(Array.from(new Uint8Array(result.buffer)), [1, 2, 3]);
 });

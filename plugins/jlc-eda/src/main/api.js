@@ -40,7 +40,7 @@ function parameterObject(value) {
 
 export function createLabApi(client) {
   async function search(params = {}) {
-    return client.call('/lab/api/catalog/search', {
+    return client.call('/lab/api/eda/catalog/search', {
       query: String(params.query || '').trim(),
       category_id: optionalPositiveId(params.category_id, 'category_id'),
       brands: stringList(params.brands),
@@ -53,29 +53,19 @@ export function createLabApi(client) {
   }
 
   async function detail(itemKey) {
-    return client.call('/lab/api/catalog/detail', { item_key: requireItemKey(itemKey) });
+    return client.call('/lab/api/eda/catalog/detail', { item_key: requireItemKey(itemKey) });
   }
 
   async function categories() {
-    return client.call('/lab/api/catalog/categories', {});
-  }
-
-  async function facets(params = {}) {
-    return client.call('/lab/api/catalog/facets', {
-      query: String(params.query || '').trim(),
-      category_id: optionalPositiveId(params.category_id, 'category_id'),
-      brands: stringList(params.brands),
-      packages: stringList(params.packages),
-      parameters: parameterObject(params.parameters),
-    });
+    return client.call('/lab/api/eda/catalog/categories', {});
   }
 
   async function bootstrap() {
-    return client.call('/lab/api/inventory/bootstrap', {});
+    return client.call('/lab/api/eda/bootstrap', {});
   }
 
   async function locations() {
-    return client.call('/lab/api/inventory/locations', {});
+    return client.call('/lab/api/eda/inventory/locations', {});
   }
 
   async function resolveCode(raw) {
@@ -102,7 +92,7 @@ export function createLabApi(client) {
   async function issue(input = {}) {
     const requestKey = assertRequestKey(input.request_key);
     const lines = validateIssueLines(input.lines);
-    return client.call('/lab/api/inventory/issue', {
+    return client.call('/lab/api/eda/inventory/issue', {
       request_key: requestKey,
       borrower_id: positiveId(input.borrower_id, 'borrower_id'),
       project: requiredText(input.project, 'project', 200),
@@ -147,5 +137,15 @@ export function createLabApi(client) {
     });
   }
 
-  return { search, detail, categories, facets, bootstrap, locations, resolveCode, receipt, issue, returnStock, issues, history };
+  async function equivalents(lines, limitPerLine = 5) {
+    return client.call('/lab/api/eda/catalog/equivalents', {
+      lines: (Array.isArray(lines) ? lines : []).map((line) => ({
+        item_key: String((line && line.item_key) || ''),
+        quantity: Number(line && line.quantity) || 0,
+      })).filter((line) => line.item_key),
+      limit_per_line: limitPerLine,
+    });
+  }
+
+  return { search, detail, categories, equivalents, bootstrap, locations, issue };
 }

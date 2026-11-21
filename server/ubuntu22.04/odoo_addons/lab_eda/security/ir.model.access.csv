@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lab_eda_token_manager,lab.eda.token manager,model_lab_eda_token,lab_workflow.group_lab_manager,1,1,1,1
+access_lab_eda_token_user,lab.eda.token user,model_lab_eda_token,base.group_user,1,0,0,0

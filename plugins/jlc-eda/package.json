@@ -1,6 +1,6 @@
 {
   "name": "lab-inventory-odoo-v3",
-  "version": "3.1.1",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "description": "嘉立创EDA专业版库存插件（Odoo 19 会话版）",
@@ -9,7 +9,7 @@
     "verify": "node scripts/verify-package.mjs",
     "test": "node --test src/tests/unit/*.test.js",
     "test:package": "node scripts/build.mjs && node --test src/tests/package/*.test.js",
-    "test:all": "node --test src/tests/unit/*.test.js && node scripts/build.mjs && node --test src/tests/package/*.test.js"
+    "test:all": "node --test src/tests/unit/*.test.js && node --test bridge/credentials.test.mjs && node scripts/build.mjs && node --test src/tests/package/*.test.js"
   },
   "devDependencies": {
     "esbuild": "0.25.10",

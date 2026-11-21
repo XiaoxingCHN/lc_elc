@@ -414,6 +414,12 @@ input[type="radio"] {
   color: var(--danger);
 }
 
+.chip.weak {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: color-mix(in srgb, var(--warn) 10%, var(--chip));
+}
+
 .card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
@@ -509,6 +515,69 @@ th.num {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+/* BOM equivalents (S5): one expandable sub-row under each short line. */
+.bom-equivalents-row td {
+  padding: 4px 8px 8px;
+  background: var(--panel-2);
+}
+
+.bom-equivalents {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bom-equivalents-toggle {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 11.5px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.bom-equivalents-toggle:hover {
+  border-color: var(--accent);
+}
+
+.bom-equivalent-candidate {
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+
+.bom-equivalent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.bom-equivalent-check {
+  padding-bottom: 0;
+  gap: 4px;
+}
+
+.bom-equivalent-name {
+  flex: 1 1 180px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.bom-equivalent-note {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin: 2px 0 0 24px;
+}
+
+.bom-equivalent-note.warn {
+  color: var(--warn);
+  margin-left: 0;
 }
 
 .empty {

@@ -1,6 +1,17 @@
 import { createBridge, readPanelPayload } from './bridge-client.js';
 import { beginSubmit, markSuccess, markFailure } from '../shared/idempotency.js';
-import { groupBom, compareLine, summarize, bomTsv, bagTraceSummary, BOM_STATUS } from '../shared/bom.js';
+import {
+  groupBom,
+  compareLine,
+  summarize,
+  bomTsv,
+  bagTraceSummary,
+  equivalentsRequestLines,
+  attachEquivalents,
+  substituteLines,
+  substitutionNote,
+  BOM_STATUS,
+} from '../shared/bom.js';
 import {
   OUTBOUND_OUTCOME,
   freezeOutboundAttempt,
@@ -110,17 +121,18 @@ const state = {
     summary: null,
     unmapped: [],
     error: null,
+    // S5 equivalents: candidates are suggestions only; `row.substitute` is set
+    // by an explicit operator click and is the ONLY way a substitute is issued.
+    equivalentsLoading: false,
+    equivalentsError: null,
+    equivalentsExpanded: new Set(),
+    equivalentsToken: 0,
     outbound: emptyBomOutbound(),
   },
   settings: {
-    mode: 'relay',
-    relayUrl: 'http://127.0.0.1:49621',
-    pairingToken: '',
-    hasPairingToken: false,
     serverUrl: '',
-    db: '',
-    login: '',
-    password: '',
+    token: '',
+    hasToken: false,
     busy: false,
     message: null,
     error: null,
@@ -288,9 +300,15 @@ function section(title, children) {
 
 function table(headers, rows, options = {}) {
   const head = el('tr', {}, headers.map((header) => el('th', { class: header.num ? 'num' : '' }, typeof header === 'object' ? (header.label ?? '') : header)));
-  const body = rows.map((row) =>
-    el('tr', {}, row.map((cell, index) => el('td', { class: headers[index] && headers[index].num ? 'num' : '' }, cell))),
-  );
+  const body = [];
+  rows.forEach((row, index) => {
+    body.push(el('tr', {}, row.map((cell, column) => el('td', { class: headers[column] && headers[column].num ? 'num' : '' }, cell))));
+    // Optional extra row rendered directly below a data row (e.g. BOM equivalents).
+    if (typeof options.rowAfter === 'function') {
+      const extra = options.rowAfter(row, index);
+      if (extra) body.push(extra);
+    }
+  });
   return el('div', { class: 'table-wrap ' + (options.class || '') }, el('table', {}, [el('thead', {}, head), el('tbody', {}, body)]));
 }
 
@@ -351,12 +369,11 @@ function renderTabs() {
 function renderStatus() {
   const sdk = (state.init && state.init.sdk) || {};
   const parts = [];
-  const connection = (state.init && state.init.connection) || { mode: 'relay', relayUrl: 'http://127.0.0.1:49621' };
-  parts.push(connection.mode === 'relay' ? '本机桥接 ' + connection.relayUrl : '直接连接 ' + (state.init && state.init.config ? state.init.config.serverUrl : '未配置'));
-  if (connection.mode === 'direct' && state.init && state.init.config && state.init.config.db) parts.push('数据库 ' + state.init.config.db);
+  const cfg = (state.init && state.init.config) || {};
+  parts.push(cfg.serverUrl || '未配置服务器');
   if (isActive()) {
     parts.push('用户 ' + (state.session.name || state.session.username || 'uid ' + state.session.uid));
-    parts.push(state.session.sessionMode === 'relay' ? '桥接会话' : '直接会话');
+    parts.push('密钥认证');
   } else {
     parts.push('未登录');
   }
@@ -454,13 +471,8 @@ async function init() {
   }
   state.session = state.init.session || { active: false, uid: null, sessionMode: 'none' };
   const config = state.init.config || {};
-  const connection = state.init.connection || {};
-  state.settings.mode = connection.mode === 'direct' ? 'direct' : 'relay';
-  state.settings.relayUrl = connection.relayUrl || 'http://127.0.0.1:49621';
-  state.settings.hasPairingToken = Boolean(connection.hasPairingToken);
-  state.settings.serverUrl = config.serverUrl || 'http://lc.rm.com';
-  state.settings.db = config.db || 'LcHardwareHouse';
-  state.settings.login = config.login || '';
+  state.settings.serverUrl = config.serverUrl || 'https://team.l-creation.club';
+  state.settings.hasToken = Boolean(config.hasToken);
   render();
   if (isActive()) {
     await refreshSession();
@@ -696,7 +708,8 @@ function renderInventoryDetail(detail) {
   const item = detail.item || {};
   const code = codeOf(item);
   const imageBox = el('div', { class: 'image-box' }, item.image_url ? '图片加载中…' : '无图片');
-  if (item.image_url) void loadDetailImage(item.image_url, item.item_key, imageBox);
+  // EDA 插件不加载器件图片：<img> 发不了 Authorization 头，而图片端点
+  // 只认 bearer。BOM 对比与库存查询不需要图，详情页直接显示占位。
 
   const meta = el('div', { class: 'meta' }, [
     el('h2', {}, (code ? code + ' · ' : '') + (item.name || '未命名器件')),
@@ -816,23 +829,6 @@ function stat(label, value) {
   return el('div', { class: 'stat' }, [el('div', { class: 'label' }, label), el('div', { class: 'value' }, value)]);
 }
 
-async function loadDetailImage(url, itemKey, box) {
-  try {
-    const image = await call('catalog.image', { url });
-    if (!state.inventory.detail || state.inventory.detail.item.item_key !== itemKey) return;
-    clear(box);
-    if (image && image.supported && image.dataUrl) {
-      box.appendChild(el('img', { src: image.dataUrl, alt: '器件图片' }));
-    } else {
-      box.textContent = (image && image.reason) || '无图片';
-    }
-  } catch (error) {
-    if (!state.inventory.detail || state.inventory.detail.item.item_key !== itemKey) return;
-    clear(box);
-    box.textContent = '图片加载失败：' + ((error && error.code) || 'ERROR');
-  }
-}
-
 /* ------------------------------------------------------------------ */
 /* Read-only BOM comparison                                            */
 /* ------------------------------------------------------------------ */
@@ -845,9 +841,119 @@ const BOM_STATUS_LABEL = {
   no_code: '无 C 编号',
 };
 
+/** Column count of the comparison table (the equivalents sub-row spans all of them). */
+const BOM_COLUMNS = 9;
+
 function bomStatusChip(status) {
   const cls = status === BOM_STATUS.OK ? 'ok' : status === BOM_STATUS.SHORT ? 'danger' : status === BOM_STATUS.UNKNOWN ? 'warn' : '';
   return el('span', { class: 'chip ' + cls }, BOM_STATUS_LABEL[status] || status);
+}
+
+/** Status cell: an explicit substitute selection overrides the stock status. */
+function bomStatusCell(row) {
+  if (row.substitute) {
+    return el('div', {}, [
+      el('span', { class: 'chip ok' }, '已选替代'),
+      el('div', { class: 'mono muted', style: 'margin-top:4px' }, row.code + ' → ' + codeOf(row.substitute)),
+    ]);
+  }
+  return bomStatusChip(row.status);
+}
+
+/* ------------------------------------------------------------------ */
+/* BOM equivalents (S5): candidates only, the operator chooses         */
+/* ------------------------------------------------------------------ */
+
+function toggleBomEquivalents(row) {
+  const key = row.itemKey || 'lcsc:' + row.code;
+  if (state.bom.equivalentsExpanded.has(key)) state.bom.equivalentsExpanded.delete(key);
+  else state.bom.equivalentsExpanded.add(key);
+  render();
+}
+
+/**
+ * Select (or clear) one candidate for a BOM line. A row holds at most ONE
+ * substitute; picking another replaces the previous choice. Nothing is ever
+ * auto-selected.
+ */
+function selectBomSubstitute(row, candidate, checked) {
+  const key = row.itemKey || 'lcsc:' + row.code;
+  state.bom.rows = state.bom.rows.map((entry) => {
+    if ((entry.itemKey || 'lcsc:' + entry.code) !== key) return entry;
+    const next = Object.assign({}, entry);
+    if (checked) next.substitute = candidate;
+    else delete next.substitute;
+    return next;
+  });
+  render();
+}
+
+function bomEquivalentCandidateLine(row, candidate) {
+  const chosen = Boolean(row.substitute && row.substitute.item_key === candidate.item_key);
+  const box = el('input', { type: 'checkbox', checked: chosen });
+  box.addEventListener('change', () => selectBomSubstitute(row, candidate, box.checked));
+  const locations = (candidate.locations || [])
+    .map((location) => location.location || location.name || location.path || '')
+    .filter(Boolean)
+    .join(' ');
+  const bags = (candidate.bags || [])
+    .map((bag) => bag.trace_code || '')
+    .filter(Boolean)
+    .join(',');
+  const line = el('div', { class: 'bom-equivalent-row' }, [
+    el('label', { class: 'check bom-equivalent-check' }, [box, el('span', {}, chosen ? '已选' : '选用')]),
+    el('span', { class: 'mono' }, codeOf(candidate) || candidate.item_key || '—'),
+    el('span', {}, candidate.brand || '—'),
+    el('span', { class: 'bom-equivalent-name' }, candidate.name || '—'),
+    el('span', {}, '可用 ' + fmtQty(candidate.available)),
+    el('span', { class: 'muted' }, locations || '—'),
+    el('span', { class: 'muted' }, '袋 ' + (bags || '—')),
+    candidate.confidence === 'weak' ? el('span', { class: 'chip weak' }, '依据较弱') : null,
+  ]);
+  const details = [];
+  if ((candidate.matched || []).length) {
+    details.push(
+      el('div', { class: 'bom-equivalent-note' }, '一致：' + candidate.matched.map((item) => item.name + ' ' + item.value).join('、')),
+    );
+  }
+  if ((candidate.conflicts || []).length) {
+    details.push(
+      el(
+        'div',
+        { class: 'bom-equivalent-note muted' },
+        '差异：' + candidate.conflicts.map((item) => item.name + ' ' + (item.source ?? '') + ' → ' + (item.candidate ?? '')).join('、'),
+      ),
+    );
+  }
+  return el('div', { class: 'bom-equivalent-candidate' }, [line].concat(details));
+}
+
+/** The extra table row rendered under one BOM line; null when it has no candidates. */
+function bomEquivalentsExtraRow(row, columnCount) {
+  const eq = row.equivalents;
+  if (!eq || !Array.isArray(eq.candidates) || !eq.candidates.length) return null;
+  const key = row.itemKey || 'lcsc:' + row.code;
+  const expanded = state.bom.equivalentsExpanded.has(key);
+  const toggle = el(
+    'button',
+    {
+      class: 'bom-equivalents-toggle',
+      type: 'button',
+      'aria-expanded': expanded ? 'true' : 'false',
+      onclick: () => toggleBomEquivalents(row),
+    },
+    (expanded ? '▾ ' : '▸ ') + '等效 ' + eq.candidates.length,
+  );
+  const content = el('div', { class: 'bom-equivalents' }, [toggle]);
+  if (expanded) {
+    if (eq.basis === 'package_category') {
+      content.appendChild(
+        el('div', { class: 'bom-equivalent-note warn' }, '源器件缺少参数，以下候选仅按封装与分类匹配，请人工确认'),
+      );
+    }
+    for (const candidate of eq.candidates) content.appendChild(bomEquivalentCandidateLine(row, candidate));
+  }
+  return el('tr', { class: 'bom-equivalents-row' }, el('td', { colspan: String(columnCount) }, content));
 }
 
 function renderBom() {
@@ -1000,10 +1106,22 @@ function renderBom() {
     );
   }
 
+  if (bom.equivalentsLoading) {
+    dom.view.appendChild(el('p', { class: 'muted', style: 'margin-top:8px' }, '正在检索等效候选…'));
+  }
+  if (bom.equivalentsError) {
+    // Equivalents are an aid; a failure here never blocks the main comparison.
+    dom.view.appendChild(
+      el('div', { class: 'notice warn', style: 'margin-top:8px' }, [
+        '等效候选检索失败：' + ((bom.equivalentsError && bom.equivalentsError.message) || '未知错误') + '（主表库存对比不受影响）',
+      ]),
+    );
+  }
+
   const rows = bom.rows || [];
   if (rows.length) {
     const tableRows = rows.map((row) => [
-      bomStatusChip(row.status),
+      bomStatusCell(row),
       el('span', { class: 'mono' }, row.code),
       row.name || '—',
       (row.designators || []).join(','),
@@ -1030,6 +1148,7 @@ function renderBom() {
             { label: '袋' },
           ],
           tableRows,
+          { rowAfter: (cells, index) => bomEquivalentsExtraRow(rows[index], BOM_COLUMNS) },
         ),
         el('div', { class: 'row', style: 'margin-top:10px' }, [
           el('button', { class: 'btn', type: 'button', onclick: () => copyText(bomTsv(rows), '已复制对比表') }, '复制对比表'),
@@ -1082,10 +1201,12 @@ function renderBom() {
 /* One-click outbound (BOM -> bag allocation -> real issue)            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Outbound lines. A row with an explicitly selected substitute issues ONLY the
+ * candidate's C code for the gap; the original code is never issued as well.
+ */
 function bomOutboundSourceLines(rows) {
-  return (rows || [])
-    .filter((row) => row && row.code)
-    .map((row) => ({ item_key: 'lcsc:' + row.code, quantity: Number(row.need) || 0 }));
+  return substituteLines(rows);
 }
 
 async function openBomOutbound() {
@@ -1183,7 +1304,7 @@ async function confirmBomOutbound() {
     attempt = freezeOutboundAttempt({
       borrowerId,
       project: project.trim(),
-      note: 'BOM 一键出库',
+      note: substitutionNote(state.bom.rows),
       plan: out.plan,
     });
   } catch (error) {
@@ -1297,6 +1418,11 @@ function scopeRadio(value, label, current) {
       state.bom.unmapped = [];
       state.bom.warnings = [];
       state.bom.grouped = null;
+      // Invalidate any in-flight equivalents response for the old scope.
+      state.bom.equivalentsToken = (state.bom.equivalentsToken || 0) + 1;
+      state.bom.equivalentsLoading = false;
+      state.bom.equivalentsError = null;
+      state.bom.equivalentsExpanded = new Set();
       state.bom.outbound = emptyBomOutbound();
       render();
     }
@@ -1321,6 +1447,40 @@ async function fetchDetailMap(codes) {
   });
   await Promise.all(workers);
   return result;
+}
+
+/**
+ * One batch equivalents request for the whole BOM (never per line). Failures
+ * are recorded separately and never block the main stock comparison.
+ */
+async function loadBomEquivalents() {
+  const bom = state.bom;
+  const token = (bom.equivalentsToken || 0) + 1;
+  bom.equivalentsToken = token;
+  const requestLines = equivalentsRequestLines(bom.rows);
+  if (!requestLines.length) {
+    bom.equivalentsLoading = false;
+    bom.equivalentsError = null;
+    bom.rows = attachEquivalents(bom.rows, { lines: [] });
+    render();
+    return;
+  }
+  bom.equivalentsLoading = true;
+  bom.equivalentsError = null;
+  render();
+  try {
+    const response = await call('catalog.equivalents', { lines: requestLines, limit_per_line: 5 }, 60000);
+    if (bom.equivalentsToken !== token) return;
+    bom.rows = attachEquivalents(bom.rows, response);
+  } catch (error) {
+    if (bom.equivalentsToken !== token) return;
+    bom.equivalentsError = error;
+  } finally {
+    if (bom.equivalentsToken === token) {
+      bom.equivalentsLoading = false;
+      render();
+    }
+  }
 }
 
 async function runBom() {
@@ -1355,6 +1515,7 @@ async function runBom() {
     bom.loading = false;
     render();
   }
+  if (!bom.error) await loadBomEquivalents();
 }
 
 async function refreshBomStock() {
@@ -1379,6 +1540,7 @@ async function refreshBomStock() {
     bom.refreshing = false;
     render();
   }
+  if (!bom.error) await loadBomEquivalents();
 }
 
 function csvCell(value) {
@@ -1418,100 +1580,43 @@ function exportBomCsv(rows) {
 /* Settings / session                                                  */
 /* ------------------------------------------------------------------ */
 
-function connectionModeRadio(value, label, current) {
-  const input = el('input', { type: 'radio', name: 'connection-mode', value, checked: current === value });
-  input.addEventListener('change', () => {
-    if (!input.checked) return;
-    state.settings.mode = value;
-    render();
-  });
-  return el('label', { class: 'check', style: 'padding-bottom:0' }, [input, el('span', {}, label)]);
-}
-
 function renderSettings() {
   const settings = state.settings;
   const session = state.session;
   const bootstrap = state.bootstrap;
   const permissions = (bootstrap && bootstrap.permissions) || {};
-  const isRelay = settings.mode !== 'direct';
 
-  const relayInput = el('input', { type: 'text', value: settings.relayUrl, placeholder: 'http://127.0.0.1:49621', class: 'mono' });
-  relayInput.addEventListener('input', () => {
-    settings.relayUrl = relayInput.value.trim();
+  const serverInput = el('input', {
+    type: 'text', value: settings.serverUrl,
+    placeholder: 'https://team.l-creation.club', class: 'mono',
   });
-  const tokenInput = el('input', {
-    type: 'password',
-    value: settings.pairingToken,
-    placeholder: settings.hasPairingToken ? '本次启动已连接；如需更换请输入新配对码' : '粘贴桥接窗口显示的配对码',
-    autocomplete: 'off',
-  });
-  tokenInput.addEventListener('input', () => {
-    settings.pairingToken = tokenInput.value.trim();
-  });
-  const serverInput = el('input', { type: 'text', value: settings.serverUrl, placeholder: 'http://lc.rm.com', class: 'mono' });
   serverInput.addEventListener('input', () => {
     settings.serverUrl = serverInput.value.trim();
   });
-  const dbInput = el('input', { type: 'text', value: settings.db, placeholder: 'LcHardwareHouse', class: 'mono' });
-  dbInput.addEventListener('input', () => {
-    settings.db = dbInput.value.trim();
-  });
-  const loginInput = el('input', { type: 'text', value: settings.login, placeholder: 'Odoo 登录名', autocomplete: 'username' });
-  loginInput.addEventListener('input', () => {
-    settings.login = loginInput.value.trim();
-  });
-  const passwordInput = el('input', {
+  const tokenInput = el('input', {
     type: 'password',
-    value: settings.password,
-    placeholder: 'Odoo 密码（仅本次登录使用）',
-    autocomplete: 'current-password',
+    value: settings.token,
+    placeholder: settings.hasToken ? '已保存；留空则沿用现有密钥' : '粘贴管理员给你的 EDA 密钥（eda_…）',
+    autocomplete: 'off',
   });
-  passwordInput.addEventListener('input', () => {
-    settings.password = passwordInput.value;
+  tokenInput.addEventListener('input', () => {
+    settings.token = tokenInput.value.trim();
   });
 
   const panel = el('section', { class: 'panel' }, [
     el('h2', {}, '连接与账户'),
-    el('p', { class: 'muted' }, '推荐使用本机桥接：先运行压缩包里的「start-windows.cmd」，把窗口里的配对码填到下面。桥接只在本机运行，不需要修改 Odoo 服务器。'),
-    el('div', { class: 'chips', style: 'margin:8px 0 12px' }, [
-      connectionModeRadio('relay', '本机桥接（推荐）', settings.mode),
-      connectionModeRadio('direct', '直接连接 Odoo（高级）', settings.mode),
+    el('p', { class: 'muted' }, 'EDA 插件用密钥直连服务器，不需要安装任何额外程序。密钥由库存管理员在网页端「管理 → EDA 插件密钥」里发放，绑定到你的账号。'),
+    el('div', { class: 'grid-2' }, [
+      field('服务器地址', serverInput, '默认 https://team.l-creation.club；内网可改为 http://192.168.31.105:8069。'),
+      field('EDA 密钥', tokenInput, '形如 eda_xxxxxxxx。密钥明文保存在本机 EDA 配置里，与浏览器保存密码同一水位；离职时管理员可随时吊销。'),
     ]),
   ]);
 
-  if (isRelay) {
-    panel.appendChild(
-      el('div', { class: 'grid-2' }, [
-        field('本机地址', relayInput, '默认 http://127.0.0.1:49621；只接受本机地址。'),
-        field('配对码', tokenInput, '每次启动桥接都会生成新配对码；只保存在内存中。'),
-      ]),
-    );
-  } else {
-    panel.appendChild(
-      el('div', { class: 'grid-2' }, [
-        field('Odoo 地址', serverInput, '默认 http://lc.rm.com；可改为 IP/端口。'),
-        field('数据库名', dbInput, '默认 LcHardwareHouse。'),
-      ]),
-    );
-  }
-
-  panel.appendChild(
-    el('div', { class: 'grid-2', style: 'margin-top:10px' }, [
-      field('Odoo 登录名', loginInput, '只保存登录名，不保存密码。'),
-      field('Odoo 密码', passwordInput, '只用于本次登录，不写入配置、不写日志。'),
-    ]),
-  );
-
   panel.appendChild(
     el('div', { class: 'row', style: 'margin-top:12px' }, [
-      el('button', { class: 'btn', type: 'button', disabled: settings.busy, onclick: () => saveConnection() }, '保存设置'),
-      el('button', { class: 'btn primary', type: 'button', disabled: settings.busy, onclick: () => login() }, settings.busy ? '处理中…' : (isRelay ? '连接并登录' : '直接登录')),
-      el('button', { class: 'btn danger', type: 'button', disabled: settings.busy || !session.active, onclick: () => logout() }, '注销'),
+      el('button', { class: 'btn primary', type: 'button', disabled: settings.busy, onclick: () => saveConnection() }, settings.busy ? '连接中…' : '保存并连接'),
+      el('button', { class: 'btn danger', type: 'button', disabled: settings.busy || !session.active, onclick: () => logout() }, '断开并清除密钥'),
     ]),
-  );
-
-  panel.appendChild(
-    el('p', { class: 'notice', style: 'margin-top:12px' }, '登录状态只在当前 EDA 会话内保持，不承诺免密天数。密码和配对码不会被保存；关闭 EDA 或重载扩展后需要重新输入。'),
   );
 
   if (settings.error) panel.appendChild(el('div', { style: 'margin-top:10px' }, errorBox(settings.error)));
@@ -1520,11 +1625,10 @@ function renderSettings() {
   panel.appendChild(el('h3', {}, '当前会话'));
   panel.appendChild(
     el('dl', { class: 'kv' }, [
-      el('dt', {}, '状态'), el('dd', {}, session.active ? '已登录' : '未登录'),
-      el('dt', {}, '连接方式'), el('dd', {}, isRelay ? '本机桥接（' + settings.relayUrl + '）' : '直接连接 Odoo'),
+      el('dt', {}, '状态'), el('dd', {}, session.active ? '已连接' : '未连接'),
+      el('dt', {}, '服务器'), el('dd', {}, settings.serverUrl || '—'),
       el('dt', {}, '用户'), el('dd', {}, session.active ? (session.name || '') + '（' + (session.username || '') + '）' : '—'),
       el('dt', {}, 'UID'), el('dd', {}, session.uid ? String(session.uid) : '—'),
-      el('dt', {}, '数据库'), el('dd', {}, session.db || settings.db || '—'),
     ]),
   );
 
@@ -1540,7 +1644,7 @@ function renderSettings() {
         ].map(([label, value]) => [label, value ? '是' : '否']),
       ),
     );
-    panel.appendChild(el('p', { class: 'muted', style: 'margin-top:8px' }, '权限以 Odoo 服务器校验为准。'));
+    panel.appendChild(el('p', { class: 'muted', style: 'margin-top:8px' }, '权限以 Odoo 服务器校验为准；插件不能越权。'));
   } else if (session.active) {
     panel.appendChild(
       el('div', { class: 'row', style: 'margin-top:10px' }, [
@@ -1550,92 +1654,43 @@ function renderSettings() {
     );
   }
 
-  if (isRelay) {
-    panel.appendChild(el('h3', {}, '使用提示'));
-    panel.appendChild(
-      el('ul', { class: 'list' }, [
-        el('li', {}, '连接失败时，先确认「start-windows.cmd」窗口仍然打开。'),
-        el('li', {}, '配对码每次启动都会变化，请从桥接窗口重新复制。'),
-        el('li', {}, '「一键出库」要在确认弹窗后才会写入 Odoo；入库、归还、扫码追溯请在网页端或 Flutter 客户端办理。'),
-        el('li', {}, '如果账号没有对应权限，界面会显示服务器返回的权限提示。'),
-      ]),
-    );
-  }
+  panel.appendChild(el('h3', {}, '使用提示'));
+  panel.appendChild(
+    el('ul', { class: 'list' }, [
+      el('li', {}, '没有密钥时，请找库存管理员在网页端「管理」页发放；离职或换机时管理员可以吊销旧密钥。'),
+      el('li', {}, '「一键出库」要在确认弹窗后才会写入 Odoo；入库、归还、扫码追溯请在网页端或 Flutter 客户端办理。'),
+      el('li', {}, '如果账号没有对应权限，界面会显示服务器返回的权限提示。'),
+    ]),
+  );
 
   dom.view.appendChild(panel);
 }
 
 async function saveConnection() {
   const settings = state.settings;
+  if (!settings.token && !settings.hasToken) {
+    settings.error = { code: 'VALIDATION_ERROR', message: '请填写 EDA 密钥。没有的话请找库存管理员发放。' };
+    render();
+    return;
+  }
   settings.busy = true;
   settings.error = null;
   settings.message = null;
   render();
   try {
-    const result = await call('config.save', {
-      mode: settings.mode,
-      relayUrl: settings.relayUrl,
-      pairingToken: settings.pairingToken,
-      serverUrl: settings.serverUrl,
-      db: settings.db,
-      login: settings.login,
-    });
+    const payload = { serverUrl: settings.serverUrl };
+    if (settings.token) payload.token = settings.token;
+    const result = await call('config.save', payload, 60000);
     state.init.config = result.config;
-    state.init.connection = result.connection;
     state.session = result.session;
     state.sessionError = null;
-    settings.hasPairingToken = Boolean(result.connection && result.connection.hasPairingToken);
-    settings.message = '设置已保存（未保存密码和配对码）。';
-    toast('设置已保存', 'ok');
-  } catch (error) {
-    settings.error = error;
-  } finally {
-    settings.busy = false;
-    render();
-  }
-}
-
-async function login() {
-  const settings = state.settings;
-  if (!settings.login || !settings.password) {
-    settings.error = { code: 'VALIDATION_ERROR', message: '请填写 Odoo 登录名和密码。' };
-    render();
-    return;
-  }
-  if (settings.mode !== 'direct' && !settings.pairingToken && !settings.hasPairingToken) {
-    settings.error = { code: 'VALIDATION_ERROR', message: '请先运行本机桥接，并填写窗口里的配对码。' };
-    render();
-    return;
-  }
-  settings.busy = true;
-  settings.error = null;
-  settings.message = null;
-  render();
-  try {
-    const result = await call(
-      'session.login',
-      {
-        mode: settings.mode,
-        relayUrl: settings.relayUrl,
-        pairingToken: settings.pairingToken,
-        serverUrl: settings.serverUrl,
-        db: settings.db,
-        login: settings.login,
-        password: settings.password,
-      },
-      60000,
-    );
-    state.session = result.session;
-    state.init.session = result.session;
-    state.init.config = result.config;
-    state.init.connection = result.connection;
-    settings.hasPairingToken = Boolean(result.connection && result.connection.hasPairingToken);
-    settings.password = '';
-    settings.pairingToken = '';
-    settings.message = '登录成功。会话仅在当前 EDA 会话内保持。';
+    settings.hasToken = Boolean(result.config && result.config.hasToken);
+    settings.token = '';
+    settings.message = '已连接：' + ((result.session && result.session.name) || '') +
+      '（' + ((result.session && result.session.username) || '') + '）';
     state.bootstrap = null;
     state.bootstrapError = null;
-    toast('登录成功', 'ok');
+    toast('已连接', 'ok');
     void loadBootstrap();
   } catch (error) {
     settings.error = error;
@@ -1652,13 +1707,14 @@ async function logout() {
   settings.message = null;
   render();
   try {
-    const result = await call('session.logout');
+    await call('session.disconnect');
     state.session = { active: false, uid: null, sessionMode: 'none' };
     state.init.session = state.session;
     state.bootstrap = null;
     state.bootstrapError = null;
-    settings.message = result.warning || '已注销并清除本地会话。';
-    toast('已注销', 'ok');
+    settings.hasToken = false;
+    settings.message = '已断开，本机保存的密钥已清除。';
+    toast('已断开', 'ok');
   } catch (error) {
     settings.error = error;
   } finally {
@@ -1709,7 +1765,7 @@ function renderDiagnostics() {
         el('dt', {}, '插件版本'), el('dd', {}, s.version || VERSION),
         el('dt', {}, '服务器 / 数据库'), el('dd', {}, ((s.config && s.config.serverUrl) || '—') + ' / ' + ((s.config && s.config.db) || '—')),
         el('dt', {}, '会话'), el('dd', {}, s.session && s.session.active ? '已登录（' + (s.session.sessionMode || '') + '）' : '未登录'),
-        el('dt', {}, '连接方式'), el('dd', {}, s.connection && s.connection.mode === 'relay' ? '本机桥接 ' + (s.connection.relayUrl || '') : '直接连接 Odoo'),
+        el('dt', {}, '认证方式'), el('dd', {}, s.session && s.session.active ? 'EDA 密钥（bearer）' : '未连接'),
         el('dt', {}, '网络接口'), el('dd', {}, sdk.clientUrl ? '可用' : '不可用'),
         el('dt', {}, '消息总线'), el('dd', {}, sdk.messageBus ? '可用' : '不可用'),
         el('dt', {}, 'sys_IFrame'), el('dd', {}, sdk.iframe ? '可用' : '不可用'),

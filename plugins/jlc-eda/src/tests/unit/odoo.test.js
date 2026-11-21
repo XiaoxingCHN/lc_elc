@@ -2,121 +2,128 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOdooClient } from '../../main/odoo.js';
 
-function response(result, options = {}) {
+const TOKEN = 'eda_' + 'A'.repeat(43);
+
+function makeTransport(responder) {
+  const requests = [];
   return {
-    status: options.status || 200,
-    ok: (options.status || 200) < 300,
-    text: JSON.stringify({ jsonrpc: '2.0', id: options.id || 1, result }),
-  };
-}
-
-function rawResponse(text, options = {}) {
-  return { status: options.status || 200, ok: (options.status || 200) < 300, text };
-}
-
-function errorResponse(code, message, name = '') {
-  return rawResponse(
-    JSON.stringify({ jsonrpc: '2.0', id: null, error: { code, message, data: name ? { name } : {} } }),
-  );
-}
-
-function makeTransport(handler) {
-  const calls = [];
-  return {
-    calls,
+    requests,
     async request(input) {
-      const path = new URL(input.url).pathname;
-      calls.push({ path, headers: input.headers || {}, body: input.body });
-      return handler(path, calls.length - 1, input);
+      requests.push(input);
+      return responder(input);
     },
   };
 }
 
-test('direct mode relies on the SDK cookie jar and never sends a Cookie header', async () => {
-  const transport = makeTransport((path) => {
-    if (path === '/web/session/authenticate') {
-      return response({ uid: 7, name: 'Alice', username: 'alice', db: 'lab' });
-    }
-    if (path === '/web/session/get_session_info') return response({ uid: 7, name: 'Alice' });
-    if (path === '/lab/api/catalog/search') {
-      return response({ ok: true, data: { items: [], total: 0, next_cursor: null }, error: null });
-    }
-    throw new Error('unexpected path ' + path);
-  });
+function jsonRpc(result, id = 1) {
+  return { status: 200, text: JSON.stringify({ jsonrpc: '2.0', id, result }) };
+}
+
+test('every request carries Authorization: bearer <token>', async () => {
+  const transport = makeTransport(() =>
+    jsonRpc({ ok: true, data: { items: [] }, error: null }));
   const client = createOdooClient({
-    config: { serverUrl: 'http://lc.rm.com', db: 'lab', login: 'alice' },
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
     transport,
   });
-  const session = await client.authenticate({ db: 'lab', login: 'alice', password: 'secret' });
+  await client.call('/lab/api/eda/catalog/search', { query: 'x' });
+  assert.equal(transport.requests.length, 1);
+  assert.equal(transport.requests[0].headers.Authorization, 'bearer ' + TOKEN);
+  assert.equal(transport.requests[0].url, 'https://lab.example.test/lab/api/eda/catalog/search');
+});
+
+test('no token means no request and a login action', async () => {
+  const transport = makeTransport(() => jsonRpc({}));
+  const client = createOdooClient({
+    config: { serverUrl: 'https://lab.example.test', token: '' },
+    transport,
+  });
+  await assert.rejects(
+    () => client.call('/lab/api/eda/bootstrap', {}),
+    (error) => error.code === 'SESSION_REQUIRED' && error.action === 'login',
+  );
+  assert.equal(transport.requests.length, 0);
+});
+
+test('MISSING_TOKEN / INVALID_TOKEN map to SESSION_EXPIRED', async () => {
+  for (const code of ['MISSING_TOKEN', 'INVALID_TOKEN']) {
+    const transport = makeTransport(() =>
+      jsonRpc({ ok: false, data: null, error: { code, message: '密钥无效', fields: {} } }));
+    const client = createOdooClient({
+      config: { serverUrl: 'https://lab.example.test', token: TOKEN },
+      transport,
+    });
+    await assert.rejects(
+      () => client.call('/lab/api/eda/bootstrap', {}),
+      (error) => error.code === 'SESSION_EXPIRED' && error.action === 'login',
+      code,
+    );
+  }
+});
+
+test('business errors keep their own code', async () => {
+  const transport = makeTransport(() =>
+    jsonRpc({ ok: false, data: null,
+      error: { code: 'FORBIDDEN', message: '没有代领权限', fields: { borrower_id: 'x' } } }));
+  const client = createOdooClient({
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
+    transport,
+  });
+  await assert.rejects(
+    () => client.call('/lab/api/eda/inventory/issue', {}),
+    (error) => error.code === 'FORBIDDEN' && error.fields.borrower_id === 'x',
+  );
+});
+
+test('successful call unwraps the data envelope', async () => {
+  const transport = makeTransport(() =>
+    jsonRpc({ ok: true, data: { user: { id: 7, name: '张三' } }, error: null }));
+  const client = createOdooClient({
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
+    transport,
+  });
+  const data = await client.call('/lab/api/eda/bootstrap', {});
+  assert.deepEqual(data, { user: { id: 7, name: '张三' } });
+});
+
+test('connect() reads the identity from bootstrap', async () => {
+  const transport = makeTransport(() =>
+    jsonRpc({ ok: true, data: { user: { id: 9, name: '李四', login: 'lisi' } }, error: null }));
+  const client = createOdooClient({
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
+    transport,
+  });
+  const session = await client.connect();
   assert.equal(session.active, true);
-  assert.equal(session.sessionMode, 'cookie-jar');
-  assert.equal(transport.calls[0].headers.Cookie, undefined);
-  assert.equal(transport.calls[1].headers.Cookie, undefined);
-  const data = await client.call('/lab/api/catalog/search', { query: '' });
-  assert.deepEqual(data.items, []);
-  assert.equal(transport.calls[2].headers.Cookie, undefined);
+  assert.equal(session.uid, 9);
+  assert.equal(session.name, '李四');
+  assert.equal(session.sessionMode, 'bearer');
 });
 
-test('reports SESSION_COOKIE_UNAVAILABLE when the post-login probe is anonymous', async () => {
-  const transport = makeTransport((path) => {
-    if (path === '/web/session/authenticate') return response({ uid: 9 });
-    if (path === '/web/session/get_session_info') {
-      return errorResponse(100, 'Odoo Session Expired', 'odoo.http.SessionExpiredException');
-    }
-    throw new Error('unexpected path ' + path);
-  });
+test('disconnect clears the identity but keeps the token', async () => {
+  const transport = makeTransport(() =>
+    jsonRpc({ ok: true, data: { user: { id: 9, name: '李四' } }, error: null }));
   const client = createOdooClient({
-    config: { serverUrl: 'http://lc.rm.com', db: 'lab', login: 'x' },
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
     transport,
   });
-  await assert.rejects(
-    () => client.authenticate({ db: 'lab', login: 'x', password: 'pw' }),
-    (error) => error.code === 'SESSION_COOKIE_UNAVAILABLE' && error.action === 'use_relay',
-  );
-  assert.equal(client.publicSession().active, false);
+  await client.connect();
+  client.disconnect();
+  const session = client.publicSession();
+  assert.equal(session.active, false);
+  assert.equal(session.uid, null);
+  // token 仍在 config 里（由调用方决定是否清除）
+  assert.equal(client.getConfig().token, TOKEN);
 });
 
-test('rejects uid:null as invalid credentials', async () => {
-  const transport = makeTransport((path) => {
-    if (path === '/web/session/authenticate') return response({ uid: null });
-    throw new Error('unexpected path ' + path);
-  });
+test('never sends a Cookie header', async () => {
+  const transport = makeTransport(() => jsonRpc({ ok: true, data: {}, error: null }));
   const client = createOdooClient({
-    config: { serverUrl: 'http://lc.rm.com', db: 'lab', login: 'x' },
+    config: { serverUrl: 'https://lab.example.test', token: TOKEN },
     transport,
   });
-  await assert.rejects(
-    () => client.authenticate({ db: 'lab', login: 'x', password: 'pw' }),
-    (error) => error.code === 'INVALID_CREDENTIALS',
-  );
-});
-
-test('logout tolerates the production destroy response without result', async () => {
-  const transport = makeTransport((path) => {
-    if (path === '/web/session/authenticate') return response({ uid: 3 });
-    if (path === '/web/session/get_session_info') return response({ uid: 3 });
-    if (path === '/web/session/destroy') return rawResponse(JSON.stringify({ jsonrpc: '2.0', id: null }));
-    throw new Error('unexpected path ' + path);
-  });
-  const client = createOdooClient({
-    config: { serverUrl: 'http://lc.rm.com', db: 'lab', login: 'x' },
-    transport,
-  });
-  await client.authenticate({ db: 'lab', login: 'x', password: 'pw' });
-  const result = await client.logout();
-  assert.equal(result.ok, true);
-  assert.equal(result.warning, '');
-  assert.equal(client.publicSession().active, false);
-});
-
-test('business call without a session fails before network', async () => {
-  const transport = makeTransport(() => {
-    throw new Error('should not be called');
-  });
-  const client = createOdooClient({
-    config: { serverUrl: 'http://lc.rm.com', db: 'lab', login: 'x' },
-    transport,
-  });
-  await assert.rejects(() => client.call('/lab/api/catalog/search', {}), (error) => error.code === 'SESSION_REQUIRED');
-  assert.equal(transport.calls.length, 0);
+  await client.call('/lab/api/eda/bootstrap', {});
+  const headers = transport.requests[0].headers;
+  assert.equal(headers.Cookie, undefined);
+  assert.equal(headers.cookie, undefined);
 });

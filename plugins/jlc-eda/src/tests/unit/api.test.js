@@ -27,7 +27,7 @@ test('search maps contract params and clamps limit', async () => {
     limit: 999,
   });
   const call = client.calls[0];
-  assert.equal(call.path, '/lab/api/catalog/search');
+  assert.equal(call.path, '/lab/api/eda/catalog/search');
   assert.equal(call.params.query, 'C123');
   assert.equal(call.params.category_id, 4);
   assert.deepEqual(call.params.brands, ['Yageo']);
@@ -42,30 +42,8 @@ test('detail canonicalizes a bare C code and rejects invalid keys', async () => 
   const client = makeClient();
   const api = createLabApi(client);
   await api.detail('c123');
-  assert.deepEqual(client.calls[0], { path: '/lab/api/catalog/detail', params: { item_key: 'lcsc:C123' } });
+  assert.deepEqual(client.calls[0], { path: '/lab/api/eda/catalog/detail', params: { item_key: 'lcsc:C123' } });
   await assert.rejects(() => api.detail('C0'), (error) => error.code === 'VALIDATION_ERROR');
-});
-
-test('receipt sends the exact contract payload', async () => {
-  const client = makeClient();
-  const api = createLabApi(client);
-  await api.receipt({
-    request_key: 'op-12345678',
-    item_key: 'c1',
-    product_template_id: '42',
-    location_id: '3',
-    quantity: '5',
-    supplier_qr: 'JLC-RAW',
-    note: 'note',
-  });
-  const call = client.calls[0];
-  assert.equal(call.path, '/lab/api/inventory/receipt');
-  assert.equal(call.params.request_key, 'op-12345678');
-  assert.equal(call.params.item_key, 'lcsc:C1');
-  assert.equal(call.params.product_template_id, 42);
-  assert.equal(call.params.location_id, 3);
-  assert.equal(call.params.quantity, 5);
-  assert.equal(call.params.supplier_qr, 'JLC-RAW');
 });
 
 test('issue validates borrower, project and unique bag lines', async () => {
@@ -98,25 +76,26 @@ test('issue validates borrower, project and unique bag lines', async () => {
   );
 });
 
-test('return sends issue_line_id, quantity and note', async () => {
+test('equivalents sends the batch lines and limit_per_line, dropping empty keys', async () => {
   const client = makeClient();
   const api = createLabApi(client);
-  await api.returnStock({ request_key: 'op-12345678', issue_line_id: '9', quantity: '2', note: 'ok' });
+  await api.equivalents([
+    { item_key: 'lcsc:C14663', quantity: 4 },
+    { item_key: '', quantity: 2 },
+    null,
+    { item_key: 'lcsc:C25804', quantity: '1' },
+  ]);
   assert.deepEqual(client.calls[0], {
-    path: '/lab/api/inventory/return',
-    params: { request_key: 'op-12345678', issue_line_id: 9, quantity: 2, note: 'ok' },
+    path: '/lab/api/eda/catalog/equivalents',
+    params: {
+      lines: [
+        { item_key: 'lcsc:C14663', quantity: 4 },
+        { item_key: 'lcsc:C25804', quantity: 1 },
+      ],
+      limit_per_line: 5,
+    },
   });
+  await api.equivalents(null, 3);
+  assert.deepEqual(client.calls[1].params, { lines: [], limit_per_line: 3 });
 });
 
-test('issues and history clamp pagination and canonicalize item key', async () => {
-  const client = makeClient();
-  const api = createLabApi(client);
-  await api.issues({ query: ' LABB ', outstanding_only: true, limit: 999 });
-  assert.equal(client.calls[0].params.limit, 200);
-  assert.equal(client.calls[0].params.query, 'LABB');
-  await api.history({ item_key: 'c7', bag_id: '2', limit: 0 });
-  assert.equal(client.calls[1].params.item_key, 'lcsc:C7');
-  assert.equal(client.calls[1].params.bag_id, 2);
-  assert.equal(client.calls[1].params.limit, 1);
-  await assert.rejects(() => api.history({ item_key: 'bad' }), (error) => error.code === 'VALIDATION_ERROR');
-});

@@ -520,6 +520,66 @@
 
             <section class="lc-panel">
                 <div class="lc-panel-head">
+                    <h2 class="lc-section-title">EDA 插件密钥</h2>
+                    <span class="lc-badge" data-tone="warn">明文只显示一次</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        嘉立创 EDA 专业版插件无法携带浏览器 Cookie，因此用独立密钥认证。
+                        密钥<strong>绑定到具体账号</strong>：插件里做的每一次出库，操作人都是这把密钥的主人。
+                        离职或密钥外泄时，在这里<strong>吊销</strong>即可立即失效，不影响其他人。
+                    </p>
+                    <div class="lc-toolbar">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-eda-target">发给谁</label>
+                            <select class="lc-input" id="lc-admin-eda-target"
+                                    data-lc-field="eda_target">
+                                <option value="">（先在上方列表里搜索，再选择）</option>
+                            </select>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-eda-name">备注</label>
+                            <input class="lc-input" id="lc-admin-eda-name" type="text"
+                                   placeholder="EDA 插件" data-lc-field="eda_name"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-admin-eda-days">有效期（天）</label>
+                            <input class="lc-input" id="lc-admin-eda-days" type="number"
+                                   value="365" min="0" data-lc-field="eda_days"/>
+                        </div>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="eda-issue">发放</button>
+                    </div>
+                    <p class="lc-hint">
+                        有效期 0 表示永不过期。发放后密钥只显示这一次，关闭后无法再查看，只能吊销重发。
+                    </p>
+                    <div class="lc-alert lc-alert-ok" role="status"
+                         data-lc-inv-eda-result="new" hidden="hidden">
+                        <p class="lc-inv-lock-head">新密钥（请立即复制，关闭后无法再查看）</p>
+                        <p class="lc-mono" data-lc-eda="token"></p>
+                    </div>
+                    <div class="lc-alert lc-alert-error" role="alert"
+                         data-lc-inv-eda-result="error" hidden="hidden">
+                        <p data-lc-eda="error"></p>
+                    </div>
+                    <table class="lc-table">
+                        <thead>
+                            <tr>
+                                <th>成员</th>
+                                <th>备注</th>
+                                <th>有效期至</th>
+                                <th>最近使用</th>
+                                <th>状态</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody data-lc-rows="eda_tokens"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
                     <h2 class="lc-section-title">仍需在原生后台完成</h2>
                 </div>
                 <div class="lc-panel-body">

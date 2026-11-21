@@ -164,13 +164,15 @@ test('iframe is self-contained, Chinese and uses the trusted bridge', async () =
   assert.equal(html.includes('http://localhost:8000'), false);
 });
 
-test('README documents Odoo 19, CORS, session cookie and permissions', async () => {
+test('README documents the key-based connection and the 4.0.0 version', async () => {
   const { zip } = await loadPackage();
   const readme = await zip.file('README.md').async('string');
   const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
-  for (const phrase of ['Odoo 19', pkg.version, '本机桥接', '配对码', 'LcHardwareHouse', 'group_lab_operator', '外部交互']) {
+  for (const phrase of ['Odoo 19', pkg.version, 'EDA 密钥', '管理', '吊销', '外部交互']) {
     assert.ok(readme.includes(phrase), 'README missing ' + phrase);
   }
+  // 4.0.0 起不再需要本机桥接，README 不该再把它当作安装步骤。
+  assert.ok(!readme.includes('start-windows.cmd'), 'README still mentions the bridge launcher');
 });
 
 test('every manifest file hash matches the ZIP content', async () => {
@@ -182,7 +184,7 @@ test('every manifest file hash matches the ZIP content', async () => {
   }
 });
 
-test('bundle contains eext, relay, node runtime and Chinese install steps', async () => {
+test('bundle contains only the eext, README, install notes and hashes', async () => {
   const { extension, manifest } = await loadPackage();
   const bundlePath = path.join(BUILD, 'lab-inventory-odoo_v' + extension.version + '-bundle.zip');
   const buffer = await fs.readFile(bundlePath);
@@ -190,24 +192,33 @@ test('bundle contains eext, relay, node runtime and Chinese install steps', asyn
   const names = Object.keys(bundle.files).filter((name) => !bundle.files[name].dir);
   for (const name of [
     'lab-inventory-odoo_v' + extension.version + '.eext',
-    'bridge/server.mjs',
-    'bridge/start-windows.cmd',
-    'bridge/start-linux.sh',
-    'bridge/runtime/node.exe',
-    'bridge/runtime/NODE-LICENSE.txt',
     '安装说明.txt',
     'SHA256.txt',
     'README.md',
   ]) {
     assert.ok(names.includes(name), 'bundle missing ' + name);
   }
+  // 4.0.0 起没有本机桥接：包里绝不能出现 Node 运行时或任何凭证文件。
+  for (const forbidden of [
+    'bridge/server.mjs',
+    'bridge/credentials.mjs',
+    'bridge/runtime/node.exe',
+    'bridge/lab-credentials.dat',
+    'bridge/relay-token.txt',
+  ]) {
+    assert.ok(!names.includes(forbidden), 'bundle must not contain ' + forbidden);
+  }
+  // 只有这 4 个文件：再加任何东西都说明打包白名单被放宽了。
+  assert.equal(names.length, 4, 'unexpected extra files: ' + names.join(', '));
   const inside = await bundle.file('lab-inventory-odoo_v' + extension.version + '.eext').async('nodebuffer');
   assert.equal(sha256(inside), manifest.sha256);
   const shaText = await bundle.file('SHA256.txt').async('string');
   assert.ok(shaText.includes(manifest.sha256));
   const install = await bundle.file('安装说明.txt').async('string');
-  assert.ok(install.includes('配对码'));
-  assert.ok(install.includes('start-windows.cmd'));
+  // 4.0.0 的安装说明讲的是「去管理页领密钥」，不再有桥接启动步骤。
+  assert.ok(install.includes('EDA 密钥'), 'install notes should explain the EDA key');
+  assert.ok(install.includes('管理'), 'install notes should point at the admin page');
+  assert.ok(!install.includes('start-windows.cmd'), 'install notes must not mention the removed bridge');
   const bundleManifest = JSON.parse(await fs.readFile(path.join(BUILD, 'bundle-manifest.json'), 'utf8'));
   assert.equal(bundleManifest.sha256, sha256(buffer));
 });

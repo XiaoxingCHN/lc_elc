@@ -59,14 +59,15 @@
     },
     {
       "id": "eda",
-      "version": "3.0.3",
+      "version": "4.0.0",
       "source_root": "plugins/jlc-eda",
       "required_files": [
         "plugins/jlc-eda/package.json",
         "plugins/jlc-eda/package-lock.json",
         "plugins/jlc-eda/extension.json",
         "plugins/jlc-eda/src/main/index.js",
-        "plugins/jlc-eda/bridge/server.mjs"
+        "plugins/jlc-eda/src/main/odoo.js",
+        "plugins/jlc-eda/src/main/config.js"
       ],
       "guide": "plugins/jlc-eda/MAINTENANCE.md"
     },
