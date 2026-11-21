@@ -222,6 +222,19 @@ server {
     #   /lab/api/inventory/legacy_stock —— 同上，仅管理端内部使用；
     #   /web/dataset/call_kw、/jsonrpc、/web/database/*、/websocket、/longpolling 等通用入口。
     # 只读/引导（lab 角色）
+    # EDA 插件专用端点（4.0.0 起用 Authorization: bearer 认证，不走 Cookie 会话）。
+    # 不登记这些路径，插件在公网上会拿到 146 字节的 nginx 404。
+    location = /lab/api/eda/bootstrap { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/borrowers { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/catalog/search { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/catalog/detail { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/catalog/categories { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/catalog/equivalents { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/inventory/locations { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/inventory/issue { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/manage/tokens { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/manage/issue { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
+    location = /lab/api/eda/manage/revoke { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/inventory/bootstrap      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/inventory/locations      { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
     location = /lab/api/inventory/resolve_code   { limit_except POST { deny all; } proxy_pass @UPSTREAM@; include bore-proxy-headers.conf; }
