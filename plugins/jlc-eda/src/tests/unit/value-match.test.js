@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildValueQuery,
+  normalizePackage,
   groupUnmappedByValue,
   attachValueMatches,
   pickValueCandidate,
@@ -132,4 +133,33 @@ test('valueSubstitutionNote lists the replacements', () => {
   const note = valueSubstitutionNote(picked);
   assert.ok(note.includes('100nF 0402'), note);
   assert.ok(note.includes('C1525'), note);
+});
+
+/* ------------------------------------------------------------------ */
+/* 封装归一化                                                           */
+/* ------------------------------------------------------------------ */
+
+test('normalizePackage strips the EDA C/R prefix', () => {
+  // EDA 原理图里电容写 C0603、电阻写 R0603，实验室库里统一是 0603。
+  assert.equal(normalizePackage('C0603'), '0603');
+  assert.equal(normalizePackage('R0603'), '0603');
+  assert.equal(normalizePackage('L0805'), '0805');
+});
+
+test('normalizePackage keeps footprints that are not chip sizes', () => {
+  assert.equal(normalizePackage('SOT-23'), 'SOT-23');
+  assert.equal(normalizePackage('SOD-323'), 'SOD-323');
+  assert.equal(normalizePackage('TO-252-2(DPAK)'), 'TO-252-2(DPAK)');
+  assert.equal(normalizePackage('RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL'),
+    'RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL');
+});
+
+test('normalizePackage handles empty and whitespace', () => {
+  assert.equal(normalizePackage(''), '');
+  assert.equal(normalizePackage('  C0402  '), '0402');
+  assert.equal(normalizePackage(null), '');
+});
+
+test('buildValueQuery uses the normalized footprint', () => {
+  assert.equal(buildValueQuery({ name: '100nF', footprint: 'C0603' }), '100nF 0603');
 });
