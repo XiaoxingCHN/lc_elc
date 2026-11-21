@@ -10,6 +10,7 @@
 """
 import functools
 import logging
+import re
 
 from odoo import http
 from odoo.exceptions import AccessError
@@ -299,6 +300,66 @@ class LabEdaApi(http.Controller):
                 limit = 5
             return request.env['lab.catalog.item'].equivalents(
                 clean, limit_per_line=limit)
+        return handler(self, _params(kwargs))
+
+    @http.route(API + '/catalog/value_match', type='jsonrpc', auth='none',
+                methods=POST, csrf=False, save_session=False)
+    @eda_auth
+    def eda_catalog_value_match(self, **kwargs):
+        """原理图里没有立创编号的器件：按「值 + 封装」查候选。
+
+        用户的原话是「像这种值有封装有为什么不做匹配」。这些器件以前只被丢进
+        「未并入库存」表，什么忙都帮不上。这里用值和封装去器件库搜，**只返回
+        候选供人判断，绝不自动合并或替换**。
+
+        入参 ``queries`` 是检索词数组（如 ``["100nF 0402", "10K 0603"]``），
+        出参 ``{results: [{query, items, total}]}``，顺序与入参一致。
+        """
+        @eda_endpoint
+        def handler(self_, params):
+            queries = params.get('queries')
+            if not isinstance(queries, (list, tuple)):
+                raise LabApiError(VALIDATION_ERROR, 'queries 必须是数组。',
+                                  {'queries': 'not_a_list'})
+            try:
+                limit = int(params.get('limit') or 3)
+            except (TypeError, ValueError):
+                limit = 3
+            limit = max(1, min(limit, 10))
+
+            Catalog = request.env['lab.catalog.item']
+            results = []
+            # 最多 200 个不同检索词，避免一次原理图把库扫穿。
+            for raw in list(queries)[:200]:
+                query = str(raw or '').strip()
+                if not query:
+                    results.append({'query': query, 'items': [], 'total': 0})
+                    continue
+                # **不**加 stock_only：实验室常备库存只有几十种，绝大多数值和
+                # 封装组合在库里是「有资料但无库存」。只返回有库存的会让用户
+                # 看到一屏空白，反而更困惑。这里返回资料库匹配项并带上库存量
+                # （0 也显示），用户自己判断要不要采购。
+                # 多取一些再本地重排：search_unified 按「有库存优先 + C 码」
+                # 排序，对 `10K 0603` 会把 110kΩ/210kΩ 排在 10kΩ 前面
+                # （`K` 匹配了 `110k`）。这里把值完全出现在名称里的排前。
+                # 取 50 条再本地重排：`10K 0603` 在库里匹配到 500+ 条
+                # （`K` 命中 `110k`/`210k`），真正的 10kΩ 可能排在几十位之后。
+                items, _cursor, total = Catalog.search_unified(
+                    query=query, limit=50)
+                value = query.split(' ')[0].lower()
+                # 值必须**独立出现**：`10k` 不能因为 `110kΩ` 里含有 `10k`
+                # 就当成匹配。前后不能紧邻数字或字母。
+                pattern = re.compile(
+                    r'(?<![0-9a-z.])' + re.escape(value) + r'(?![0-9])'
+                    if value else r'(?!)')
+
+                def _rank(item):
+                    name = str(item.get('name') or '').lower()
+                    return (0 if pattern.search(name) else 1,
+                            0 if item.get('lab_available_quantity') else 1)
+                items = sorted(items, key=_rank)[:limit]
+                results.append({'query': query, 'items': items, 'total': total})
+            return {'results': results}
         return handler(self, _params(kwargs))
 
     # ------------------------------------------------------------------ 库存

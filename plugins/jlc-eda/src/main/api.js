@@ -147,5 +147,15 @@ export function createLabApi(client) {
     });
   }
 
-  return { search, detail, categories, equivalents, bootstrap, locations, issue };
+  /** 无 C 编号器件的「值 + 封装」批量检索。只返回候选，不自动合并。 */
+  async function valueMatch(queries, limit = 3) {
+    return client.call('/lab/api/eda/catalog/value_match', {
+      queries: (Array.isArray(queries) ? queries : [])
+        .map((q) => String(q || '').trim())
+        .filter(Boolean),
+      limit,
+    });
+  }
+
+  return { search, detail, categories, equivalents, valueMatch, bootstrap, locations, issue };
 }
