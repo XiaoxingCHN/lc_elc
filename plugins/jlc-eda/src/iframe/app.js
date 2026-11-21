@@ -7,6 +7,8 @@ import {
   bomTsv,
   bagTraceSummary,
   equivalentsRequestLines,
+  groupUnmappedByValue,
+  attachValueMatches,
   attachEquivalents,
   substituteLines,
   substitutionNote,
@@ -123,6 +125,10 @@ const state = {
     error: null,
     // S5 equivalents: candidates are suggestions only; `row.substitute` is set
     // by an explicit operator click and is the ONLY way a substitute is issued.
+    valueMatchLoading: false,
+    valueMatchError: null,
+    valueMatchToken: 0,
+    unmappedGroups: null,
     equivalentsLoading: false,
     equivalentsError: null,
     equivalentsExpanded: new Set(),
@@ -1160,14 +1166,26 @@ function renderBom() {
 
   if (bom.unmapped && bom.unmapped.length) {
     dom.view.appendChild(
-      section('缺少有效 C 编号的器件（未并入库存）', [
+      section('没有立创 C 编号的器件（按值 + 封装匹配）', [
+        el('p', { class: 'muted', style: 'margin:0 0 8px' },
+          '这些器件原理图里只填了值和封装、没填立创编号。下面按「值 + 封装」' +
+          '去器件库搜出的候选仅供参考——插件不会自动合并或替换，' +
+          '确认要用哪个请到网页端建好编号后重新读取。'),
+        bom.valueMatchError
+          ? errorBox(bom.valueMatchError, { retry: () => loadValueMatches() })
+          : null,
+        bom.valueMatchLoading
+          ? el('p', { class: 'muted' }, '正在按值 + 封装检索…')
+          : null,
         table(
-          [{ label: '位号' }, { label: '名称' }, { label: '型号' }, { label: '原因' }],
-          bom.unmapped.map((component) => [
-            component.designator || '—',
-            component.name || '—',
-            component.mpn || '—',
-            '没有有效的立创 C 编号，禁止猜测或合并',
+          [{ label: '位号' }, { label: '值' }, { label: '封装' }, { label: '数量' },
+           { label: '库中候选（有库存）' }],
+          (bom.unmappedGroups || groupUnmappedByValue(bom.unmapped)).map((group) => [
+            (group.designators || []).join(', ') || '—',
+            group.value || '—',
+            group.footprint || '—',
+            fmtQty(group.quantity),
+            renderValueCandidates(group),
           ]),
         ),
       ]),
@@ -1453,6 +1471,57 @@ async function fetchDetailMap(codes) {
  * One batch equivalents request for the whole BOM (never per line). Failures
  * are recorded separately and never block the main stock comparison.
  */
+/** 一个分组的候选单元格：C 编号 + 名称 + 可用量，最多 3 条。 */
+function renderValueCandidates(group) {
+  const candidates = Array.isArray(group && group.candidates) ? group.candidates : [];
+  if (!candidates.length) {
+    return el('span', { class: 'muted' },
+      group && group.query ? '库里没有匹配的现货' : '缺少值或封装，无法检索');
+  }
+  return el('div', {}, candidates.map((item) => el('div', { class: 'mono', style: 'line-height:1.6' },
+    (item.catalog_code || item.item_key || '—') + '  ' +
+    (item.name || '') + '  可用 ' + fmtQty(item.lab_available_quantity))));
+}
+
+/**
+ * 无 C 编号器件：按「值 + 封装」查候选。
+ *
+ * 这些器件以前只出现在「未并入库存」表里，什么都帮不上。现在按值和封装去
+ * 器件库搜，把候选列出来让用户自己判断——**绝不自动合并或替换**。
+ */
+async function loadValueMatches() {
+  const bom = state.bom;
+  const token = (bom.valueMatchToken || 0) + 1;
+  bom.valueMatchToken = token;
+
+  const groups = groupUnmappedByValue(bom.unmapped);
+  bom.unmappedGroups = groups;
+  const queries = groups.map((g) => g.query).filter(Boolean);
+  if (!queries.length) {
+    bom.valueMatchLoading = false;
+    bom.valueMatchError = null;
+    render();
+    return;
+  }
+
+  bom.valueMatchLoading = true;
+  bom.valueMatchError = null;
+  render();
+  try {
+    const response = await call('catalog.valueMatch', { queries, limit: 3 }, 60000);
+    if (bom.valueMatchToken !== token) return;
+    bom.unmappedGroups = attachValueMatches(groups, response);
+  } catch (error) {
+    if (bom.valueMatchToken !== token) return;
+    bom.valueMatchError = error;
+  } finally {
+    if (bom.valueMatchToken === token) {
+      bom.valueMatchLoading = false;
+      render();
+    }
+  }
+}
+
 async function loadBomEquivalents() {
   const bom = state.bom;
   const token = (bom.equivalentsToken || 0) + 1;
@@ -1516,6 +1585,7 @@ async function runBom() {
     render();
   }
   if (!bom.error) await loadBomEquivalents();
+  if (!bom.error) await loadValueMatches();
 }
 
 async function refreshBomStock() {
@@ -1541,6 +1611,7 @@ async function refreshBomStock() {
     render();
   }
   if (!bom.error) await loadBomEquivalents();
+  if (!bom.error) await loadValueMatches();
 }
 
 function csvCell(value) {
