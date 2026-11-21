@@ -4,6 +4,9 @@ import {
   buildValueQuery,
   groupUnmappedByValue,
   attachValueMatches,
+  pickValueCandidate,
+  valueSubstituteLines,
+  valueSubstitutionNote,
 } from '../../shared/bom.js';
 
 /**
@@ -73,4 +76,60 @@ test('attachValueMatches leaves groups untouched when the response is missing', 
   const groups = groupUnmappedByValue([comp()]);
   const out = attachValueMatches(groups, null);
   assert.deepEqual(out[0].candidates, []);
+});
+
+/* ------------------------------------------------------------------ */
+/* 勾选候选 → 进出库                                                    */
+/* ------------------------------------------------------------------ */
+
+test('pickValueCandidate records the choice on the group', () => {
+  const groups = groupUnmappedByValue([comp()]);
+  const withCandidates = attachValueMatches(groups, {
+    results: [{ query: '100nF 0402', items: [{ item_key: 'lcsc:C1525', catalog_code: 'C1525' }] }],
+  });
+  const picked = pickValueCandidate(withCandidates, '100nF\u00000402', 'lcsc:C1525');
+  assert.equal(picked[0].substitute.item_key, 'lcsc:C1525');
+});
+
+test('pickValueCandidate with null clears the choice', () => {
+  const groups = attachValueMatches(groupUnmappedByValue([comp()]), {
+    results: [{ query: '100nF 0402', items: [{ item_key: 'lcsc:C1525', catalog_code: 'C1525' }] }],
+  });
+  const picked = pickValueCandidate(groups, groups[0].key, 'lcsc:C1525');
+  const cleared = pickValueCandidate(picked, groups[0].key, null);
+  assert.equal(cleared[0].substitute, undefined);
+});
+
+test('valueSubstituteLines issues picked groups only', () => {
+  const groups = attachValueMatches(groupUnmappedByValue([
+    comp({ designator: 'C12' }),
+    comp({ designator: 'R9', name: '10K', footprint: '0603' }),
+  ]), {
+    results: [
+      { query: '100nF 0402', items: [{ item_key: 'lcsc:C1525', catalog_code: 'C1525' }] },
+      { query: '10K 0603', items: [{ item_key: 'lcsc:C101254', catalog_code: 'C101254' }] },
+    ],
+  });
+  const picked = pickValueCandidate(groups, groups[0].key, 'lcsc:C1525');
+  const lines = valueSubstituteLines(picked);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].item_key, 'lcsc:C1525');
+  assert.equal(lines[0].quantity, 1);
+});
+
+test('valueSubstituteLines returns nothing when no group is picked', () => {
+  const groups = attachValueMatches(groupUnmappedByValue([comp()]), {
+    results: [{ query: '100nF 0402', items: [{ item_key: 'lcsc:C1525' }] }],
+  });
+  assert.deepEqual(valueSubstituteLines(groups), []);
+});
+
+test('valueSubstitutionNote lists the replacements', () => {
+  const groups = attachValueMatches(groupUnmappedByValue([comp({ designator: 'C12,C4' })]), {
+    results: [{ query: '100nF 0402', items: [{ item_key: 'lcsc:C1525', catalog_code: 'C1525' }] }],
+  });
+  const picked = pickValueCandidate(groups, groups[0].key, 'lcsc:C1525');
+  const note = valueSubstitutionNote(picked);
+  assert.ok(note.includes('100nF 0402'), note);
+  assert.ok(note.includes('C1525'), note);
 });

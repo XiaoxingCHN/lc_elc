@@ -113,6 +113,26 @@ def eda_auth(handler):
     return wrapper
 
 
+_R_NOTATION = re.compile(r'^(\d+)(?:r|R)(\d*)$')
+
+
+def _value_pattern(value):
+    """把检索值编译成匹配名称的正则。
+
+    * `100r` → `100`（库里写 `100Ω`）
+    * `4r7`  → `4.7`（库里写 `4.7Ω`）
+    * 其余原样，前后不能紧邻数字或字母，避免 `10k` 命中 `110kΩ`。
+    """
+    text = str(value or '').strip().lower()
+    if not text:
+        return re.compile(r'(?!)')
+    match = _R_NOTATION.match(text)
+    if match:
+        whole, frac = match.group(1), match.group(2)
+        text = whole + ('.' + frac if frac else '')
+    return re.compile(r'(?<![0-9a-z.])' + re.escape(text) + r'(?![0-9])')
+
+
 class LabEdaManageApi(http.Controller):
     """管理页「EDA 密钥」区块。
 
@@ -306,14 +326,19 @@ class LabEdaApi(http.Controller):
                 methods=POST, csrf=False, save_session=False)
     @eda_auth
     def eda_catalog_value_match(self, **kwargs):
-        """原理图里没有立创编号的器件：按「值 + 封装」查候选。
+        """原理图里没有立创编号的器件：按「值 + 封装」查**实验室自己的库存**。
 
-        用户的原话是「像这种值有封装有为什么不做匹配」。这些器件以前只被丢进
-        「未并入库存」表，什么忙都帮不上。这里用值和封装去器件库搜，**只返回
-        候选供人判断，绝不自动合并或替换**。
+        用户的要求很明确：
 
-        入参 ``queries`` 是检索词数组（如 ``["100nF 0402", "10K 0603"]``），
-        出参 ``{results: [{query, items, total}]}``，顺序与入参一致。
+        * 「这个肯定是查我们的现有库存里有没有而不是说一定要立创商城里」
+        * 「我们肯定查是以我们器件 SN 码为识别而不是以立创商城编号，
+          立创编号只是辅助我们在立创 EDA 里进行器件对应」
+
+        所以这里**不返回立创资料库卡片**，而是返回实验室的 ``product.template``：
+        ``lab_sn`` 是实验室自己的编号，``lab_specifications`` 是结构化规格，
+        库存来自实时 quant。立创编号只作为辅助字段一并带出。
+
+        入参 ``queries`` 是检索词数组（如 ``["100nF 0805", "10K 0603"]``）。
         """
         @eda_endpoint
         def handler(self_, params):
@@ -322,43 +347,61 @@ class LabEdaApi(http.Controller):
                 raise LabApiError(VALIDATION_ERROR, 'queries 必须是数组。',
                                   {'queries': 'not_a_list'})
             try:
-                limit = int(params.get('limit') or 3)
+                limit = int(params.get('limit') or 5)
             except (TypeError, ValueError):
-                limit = 3
-            limit = max(1, min(limit, 10))
+                limit = 5
+            limit = max(1, min(limit, 20))
 
             Catalog = request.env['lab.catalog.item']
+            Tmpl = request.env['product.template']
+            _stocked, qty_by_tmpl, avail_by_tmpl, _cq = Catalog._live_state()
+
             results = []
-            # 最多 200 个不同检索词，避免一次原理图把库扫穿。
             for raw in list(queries)[:200]:
                 query = str(raw or '').strip()
                 if not query:
                     results.append({'query': query, 'items': [], 'total': 0})
                     continue
-                # **不**加 stock_only：实验室常备库存只有几十种，绝大多数值和
-                # 封装组合在库里是「有资料但无库存」。只返回有库存的会让用户
-                # 看到一屏空白，反而更困惑。这里返回资料库匹配项并带上库存量
-                # （0 也显示），用户自己判断要不要采购。
-                # 多取一些再本地重排：search_unified 按「有库存优先 + C 码」
-                # 排序，对 `10K 0603` 会把 110kΩ/210kΩ 排在 10kΩ 前面
-                # （`K` 匹配了 `110k`）。这里把值完全出现在名称里的排前。
-                # 取 50 条再本地重排：`10K 0603` 在库里匹配到 500+ 条
-                # （`K` 命中 `110k`/`210k`），真正的 10kΩ 可能排在几十位之后。
-                items, _cursor, total = Catalog.search_unified(
-                    query=query, limit=50)
-                value = query.split(' ')[0].lower()
-                # 值必须**独立出现**：`10k` 不能因为 `110kΩ` 里含有 `10k`
-                # 就当成匹配。前后不能紧邻数字或字母。
-                pattern = re.compile(
-                    r'(?<![0-9a-z.])' + re.escape(value) + r'(?![0-9])'
-                    if value else r'(?!)')
 
-                def _rank(item):
-                    name = str(item.get('name') or '').lower()
-                    return (0 if pattern.search(name) else 1,
-                            0 if item.get('lab_available_quantity') else 1)
-                items = sorted(items, key=_rank)[:limit]
-                results.append({'query': query, 'items': items, 'total': total})
+                # 值 + 封装拆开：值用于匹配规格，封装用于收窄。
+                parts = query.split()
+                value = parts[0] if parts else ''
+                package = parts[1] if len(parts) > 1 else ''
+
+                domain = [('lab_sn', '!=', False)]
+                if package:
+                    domain.append(('lab_package', '=ilike', package))
+                # 值用正则做**独立出现**的匹配：`ilike %1k%` 会命中 `5.1kΩ`。
+                # lab_search_specs 是归一化文本（0.1uF/100nF 互认），比抠名称可靠，
+                # 但子串匹配太松，所以拿回来后再用边界正则筛一遍。
+                if value:
+                    domain.append(('lab_search_specs', 'ilike', value))
+                templates = Tmpl.search(domain, limit=limit * 8)
+                if value:
+                    strict = _value_pattern(value)
+                    templates = templates.filtered(
+                        lambda tmpl: strict.search(
+                            str(tmpl.lab_search_specs or '').lower()))
+
+                rows = []
+                for tmpl in templates:
+                    qty = qty_by_tmpl.get(tmpl.id, 0.0)
+                    avail = avail_by_tmpl.get(tmpl.id, 0.0)
+                    if qty <= 0:
+                        continue                      # 只列实验室真正有货的
+                    rows.append({
+                        'item_key': 'lab:%d' % tmpl.id,
+                        'sn': tmpl.lab_sn or '',
+                        'name': tmpl.name or '',
+                        'package': tmpl.lab_package or '',
+                        'catalog_code': tmpl.lab_lcsc_code_norm or '',
+                        'specifications': tmpl.lab_specifications or '',
+                        'quantity': qty,
+                        'available': avail,
+                    })
+                rows.sort(key=lambda r: -r['available'])
+                results.append({'query': query, 'items': rows[:limit],
+                                'total': len(rows)})
             return {'results': results}
         return handler(self, _params(kwargs))
 
