@@ -30,7 +30,7 @@ import {
   locationSummary,
 } from '../shared/detail.js';
 
-const VERSION = '3.1.1';
+const VERSION = '4.0.0';
 
 const TABS = [
   { id: 'inventory', label: '器件库' },

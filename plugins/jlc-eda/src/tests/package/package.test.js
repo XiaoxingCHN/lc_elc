@@ -34,6 +34,19 @@ test('package exists at the expected deterministic name', async () => {
   assert.ok(buffer.length > 50000);
 });
 
+test('iframe bundle reports the same version as extension.json', async () => {
+  // 面板左上角显示的版本来自 iframe/app.js 里的 VERSION 常量，与
+  // extension.json 是两个独立的地方。漏改一个，扩展管理器里显示 4.0.0
+  // 而面板里显示旧版本，用户会以为装错了（真实发生过）。
+  const { zip, extension } = await loadPackage();
+  const html = await zip.file('iframe/app.html').async('string');
+  // 构建会把 const 改成 var、单引号改成双引号，所以两种都认。
+  const match = html.match(/(?:const|var|let)\s+VERSION\s*=\s*['"]([^'"]+)['"]/);
+  assert.ok(match, 'iframe bundle should declare a VERSION constant');
+  assert.equal(match[1], extension.version,
+    'iframe VERSION must match extension.json');
+});
+
 test('package SHA-256 matches build manifest', async () => {
   const { manifest, buffer } = await loadPackage();
   assert.equal(sha256(buffer), manifest.sha256);
