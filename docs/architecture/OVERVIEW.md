@@ -46,6 +46,6 @@ Flutter只缓存公开资料和安全登录状态，没有第二套权威库存�
 
 ## 环境分离
 
-已知生产192.168.31.105:8069、数据库LcHardwareHouse、内网域名lc.rm.com仅供定位，真实账号密码与odoo.conf不在仓库。维护者应为本地/测试环境使用独立配置，不把生产作为自动测试默认目标。
+已知生产192.168.31.105:8069、数据库LcHardwareHouse、内网域名 team.l-creation.club（旧域名 lc.rm.com 已停用）仅供定位，真实账号密码与odoo.conf不在仓库。维护者应为本地/测试环境使用独立配置，不把生产作为自动测试默认目标。
 
 server/ubuntu22.04/systemd是旧离线安装模板；services/lcsc/systemd-production是归档时只读导出的实际服务定义。二者用途不同，不可混称同一环境。全新Ubuntu22.04包为cp310；生产已存在cp312，见CURRENT_STATE。

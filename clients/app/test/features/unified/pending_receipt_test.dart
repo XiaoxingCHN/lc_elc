@@ -469,4 +469,96 @@ void main() {
     expect(find.text('已收录，正在刷新。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'scan the shelf ONCE, then keep scanning bags into it',
+    (tester) async {
+      // The operator's flow chart: 扫描库位二维码 -> 是 -> 录库界面 -> 连续扫袋码.
+      // A bag scan must never clear the chosen shelf, or the operator is forced
+      // back to the location scan for every single bag.
+      final fake = FakeLabApi(
+        onCall: (path, params) async {
+          if (path == LabApiRoutes.pendingList) return {'records': []};
+          if (path == LabApiRoutes.inventoryLocations) {
+            return {
+              'locations': [
+                {'id': 17, 'code': 'K000004', 'name': 'R1', 'path': 'WH/库存/R区/R1'},
+              ],
+            };
+          }
+          if (path == LabApiRoutes.inventoryResolveCode) {
+            final raw = (params['raw'] ?? '').toString();
+            if (raw.startsWith('LABL:')) {
+              return {
+                'kind': 'location',
+                'location': {
+                  'id': 17,
+                  'code': 'K000004',
+                  'name': 'R1',
+                  'path': 'WH/库存/R区/R1',
+                },
+              };
+            }
+            return {
+              'kind': 'bag',
+              'bag': {
+                'id': 42,
+                'trace_code': raw,
+                'location_id': 17,
+                'location_code': 'K000004',
+                'quantity': 100.0,
+              },
+              'item_key': 'lab:99',
+            };
+          }
+          if (path == LabApiRoutes.pendingResolve) {
+            return {
+              'record': {
+                'id': 7,
+                'trace_code': (params['raw'] ?? '').toString(),
+                'name': 'GH1.25 端子 3P',
+                'quantity': 100,
+                'state': 'pending',
+              },
+              'recommendations': [],
+            };
+          }
+          throw StateError(path);
+        },
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            labApiProvider.overrideWithValue(fake.client),
+            sessionScopeSourceProvider.overrideWithValue(
+              const LabSessionScope(uid: 7),
+            ),
+          ],
+          child: const MaterialApp(home: PendingReceiptScreen(initialTab: 1)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Step 1: the screen asks for the shelf, not a bag.
+      expect(find.text('第 1 步 · 扫描库位码'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'LABL:K000004');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      // The shelf is now sticky and the field switched to bag mode.
+      expect(find.textContaining('入库库位：K000004'), findsOneWidget);
+      expect(find.text('扫描袋追溯码'), findsOneWidget);
+
+      // Step 2: a bag scan resolves the bag and must NOT clear the shelf.
+      await tester.enterText(find.byType(TextField).first, 'TRC00000001');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('入库库位：K000004'), findsOneWidget,
+          reason: '扫描袋码后库位必须保留，否则每袋都要重扫库位');
+      expect(find.text('第 1 步 · 扫描库位码'), findsNothing);
+    },
+  );
 }

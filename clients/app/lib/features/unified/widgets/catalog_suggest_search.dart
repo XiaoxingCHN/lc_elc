@@ -289,7 +289,16 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
 
   _SuggestStatus _status = _SuggestStatus.idle;
   List<CatalogSuggestionGroup> _groups = const <CatalogSuggestionGroup>[];
-  List<GlobalKey> _rowKeys = const <GlobalKey>[];
+  /// One stable key per catalog code.
+  ///
+  /// A fresh GlobalKey per search response destroyed and rebuilt every row,
+  /// which cancelled the tap recognizer of a row the operator was already
+  /// pressing (the list can refresh while the button is held). Reusing the key
+  /// for the same code keeps the Element - and the gesture - alive.
+  final Map<String, GlobalKey> _rowKeys = <String, GlobalKey>{};
+
+  GlobalKey _rowKeyFor(CatalogSuggestionGroup group) =>
+      _rowKeys.putIfAbsent(group.code, () => GlobalKey());
   int? _active;
   bool _panelOpen = false;
   bool _openUp = false;
@@ -396,15 +405,11 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
         ? (delta > 0 ? 0 : count - 1)
         : (current + delta).clamp(0, count - 1);
     setState(() => _active = next);
-    final rowContext = next < _rowKeys.length
-        ? _rowKeys[next].currentContext
-        : null;
+    final rowContext = _rowKeys[_groups[next].code]?.currentContext;
     if (rowContext != null && rowContext.mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final context = next < _rowKeys.length
-            ? _rowKeys[next].currentContext
-            : null;
+        final context = _rowKeys[_groups[next].code]?.currentContext;
         if (context != null && context.mounted) {
           Scrollable.ensureVisible(
             context,
@@ -466,7 +471,6 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
       final groups = groupCatalogSuggestions(page.items, limit: widget.limit);
       setState(() {
         _groups = groups;
-        _rowKeys = List<GlobalKey>.generate(groups.length, (_) => GlobalKey());
         _active = null;
         _errorCode = null;
         _errorMessage = null;
@@ -528,7 +532,15 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
 
   void _commit(int index) {
     if (index < 0 || index >= _groups.length) return;
-    final group = _groups[index];
+    _commitGroup(_groups[index]);
+  }
+
+  /// Commits a row that was captured when the press started.
+  ///
+  /// The list can be replaced by a newer search response while the pointer is
+  /// still down; resolving the row by index at tap time would then commit the
+  /// wrong item (or nothing at all). The row passes its own group instead.
+  void _commitGroup(CatalogSuggestionGroup group) {
     _seq++;
     _debounce?.cancel();
     _closePanel(invalidate: false);
@@ -547,7 +559,7 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
 
   void _resetResults() {
     _groups = const <CatalogSuggestionGroup>[];
-    _rowKeys = const <GlobalKey>[];
+    _rowKeys.clear();
     _active = null;
     _errorCode = null;
     _errorMessage = null;
@@ -803,9 +815,14 @@ class CatalogSuggestFieldState extends ConsumerState<CatalogSuggestField> {
       selected: active,
       label: group.semanticsLabel,
       child: InkWell(
-        key: index < _rowKeys.length ? _rowKeys[index] : null,
+        key: _rowKeyFor(group),
         canRequestFocus: false,
-        onTap: () => _commit(index),
+        // Commit on pointer-down, as the framework's own autocomplete examples
+        // and the InkWell docs recommend: the list can be replaced by a newer
+        // search response while the button is held, which disposes the row and
+        // cancels the pending tap. Committing here makes the press reliable
+        // without depending on the pointer-up reaching the same recognizer.
+        onTapDown: (_) => _commitGroup(group),
         onHover: (hovering) {
           if (hovering && _active != index) {
             setState(() => _active = index);

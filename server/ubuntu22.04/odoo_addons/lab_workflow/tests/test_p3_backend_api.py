@@ -134,9 +134,14 @@ class LabP3BackendTest(TransactionCase):
         second = self._receipt(6, self.location_b)
 
         data = self.common.with_user(self.viewer).lab_bags(has_stock=True)
-        self.assertEqual({row['id'] for row in data['bags']},
-                         {first['bag']['id'], second['bag']['id']})
-        self.assertIsNone(data['next_cursor'])
+        # `lab_bags` lists the WHOLE company and this database is the production
+        # one, so it also returns real bags. Assert that OUR two are present,
+        # not that they are the only ones - an absolute set comparison makes
+        # this test read the database's contents instead of the filter.
+        ours = {first['bag']['id'], second['bag']['id']}
+        returned = {row['id'] for row in data['bags']}
+        self.assertTrue(ours <= returned,
+                        '两个新建的袋都应在 has_stock=True 的结果里')
 
         by_location = self.common.lab_bags(location_id=self.location_b.id)
         self.assertEqual([row['id'] for row in by_location['bags']],
@@ -158,8 +163,22 @@ class LabP3BackendTest(TransactionCase):
         # 没有库存的袋（领空后）在 has_stock=true 时被过滤
         self._issue(first['bag'], quantity=10)
         self.env['lab.bag'].browse(first['bag']['id'])._lab_sync_quantity()
-        self.assertEqual(len(self.common.lab_bags(has_stock=True)['bags']), 1)
-        self.assertEqual(len(self.common.lab_bags(has_stock=False)['bags']), 2)
+        # `lab_bags` is not scoped to this test: it lists the whole company, and
+        # this database is the production one, so absolute counts assert the
+        # database's contents rather than the filter.
+        #
+        # What `has_stock` actually means (see `lab_bags`): `true` adds
+        # `quantity > 0`; `false` adds NOTHING, i.e. it returns every bag. So
+        # the contract is one-sided - the emptied bag must drop out of
+        # `has_stock=true`, and must still be present when no filter is asked.
+        with_stock = {row['id'] for row in self.common.lab_bags(has_stock=True)['bags']}
+        without_filter = {
+            row['id'] for row in self.common.lab_bags(has_stock=False)['bags']}
+        self.assertIn(second['bag']['id'], with_stock)
+        self.assertNotIn(first['bag']['id'], with_stock,
+                         '领空后的袋不应出现在 has_stock=True')
+        self.assertIn(first['bag']['id'], without_filter,
+                      'has_stock=false 表示不过滤，空袋仍应列出')
 
     def test_02_bag_detail_and_label_facts(self):
         receipt = self._receipt(10)
@@ -483,6 +502,104 @@ class LabP3BackendTest(TransactionCase):
         revoked = self.common.lab_member_set_role(
             user_id=target.id, role='lab_manager', enabled=False)
         self.assertFalse(revoked['member']['roles']['lab_manager'])
+
+    # ==================================================================
+    # 5b. 账号维护（批次 A：建号 / 改密 / 停用 / 系统组）
+    # ==================================================================
+    def test_35_user_create_manager_only_and_validation(self):
+        """建账号：manager 门禁 + 登录名唯一 + 密码必填。"""
+        # 非管理员不能建号
+        self._assert_code(CODE_FORBIDDEN,
+                          self.common.with_user(self.operator).lab_admin_user_create,
+                          login='p3_new_a', name='新账号A', password='test-Pass2026a')
+
+        created = self.common.with_user(self.manager).lab_admin_user_create(
+            login='p3_new_a', name='新账号A', password='test-Pass2026a')
+        self.assertTrue(created['user']['id'])
+        self.assertEqual(created['user']['login'], 'p3_new_a')
+        # 新账号默认只有内部用户组，没有任何库存角色
+        user = self.env['res.users'].browse(created['user']['id'])
+        self.assertTrue(user.has_group('base.group_user'))
+        self.assertFalse(user.has_group('lab_workflow.group_lab_user'))
+
+        # 登录名重复 -> 冲突
+        self._assert_code(CODE_CONFLICT, self.common.with_user(self.manager).lab_admin_user_create,
+                          login='p3_new_a', name='重复', password='test-Pass2026a')
+        # 空密码 / 空登录名 -> 校验失败
+        self._assert_code(CODE_VALIDATION, self.common.with_user(self.manager).lab_admin_user_create,
+                          login='', name='无登录名', password='test-Pass2026a')
+        self._assert_code(CODE_VALIDATION, self.common.with_user(self.manager).lab_admin_user_create,
+                          login='p3_new_b', name='无密码', password='')
+
+    def test_36_user_set_password_and_toggle_active(self):
+        """改密与停用：manager 可做；不能停用自己；不能停用最后一个管理员。"""
+        target = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'p3_pw', 'login': 'p3_pw',
+            'email': 'p3_pw@example.invalid',
+            'company_id': self.company.id,
+            'company_ids': [(6, 0, [self.company.id])],
+        })
+        self._assert_code(CODE_FORBIDDEN,
+                          self.common.with_user(self.operator).lab_admin_user_set_password,
+                          user_id=target.id, password='test-NewPass26a')
+        changed = self.common.with_user(self.manager).lab_admin_user_set_password(
+            user_id=target.id, password='test-NewPass26a')
+        self.assertTrue(changed['changed'])
+        # 新密码确实生效（Odoo 19 的 authenticate 签名是
+        # (credential, user_agent_env)，返回 {'uid': ...} 而不是 int）
+        target.invalidate_recordset()
+        auth = self.env['res.users'].authenticate(
+            {'login': 'p3_pw', 'password': 'NewPass!2026', 'type': 'password'},
+            {'interactive': False})
+        self.assertEqual(auth['uid'], target.id)
+
+        # 不能停用自己
+        error = self._assert_code(CODE_PRECONDITION,
+                                  self.common.with_user(self.manager).lab_admin_user_toggle_active,
+                                  user_id=self.manager.id, active=False)
+        self.assertEqual(error.fields.get('user_id'), 'self')
+
+        # 可以停用别人
+        toggled = self.common.with_user(self.manager).lab_admin_user_toggle_active(
+            user_id=target.id, active=False)
+        self.assertFalse(toggled['user']['active'])
+
+    def test_37_user_toggle_cannot_disable_last_manager(self):
+        """停用最后一名管理员必须被拒（与撤销角色同一 fail-closed 规则）。
+
+        用系统管理员身份操作：目标不是操作者自己，所以不会先撞上
+        「不能停用自己」；同时公司里只有这一名 manager，应当被
+        last_manager 规则拦下。
+        """
+        company_c, sole_manager = self._make_isolated_manager_company('p3_e_sole')
+        self.assertEqual(self._managers_in_company(company_c).ids, [sole_manager.id])
+        error = self._assert_code(
+            CODE_PRECONDITION,
+            self.common.with_company(company_c).lab_admin_user_toggle_active,
+            user_id=sole_manager.id, active=False)
+        self.assertEqual(error.fields.get('role'), 'last_manager')
+        self.assertTrue(sole_manager.active, '被拒后账号必须仍是启用状态')
+
+    def test_38_system_group_requires_system_admin(self):
+        """授予 base.group_system 必须操作者自己就是系统管理员。"""
+        target = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'p3_sys', 'login': 'p3_sys',
+            'email': 'p3_sys@example.invalid',
+            'company_id': self.company.id,
+            'company_ids': [(6, 0, [self.company.id])],
+        })
+        # 库存管理员（非系统管理员）不能授予系统组
+        error = self._assert_code(
+            CODE_FORBIDDEN,
+            self.common.with_user(self.manager).lab_admin_user_set_system_group,
+            user_id=target.id, enabled=True)
+        self.assertEqual(error.fields.get('group'), 'base.group_system')
+        self.assertFalse(target.has_group('base.group_system'))
+
+        # 系统管理员（测试环境 su）可以授予
+        granted = self.common.lab_admin_user_set_system_group(user_id=target.id, enabled=True)
+        self.assertTrue(granted['changed'])
+        self.assertTrue(target.has_group('base.group_system'))
 
     # ==================================================================
     # 6. history 过滤

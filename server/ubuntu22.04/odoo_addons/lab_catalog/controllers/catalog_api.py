@@ -262,6 +262,36 @@ class LabCatalogController(http.Controller):
                               {'item_key': 'not_found'})
         return data
 
+    # ------------------------------------------------------------------ equivalents
+    @http.route('/lab/api/catalog/equivalents', type='jsonrpc', auth='user',
+                methods=['POST'])
+    @api_route
+    def catalog_equivalents(self, params):
+        """BOM 等效件（S5）：一次请求处理整张 BOM，避免逐行往返。
+
+        主匹配永远是 C 编号；这里只给候选，绝不自动替换。
+        """
+        lines = params.get('lines')
+        if not isinstance(lines, (list, tuple)):
+            raise LabApiError(VALIDATION_ERROR, 'lines 必须是数组。',
+                              {'lines': 'not_a_list'})
+        clean = []
+        for index, raw in enumerate(lines[:200]):
+            if not isinstance(raw, dict):
+                continue
+            item_key = str(raw.get('item_key') or '').strip()
+            if not item_key:
+                continue
+            clean.append({'item_key': item_key,
+                          'quantity': raw.get('quantity')})
+        limit = params.get('limit_per_line')
+        try:
+            limit = int(limit) if limit is not None else 5
+        except (TypeError, ValueError):
+            limit = 5
+        return request.env['lab.catalog.item'].equivalents(
+            clean, limit_per_line=limit)
+
     # ------------------------------------------------------------------ categories
     @http.route('/lab/api/catalog/categories', type='jsonrpc', auth='user', methods=['POST'])
     @api_route

@@ -1,5 +1,125 @@
 # 当前状态与已知限制
 
+## 2026-11-21 EDA 插件 4.0.0：去掉本机桥接，改用 API 密钥（未部署）
+
+**背景**：用户要求「只装插件，不装别的东西」。旧版带 89 MB 的 Node 桥接 + 配对码，必须先双击启动一个进程。
+
+**根因（查官方文档确认）**：EDA 的 `sys_ClientUrl.request()` 的 `options` 只有 `headers`/`integrity`，**没有 `credentials`**；而 `Cookie` 是 Fetch 规范的禁止请求头。Cookie 会话在插件里物理上不可能。`Authorization` 不是禁止头，而 Odoo 19 原生支持 `auth='bearer'`。
+
+**新增 `lab_eda` 模块**（`server/ubuntu22.04/odoo_addons/lab_eda`）：
+- `lab.eda.token`：绑定到具体用户，只存 sha256，发放权锁在 `group_lab_manager`
+- 插件端点 `/lab/api/eda/*`（`auth='none'` + bearer）
+- 管理页端点 `/lab/api/eda/manage/*`（`auth='user'` + 会话）
+- 现有 50 个 `auth='user'` 路由**一个没动**，网页端零影响
+
+**管理页**：`/lab/settings` 新增「EDA 插件密钥」区块（选择成员 → 备注 → 有效期 → 发放 → 明文只显示一次 → 列表显示前缀/到期/最近使用/状态 → 吊销）。
+
+**插件**：删除 `bridge/`（含 92 MB node.exe）、`relay.js`、`images.js`、配对码、Cookie 会话；`odoo.js` 改为 bearer；设置页只剩「服务器地址 + EDA 密钥」。包体积 **89 MB → 103 KB**。
+
+**验证（真实 Odoo + 真实 HTTP）**：
+- `lab_eda` 21 项 ORM 测试全绿；插件 119 单元 + 15 打包 = 134 项全绿
+- 无 token→MISSING_TOKEN、错 token→INVALID_TOKEN、吊销后立即失效
+- 操作员 `can_issue_for_others=false`、borrowers 只有自己；管理员可选他人
+- **操作员出库 `actor_id` = token 绑定用户**；管理员代领 `actor_id=7/borrower_id=8` 分离正确
+- 管理页 `/lab/settings` 200，EDA 区块表头 5 列、表单字段、结果区全部渲染；`data-workflow-config` 里三个端点映射正确
+- 页面级闭环：发放 → 明文 → bearer 生效 → 吊销 → 立即失效
+
+**过程中修掉的真 bug**：
+1. `lab_catalog` 和 `lab_workflow` 各有一个**同名不同类**的 `LabApiError`，`api_route` 只认自己那个 → 越权返回 `INTERNAL_ERROR` 而非 `FORBIDDEN`。已加 `_map_business_error` + 自己的 `eda_endpoint` 装饰器。
+2. `lab_web_list()` 用 `search([])` 会过滤 `active=False`，吊销后的密钥从管理页消失。已加 `with_context(active_test=False)`。
+3. `FORBIDDEN_CODES` 分支丢掉了 `error.fields`，UI 无法告诉用户缺哪个权限组。
+
+**未部署到生产**。生产仍是 `lab_catalog 19.0.2.0.19` / `lab_inventory 19.0.1.1.1`，没有 `lab_eda`。
+
+**未验证**：EDA 宿主实机（无法在此环境启动 EDA）。
+
+## 2026-11-21 域名更正：正式域名是 team.l-creation.club
+
+**`lc.rm.com` 是已停用的旧域名。** 全仓库（插件源码、默认配置、文档）已改为 `https://team.l-creation.club`；历史审计记录（`maintenance/audit/`、`maintenance/handoffs/` 与 CHANGELOG 的历史条目）保持原样，那是当时的真实记录，不改写。
+
+- nginx 只有 `team.l-creation.club` 一个业务 vhost（`/etc/nginx/sites-enabled/team-l-creation-club`），另有一个 `default-catchall` 把未匹配请求 404。
+- 实测：`https://team.l-creation.club/` 200、`/web/health` 200、内网 `http://192.168.31.105:8069/web/health` 200。
+- 插件默认上游：`src/main/config.js` `DEFAULT_SERVER_URL`、`bridge/server.mjs` `DEFAULT_UPSTREAM` 均已改为 `https://team.l-creation.club`。
+- 测试里的主机名统一改为 `lab.example.test`（占位符，避免再写死真实域名）；两条断言默认值的用例改为新域名。
+
+## 2026-11-21 EDA 插件 3.2.0 + 服务端等效件：已部署并验证
+
+- **免登录（P1+P2）**：凭证全部搬到本机桥接侧，插件端一个密码都不碰。新增 `bridge/lab-credentials.dat`，内容是 Windows DPAPI 加密后的 JSON（cookie 与密码同一个文件——`session_id` 本身就是 bearer 凭证，只加密一个没有意义）。桥接新增 `POST /session/restore`：cookie 有效直接进，失效用保存的密码自动重登，都失败返回 `restored: 'none'` 让插件回落到登录表单。`/logout` 删除保存的密码。`--no-save-credentials` 供公用机器。Linux 桥接不存密码。
+- **等效件（S5）**：新增 `/lab/api/catalog/equivalents`，一次请求处理整张 BOM。判定逻辑在 `lab_inventory/tools/equivalent_match.py`（纯逻辑、可离线测试）：容值/阻值不同或耐压/功率低于需求 = 硬冲突，**直接丢弃不展示**；参数不足退化为同封装同类别并标 `weak`。候选必须有可用库存。
+- **版本**：`lab_catalog 19.0.2.0.18 → 19.0.2.0.19`、`lab_inventory 19.0.1.1.0 → 19.0.1.1.1`、EDA 插件 `3.1.1 → 3.2.0`。
+- **部署**：`upgrade_modules.sh --code-dir` 走完整流程（备份 → 停服务 → 换代码 → `-u` → 健康检查 → 起服务）。退出码 0、0 条 ERROR、`/web/health` 200、`/web/login` 200。备份点 `/var/backups/lc-elc/20261120T162716Z-before-upgrade`。生产模块版本已确认 `lab_catalog 19.0.2.0.19` / `lab_inventory 19.0.1.1.1`。
+- **生产实测（Odoo shell，真实 stock.quant）**：造一组临时同规格器件（10kΩ ±1%，同封装），接口返回 `basis=params`、1 条 `strong` 候选、可用量 42、库位 R11、一致项「阻值 10kΩ / 精度 ±1%」。验证数据已删除，残留计数全为 0。
+- **生产真实数据无自然等效对**：现有 80 个有库存器件里没有两个同规格不同编号的，所以 S5 的验收场景在生产上**无法自然复现**——这是数据现状，不是功能缺陷。
+- **实测**：`test_equivalent_match.py` 21 项（纯逻辑，含 3 个已修 bug 的回归）；插件单元 131 + 桥接凭证 7 + 打包 15 = 153 全绿；`repo_check` PASS 53。
+- **未验证**：`test_catalog_equivalents.py`（ORM 测试）仍未在 Odoo 测试运行器上跑过——生产库不是测试靶场（AGENTS.md），隔离库需要改 `pg_hba.conf`，已试过并回滚。等效件的 ORM 路径改为在生产库上用 Odoo shell 直接验证（见上）。
+- **EDA 插件**：包已构建并交付用户，尚未在真实 EDA 宿主中实机验证。
+- 设计文档：[EDA 免登录与等效件](../../maintenance/tasks/2026-11-20-eda-persist-login-and-equivalents-design.md)
+
+## 2026-11-19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
+
+- 作业页（入库/领料/归还/标签/历史）曾带着分区切换器显示：`context.push` 在 shell 分支内会推到该分支的导航器。7 条根级路由加 `parentNavigatorKey: rootNavigatorKey` 后总是覆盖外壳。同时删掉 `/catalog` 在 `unifiedRoutes` 里的重复定义（根级那份赢得匹配，器件库其实不在外壳里）。
+- **服务端已部署**：`lab_workflow 19.0.2.0.3 → 19.0.2.0.4`、`lab_team_web` 同步换代码。备份 `/var/backups/lc-elc/20261119T135447Z-before-upgrade`。升级退出码 0、0 条 ERROR、服务 active、`/web/health` 200、公网 `/` 200。
+- 存量数据：模板 #16 `GH1.25 端子 2P`（`LAB-000025`）原 `is_storable=False`，已确认无无批次库存后改为 `is_storable=True / tracking=lot`。
+- 实测：`flutter test` **510 passed / 5 skipped**；`analyze` 0 error / 0 warning。
+- **未验证**：Android 实机、真实打印与扫码。
+
+## 2026-11-19 客户端 1.3.5+21：手机切换器布局 + 内网 https 手误
+
+- 手机底部栏里分区切换器被撑成整屏胶囊（`Center` 在有限高度约束下扩张）。实测 412×915 屏幕上从 412×907 修到 412×52，加回归测试。
+- 登录页拦下 `https://<内网IP>:8069`（该端口明文无证书），直接提示改成 `http://`。`18443` 与公网地址不受影响。
+- 实测：`flutter test` **509 passed / 5 skipped**；`analyze` 0 error / 0 warning。
+- **未验证**：服务端修复未部署、Android 实机、真实打印扫码；未提交/未推送。
+
+## 2026-11-19 修「新建器件」不可入库；制袋贴标补完成按钮
+
+- **服务端 bug**：`lab_pending_create` 的新建器件分支漏设 `is_storable`/`tracking`，物料建成不可库存，制袋码能出但扫码上架必被拒（截图里的「未开启库存管理（is_storable=False）」）。已补 `is_storable=True` + `tracking='lot'`，并在 `test_workflow_business.py` 加断言钉住「手工建档的物料必须能真正入库」。
+- **客户端**：制袋贴标页补收尾区「第 1 步 · 制袋贴标」——打印按钮 + **「完成贴标，进入『扫码上架』」**。此前这一页结束在打印按钮上，没有完成动作也没有下一步入口。
+- 实测：`flutter test` **504 passed / 5 skipped**；`analyze` 0 error / 0 warning；服务端 `py_compile` 通过。
+- **未验证**：服务端 Odoo 测试本机无法运行（Windows 无 Odoo 运行时），需在服务器上跑；未部署；未提交/未推送。
+
+## 2026-11-19 客户端 1.3.5+19：卡片对比度修复 + 库位标签版式
+
+- 库存管理卡片曾整张铺荧光绿而文字用 `onSurface`，对比度 **1.2:1**（不可读）。改为中性玻璃面板 + 强调色图标；新增 `warehouse_contrast_test.dart` 用 WCAG 公式钉住 ≥4.5:1，并把错误组合本身也钉住。桌面切换器改为左侧紧凑胶囊。
+- 库位标签：QR 11 mm @(1,1)，**库码在 QR 正下方**（6 pt，落在码列内），**名称右侧 17 pt**。名称取 `名称：` 行而非 `title`（服务端库位标签的 title 是库码）。器件袋标签不变。
+- 实测：`flutter test` **504 passed / 5 skipped**；`analyze` 0 error / 0 warning；真实 Windows 截图确认可读。
+- **未验证**：真实打印与扫码、Android 实机；未提交/未推送。
+
+## 2026-11-19 客户端 1.3.4+18：登录后拆成四个分区
+
+- 落点从器件库改为 **库存速览** `/stock`。四分区：库存速览 / 仓位速览（`/stock/locations`，含仓位内容页 `/stock/locations/:id`）/ 器件库（原样）/ 库存管理（`/stock/manage` 五入口）。
+- 切换用 `GlassSegmentedControl`：≥900 顶部、窄屏底部、200% 文本回退下拉；`StatefulShellRoute.indexedStack`，各区保留自己的栈。
+- 作业页仍在根级全屏 push，深链与返回栈不变；`/home`、`/products` 仍重定向到 `/catalog`。无会话的离线浏览不渲染切换器。
+- 数据层增量：`locations(with_stats)`、新增 `bags()` 接 `/inventory/bags`（分页 `next_cursor`，`limit` ≤100）。服务端零改动。
+- 实测：`flutter test --no-pub` **488 passed / 5 skipped**；`analyze` 0 error / 0 warning；`build_client.py --platform windows --test` 三步 exit 0；`repo_check` **PASS 53 项**。
+- 产物 `clients/windows/releases/1.3.4+18/LC_ELC-Windows-1.3.4+18-x64.zip`（37,731,644 B，sha256 `6cd4ca0e…c2472317`），清单 `source-client-1.3.4-18-20261119.json`（218 文件）已激活。
+- **未验证**：真实数据下的分区切换与仓位分页、打印仓位标签、Android 布局；未提交/未推送。任务单 [四分区导航](../../maintenance/tasks/2026-11-19-four-section-navigation.md)。
+
+## 2026-11-19 客户端 1.3.3+17：有线接入的内网加速；标签排版先完整后字号
+
+- 内网加速提示原先只按 WiFi SSID 匹配，**插网线的台式机没有 SSID，功能静默失效**（用户：「Windows 平台有时候我的内网是通过有线接入的」）。新增 `lib/services/lan_probe.dart`（`GET /web/health`，3 秒、无凭据、仅私有网段，`<500` 即可达）；判定改为「报告了 SSID 仍以名称为准；没有 SSID 则探测成功才提示」，覆盖「填过 WiFi 名但今天插网线」。
+- 标签排版两处修正：① `wrappedBody()` 的 `omitted.clear()` 会连「超出四行上限的源行」一起清掉，第五个字段没打出来却报 `truncated=false`；现拆 `capOmitted`/`wrapOmitted`。② 适配改两遍，先找「放得下且不丢行」的最大字号，宁可小 0.4 pt 也不丢字段。
+- 清理 `DrawLableBarCode` 绑定（条形码方案已放弃）。
+- 实测：`flutter test --no-pub` **468 passed / 5 skipped**；`analyze` 0 error / 0 warning；`build_client.py --platform windows --test` 三步 exit 0；`repo_check` **PASS 53 项**。产物 `clients/windows/releases/1.3.3+17/LC_ELC-Windows-1.3.3+17-x64.zip`（37,666,952 B，sha256 `f09957ae…32580c`），清单 `source-client-1.3.3-17-20261119.json` 已激活。
+- **未验证**：真实插拔网线、现网 `/web/health` 返回、真实打印与扫码、Android 蓝牙出纸、应用内更新；未提交/未推送。交接 [有线内网加速与标签适配](../../maintenance/handoffs/2026-11-19-wired-lan-and-label-fit.md)。
+
+## 2026-11-19 客户端 1.3.3+11：精臣 B1 Pro 热敏标签直打（Windows USB / Android 蓝牙）
+
+- 三端：Windows `1.3.3+11`（USB 直打，随包 8 个 x64 DLL + ZT001.ttf）、Android `1.3.3+11`（蓝牙直打，仅 arm64-v8a / armeabi-v7a，102.6 MB）、Linux 仍 `1.3.2+10`（无精臣 Linux SDK）。
+- 服务端 `lab_labels_preview` 增加可选 `include_content`（默认 false）：返回每张标签的 `title`/`lines`/`payload`，与 PDF 同源，供直打使用。
+- 版式 40×20：QR 13×13 + 标题 6.49 pt + 正文 5.50 pt × 3 行；第 4 行省略并返回 `truncated`。
+- 构建：两平台三步 exit 0，`flutter test` 各 456 passed / 5 skipped，`analyze` 0 error，`repo_check` PASS 53 项。
+- **未验证**：真实 USB/蓝牙打印、权限弹窗、实体扫码、DPAPI、应用内更新；未提交/未推送。
+
+## 2026-11-19 Android 精臣 B1 Pro 蓝牙直打（源码 + 构建通过；未实机出纸）
+
+- **范围**：Flutter Android 客户端新增蓝牙直打（40×20 mm：一个二维码 + 标题 + 文字行），走服务端已就绪的 `/lab/api/labels/preview` 可选 `include_content: true`。服务端、Windows/Linux 打印路径未改；客户端 `pubspec` 版本未升（仍 `1.3.2+10`）。
+- **SDK**：精臣 Android SDK 4.1.1（`4.1.1-release.aar` + **必需**的 `image-1.9.5.aar`）复制到 `clients/app/android/app/libs/`，来源 `F:\lc_elc\Android-4.1.1-20261117.zip`，SHA256 记录在同目录 README；未引入 LPAPI（B1 Pro 不需要）。V4.1.1 更新记录明确“SDK 支持 B1_Pro”。
+- **实现**：`NiimbotPrinterBridge.kt`（`lab/printer` MethodChannel + `lab/printer/scan` EventChannel，扫描/连接子线程/打印缓存回调）；`lib/services/niimbot_android_printer.dart` 复用 Windows 侧的 `planThermalLabel` 几何计划；标签页在 Android 上显示搜索→列表→连接→打印区域，非 Android 或 SDK 不可用时隐藏；失败一律给具体中文原因，只有真实完成打印才显示成功。
+- **权限**：Android 12+ `BLUETOOTH_SCAN`(neverForLocation)+`BLUETOOTH_CONNECT`，6–11 `ACCESS_FINE_LOCATION`，`BLUETOOTH`/`BLUETOOTH_ADMIN` 限 `maxSdkVersion=30`；运行时请求在 `MainActivity`。
+- **混淆**：新增 `android/app/proguard-rules.pro`（文档 1.3 节规则），否则 Flutter release 的 R8 会破坏 SDK 反射/native 回调。
+- **证据**：`flutter analyze` 0 error（119 条既有风格 info）；`flutter test --no-pub` **456 通过 / 5 跳过 / 0 失败**；`build_client.py --platform android --test` 三步 exit 0，APK 134,929,251 B sha256 `e31c4845…a50908`（内含两个 ABI 的 `libminilzo.so`/`libniimbot_canvas_image.so`/`libskia.so` 与 `assets/font/ZT001.ttf`）。`repo_check.py` 的 3 项 `frozen-source` 失败来自本工作树既有未提交改动，非本轮引入。
+- **未做/边界**：真机蓝牙配对、实际出纸、开盖/缺纸/断线错误提示、Android 6–11 与 12+ 权限弹窗均 **未验证**；APK 只在 `local/build/`，未复制到 `clients/android/releases`、未登记快照、未发布、未提交。交接 [Android 精臣蓝牙直打](../../maintenance/handoffs/2026-11-19-android-niimbot-bluetooth.md)。
+
 ## 2026-11-18 Linux 客户端 1.3.2+10 构建（WSL；未实机验收）
 
 - 三端补齐：Linux `1.3.2+10` 已在 WSL Ubuntu 22.04 用归档工具链构建，三步 exit 0，`flutter test` **340 passed / 5 skipped**；产物 `clients/linux/releases/1.3.2+10/LC_ELC-Linux-1.3.2+10.tar.gz`，16,503,485 B，sha256 `4f20594c…f78e5a`，bundle 内 `client-install.json` = 1.3.2 / build 10 / linux。

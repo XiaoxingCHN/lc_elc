@@ -2,7 +2,40 @@
 
 ## 改哪里
 
-lib/features/unified是统一器件展示、详情和收/领/还/标签；lib/services/lab_api_client.dart是业务API；odoo_client.dart是登录和HTTP会话；login_memory_store.dart/secret_backend.dart是安全登录；providers/auth_provider.dart负责状态；routes负责返回/离线访问边界。修改共享源码同时考虑三端行为。
+lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/器件库/库存管理）与外壳；lib/features/unified是统一器件展示、详情和收/领/还/标签；lib/services/lab_api_client.dart是业务API；odoo_client.dart是登录和HTTP会话；login_memory_store.dart/secret_backend.dart是安全登录；providers/auth_provider.dart负责状态；routes负责返回/离线访问边界。修改共享源码同时考虑三端行为。
+
+## 登录后的分区外壳
+
+登录落点是 `/stock`（库存速览），不是器件库。四个分区由 `StatefulShellRoute.indexedStack` 承载，各自保留页面栈：
+
+| 分区 | 根路径 | 页面 |
+|---|---|---|
+| 库存速览 | `/stock` | 器件数 / 有库存数 / 仓位数 / 实物袋 / 在库数量 + 仓位分布 + 有库存器件 |
+| 仓位速览 | `/stock/locations` | 每个仓位的袋数与数量；`/stock/locations/:id` 是该仓位的实物袋列表 |
+| 器件库 | `/catalog` | 原 `UnifiedCatalogScreen`，未改动 |
+| 库存管理 | `/stock/manage` | 入库 / 领料 / 归还 / 标签打印 / 历史追溯 五个入口 |
+
+- 切换用 `GlassSegmentedControl`：**宽度 ≥900 放顶部，窄屏放底部**；200% 文本时换成下拉（阈值与入库页步骤切换一致）。
+- 作业页（`/receipt`、`/receipt/prepare`、`/issue`、`/return`、`/labels`、`/history`）**仍在根级、全屏 push**，不属于任何分区，深链、扫码 intent 与返回栈不变。库存管理页只是入口。
+- `/home`、`/products`、`/products/:id` 仍重定向到 `/catalog`：这些旧链接的意思是「给我看器件」，不是「给我看汇总」。
+- 数字来源：器件数/有库存数取 `/catalog/search` 的 `total`（一次不带 `stock_only`、一次带）；仓位数与在库数量取 `locations(with_stats:1)` 的 `stock.quant` 合计。客户端不自己累加一页数据来冒充总数。
+- 仓位内容页走 `/inventory/bags`（`location_id` 含子仓位、`next_cursor` 键集分页、`limit` 服务端上限 100），客户端此前没有接这个接口。
+
+## 热敏标签版式（40 × 20 mm）
+
+`lib/services/niimbot_layout.dart` 是纯 Dart 排版，Windows FFI 与 Android 桥接共用同一份几何。
+**两种标签用两套版式，不要合并**：
+
+| | 器件追溯标签（`bag`） | 库位标签（`location`） |
+|---|---|---|
+| 二维码 | 11 mm @ (1,1) | 11 mm @ (1,1) |
+| 码下方 | — | **库码**（6 pt，宽度限制在 11 mm 码列内） |
+| 右侧列 | 标题 + 最多 4 行正文，自适应字号 | **名称**，17 pt |
+| 取值 | `title` 是 SN | 名称取 `名称：` 行；**`title` 是库码，不能当名称用** |
+
+- 库码取自 `payload`（`LABL:K000003` → `K000003`），保证打出来的与二维码编码的是同一个串。
+- 适配两遍：先找「放得下且一行不丢」的最大字号，找不到才退到「放得下就行」并如实上报丢弃项。
+- `GlassSurface.prominent` 每屏最多一个；正文压在上面只有 1.2:1，**不可读**（`warehouse_contrast_test.dart` 钉住）。
 
 ## 玻璃设计系统
 

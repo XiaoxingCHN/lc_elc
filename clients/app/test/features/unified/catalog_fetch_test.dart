@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_inventory_client/features/unified/models/catalog_query.dart';
 import 'package:lab_inventory_client/features/unified/models/unified_item.dart';
@@ -283,10 +285,22 @@ void main() {
       final status = CatalogFetchStatus.fromJson(statusJson(state));
       expect(status.isTerminal, isTrue, reason: state);
       expect(status.isDone, state == 'done', reason: state);
+      expect(status.isActive, isFalse, reason: state);
     }
     for (final state in <String>['queued', 'resolving', 'fetching']) {
-      expect(CatalogFetchStatus.fromJson(statusJson(state)).isTerminal, isFalse);
+      final status = CatalogFetchStatus.fromJson(statusJson(state));
+      expect(status.isTerminal, isFalse);
+      expect(status.isActive, isTrue);
     }
+    // `still_running` is a CLIENT state: the server may still finish the task,
+    // so it is neither terminal nor something this client is polling.
+    final stillRunning = CatalogFetchStatus.fromJson(
+      statusJson(CatalogFetchStatus.stillRunningState),
+    );
+    expect(stillRunning.isTerminal, isFalse);
+    expect(stillRunning.isActive, isFalse);
+    expect(stillRunning.isStillRunning, isTrue);
+    expect(stillRunning.isQueryable, isTrue);
   });
 
   test('a keyword suggestion (>5 chars) fetches candidates for that keyword',
@@ -401,6 +415,267 @@ void main() {
     expect(payloads.single.containsKey('catalog_code'), isFalse);
     expect(controller.status?.isDone, isTrue);
     controller.dispose();
+  });
+
+  group('fetch ownership across query switches (P2-03 / M2)', () {
+    Map<String, dynamic> pageFor(String query) => page(<Map<String, dynamic>>[
+          itemJson(
+            itemKey: 'catalog:${query.hashCode}',
+            name: '结果 $query',
+          ),
+        ]);
+
+    testWidgets(
+        'a late CREATE answer of the old query is never written and its task '
+        'id is kept for a later query', (tester) async {
+      final api = FakeLabApi();
+      final create = Completer<Map<String, dynamic>>();
+      api.onCall = (path, params) async {
+        switch (path) {
+          case LabApiRoutes.catalogSearch:
+            return pageFor(params['query'] as String? ?? '');
+          case LabApiRoutes.catalogFetch:
+            return create.future;
+          case LabApiRoutes.catalogFetchStatus:
+            // Thrown (not fail()) because timer-driven polls run inside a
+            // guarded pump zone, where test-framework guards cannot nest.
+            throw StateError('an abandoned task must not be polled');
+          default:
+            throw StateError('unexpected path $path');
+        }
+      };
+
+      final notifier = CatalogNotifier(
+        api: api.client,
+        fetchPollInterval: const Duration(seconds: 1),
+        maxFetchPolls: 5,
+      );
+      await notifier.refresh();
+
+      unawaited(notifier.startFetch(query: 'OLD'));
+      await tester.pump();
+      expect(notifier.state.fetchBusy, isTrue);
+
+      await notifier.updateQuery(const CatalogQuery(text: 'NEW'));
+      expect(notifier.state.items.single.name, '结果 NEW');
+
+      // The operator moved on; the old create now answers with an accepted task.
+      create.complete(statusJson('queued', requestId: 7, query: 'OLD'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        notifier.state.items.single.name,
+        '结果 NEW',
+        reason: 'the old query result never replaces the new one',
+      );
+      expect(notifier.state.fetchStatus?.requestId, 7,
+          reason: 'the accepted server task id is not lost');
+      expect(notifier.state.fetchStatus?.isStillRunning, isTrue);
+      expect(notifier.state.fetchStatus?.isTerminal, isFalse);
+      expect(notifier.state.fetchStatus?.isQueryable, isTrue);
+      expect(notifier.state.fetchBusy, isFalse);
+      notifier.dispose();
+    });
+
+    testWidgets(
+        'a late POLL answer of the old query cannot overwrite the new query',
+        (tester) async {
+      final api = FakeLabApi();
+      final oldPoll = Completer<Map<String, dynamic>>();
+      var polls = 0;
+      api.onCall = (path, params) async {
+        switch (path) {
+          case LabApiRoutes.catalogSearch:
+            return pageFor(params['query'] as String? ?? '');
+          case LabApiRoutes.catalogFetch:
+            return statusJson('queued', requestId: 7, query: 'OLD');
+          case LabApiRoutes.catalogFetchStatus:
+            polls++;
+            return oldPoll.future;
+          default:
+            throw StateError('unexpected path $path');
+        }
+      };
+
+      final notifier = CatalogNotifier(
+        api: api.client,
+        fetchPollInterval: const Duration(seconds: 1),
+        maxFetchPolls: 5,
+      );
+      await notifier.refresh();
+      await notifier.startFetch(query: 'OLD');
+      expect(notifier.state.fetchStatus?.state, 'queued');
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(polls, 1);
+
+      await notifier.updateQuery(const CatalogQuery(text: 'NEW'));
+      expect(notifier.state.fetchStatus?.isStillRunning, isTrue,
+          reason: 'switching the query only stops the local subscription');
+      expect(notifier.state.fetchStatus?.requestId, 7);
+
+      oldPoll.complete(statusJson('done', requestId: 7, query: 'OLD'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(notifier.state.items.single.name, '结果 NEW');
+      expect(notifier.state.fetchStatus?.isStillRunning, isTrue,
+          reason: 'the stale poll answer is dropped, not shown as done');
+      expect(notifier.state.fetchStatus?.requestId, 7);
+      notifier.dispose();
+    });
+
+    testWidgets(
+        'the poll window expiring keeps the task id queryable and a later '
+        'server done still lands', (tester) async {
+      final api = FakeLabApi();
+      var polls = 0;
+      var serverDone = false;
+      api.onCall = (path, params) async {
+        switch (path) {
+          case LabApiRoutes.catalogSearch:
+            return pageFor(params['query'] as String? ?? '');
+          case LabApiRoutes.catalogFetch:
+            return statusJson('queued', requestId: 7, query: 'SLOW');
+          case LabApiRoutes.catalogFetchStatus:
+            if (params['request_id'] != 7) {
+              throw StateError('polled the wrong task id: ${params['request_id']}');
+            }
+            polls++;
+            return serverDone
+                ? statusJson('done', requestId: 7, query: 'SLOW')
+                : statusJson('fetching', requestId: 7, query: 'SLOW');
+          default:
+            throw StateError('unexpected path $path');
+        }
+      };
+
+      final notifier = CatalogNotifier(
+        api: api.client,
+        fetchPollInterval: const Duration(seconds: 1),
+        maxFetchPolls: 2,
+      );
+      await notifier.refresh();
+      await notifier.startFetch(query: 'SLOW');
+
+      // Two polls, then the next tick notices the budget is spent.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(polls, 2);
+
+      final exhausted = notifier.state.fetchStatus!;
+      expect(exhausted.state, CatalogFetchStatus.stillRunningState);
+      expect(exhausted.isTerminal, isFalse,
+          reason: 'a task the cron may still finish is not "failed"');
+      expect(exhausted.requestId, 7, reason: 'the task id is not discarded');
+      expect(exhausted.isQueryable, isTrue);
+      expect(exhausted.message, contains('7'));
+
+      // The backend cron finished it after the window: an explicit re-query
+      // finds the result and refreshes the list.
+      serverDone = true;
+      final searchesBefore = api.countFor(LabApiRoutes.catalogSearch);
+      await notifier.resumeFetch();
+      await tester.pump();
+
+      expect(notifier.state.fetchStatus?.isDone, isTrue);
+      expect(api.countFor(LabApiRoutes.catalogSearch), searchesBefore + 1,
+          reason: 'a done result refreshes the list once');
+      expect(notifier.state.items, isNotEmpty);
+      notifier.dispose();
+    });
+
+    testWidgets('a dropped connection keeps the task queryable after reconnect',
+        (tester) async {
+      final api = FakeLabApi();
+      var offline = true;
+      api.onCall = (path, params) async {
+        switch (path) {
+          case LabApiRoutes.catalogSearch:
+            return pageFor(params['query'] as String? ?? '');
+          case LabApiRoutes.catalogFetch:
+            return statusJson('queued', requestId: 7, query: 'NET');
+          case LabApiRoutes.catalogFetchStatus:
+            if (offline) {
+              throw businessFailure('NETWORK_ERROR', '无法连接服务器。');
+            }
+            return statusJson('done', requestId: 7, query: 'NET');
+          default:
+            throw StateError('unexpected path $path');
+        }
+      };
+
+      final notifier = CatalogNotifier(
+        api: api.client,
+        fetchPollInterval: const Duration(seconds: 1),
+        maxFetchPolls: 10,
+      );
+      await notifier.refresh();
+      await notifier.startFetch(query: 'NET');
+      await tester.pump(const Duration(seconds: 1));
+
+      final dropped = notifier.state.fetchStatus!;
+      expect(dropped.state, CatalogFetchStatus.stillRunningState);
+      expect(dropped.requestId, 7);
+      expect(dropped.isTerminal, isFalse,
+          reason: 'a network drop says nothing about the server task');
+
+      offline = false;
+      await notifier.resumeFetch();
+      await tester.pump();
+      expect(notifier.state.fetchStatus?.isDone, isTrue);
+      expect(notifier.state.items, isNotEmpty,
+          reason: 'the recovered task refreshes the list');
+      notifier.dispose();
+    });
+
+    testWidgets('an old poll answer never overwrites a newer task id',
+        (tester) async {
+      final api = FakeLabApi();
+      final oldPoll = Completer<Map<String, dynamic>>();
+      var polls = 0;
+      api.onCall = (path, params) async {
+        switch (path) {
+          case LabApiRoutes.catalogSearch:
+            return pageFor(params['query'] as String? ?? '');
+          case LabApiRoutes.catalogFetch:
+            final query = params['query'] as String;
+            return query == 'OLD'
+                ? statusJson('queued', requestId: 7, query: 'OLD')
+                : statusJson('queued', requestId: 8, query: 'NEW');
+          case LabApiRoutes.catalogFetchStatus:
+            polls++;
+            if (params['request_id'] == 7) return oldPoll.future;
+            return statusJson('fetching', requestId: 8, query: 'NEW');
+          default:
+            throw StateError('unexpected path $path');
+        }
+      };
+
+      final notifier = CatalogNotifier(
+        api: api.client,
+        fetchPollInterval: const Duration(seconds: 1),
+        maxFetchPolls: 10,
+      );
+      await notifier.refresh();
+      await notifier.startFetch(query: 'OLD');
+      await tester.pump(const Duration(seconds: 1));
+      expect(polls, 1);
+
+      await notifier.startFetch(query: 'NEW');
+      expect(notifier.state.fetchStatus?.requestId, 8);
+
+      oldPoll.complete(statusJson('done', requestId: 7, query: 'OLD'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(notifier.state.fetchStatus?.requestId, 8,
+          reason: 'the superseded task cannot take over the panel');
+      expect(notifier.state.fetchStatus?.isDone, isFalse);
+      notifier.dispose();
+    });
   });
 
   test('a screen can fetch its own query while the list shows another',

@@ -29,6 +29,11 @@ const int _odooSessionExpiredCode = 100;
 /// Redirect hops allowed while fetching one same-origin asset.
 const int _maxAssetRedirects = 5;
 
+/// Request option key holding the session generation a request was issued
+/// under. A late 401 is compared against it so it cannot tear down a session
+/// that was established after the request started (server switch).
+const String _sessionGenerationKey = 'lc_session_generation';
+
 /// Core Odoo JSON-RPC client.
 ///
 /// Handles authentication, RPC calls, and field probing.
@@ -52,6 +57,28 @@ class OdooClient implements AuthGateway {
   late final Dio _dio;
   late final CookieJar _cookieJar;
   int? _uid;
+
+  /// Bumped every time the client is repointed at another server/database or
+  /// its session is dropped. A request that started under an older generation
+  /// must not report a 401 against the new session (see
+  /// [AuthStateNotifier.switchServer]).
+  int _sessionGeneration = 0;
+
+  /// Cancels every request issued under the CURRENT session.
+  ///
+  /// Used by `AuthStateNotifier.switchServer` before pointing the client at
+  /// another server: an answer to an old request must never be mistaken for a
+  /// failure of the new session.
+  @override
+  void cancelInFlightRequests() {
+    if (!_inFlightToken.isCancelled) {
+      _inFlightToken.cancel('服务器已切换');
+    }
+    _inFlightToken = CancelToken();
+  }
+
+  CancelToken _inFlightToken = CancelToken();
+
   final _updateEvents = StreamController<void>.broadcast();
   Stream<void> get updateConnectionEvents => _updateEvents.stream;
   int _activeRpc = 0;
@@ -73,6 +100,9 @@ class OdooClient implements AuthGateway {
   /// It is only a notification: no automatic sign-in is triggered.
   @override
   set onSessionInvalid(void Function()? handler) => _onSessionInvalid = handler;
+
+  @override
+  int get sessionGeneration => _sessionGeneration;
 
   @override
   bool get isAuthenticated => _uid != null;
@@ -101,6 +131,9 @@ class OdooClient implements AuthGateway {
         'Invalid Odoo server URL: "$baseUrl". Expected http://host:port.',
       );
     }
+    // Cleartext HTTP is only allowed for the configured intranet addresses;
+    // any other HTTP host must be refused rather than silently downgraded.
+    OdooConfig.ensureCleartextAllowed(normalized);
     if (trimmedDb.isEmpty) {
       throw OdooValidationException('Odoo database name must not be empty.');
     }
@@ -111,6 +144,7 @@ class OdooClient implements AuthGateway {
 
     // A different server means a different session. The jar is in-memory, so
     // the wipe is not awaited; a failure here cannot corrupt anything.
+    _sessionGeneration++;
     _uid = null;
     unawaited(_cookieJar.deleteAll());
   }
@@ -140,6 +174,8 @@ class OdooClient implements AuthGateway {
           handler.reject(DioException(requestOptions: options, error: '安装更新期间暂停服务器操作'));
           return;
         }
+        // Remember which session this request belongs to (see _notifySessionInvalid).
+        options.extra[_sessionGenerationKey] = _sessionGeneration;
         _activeRpc++; handler.next(options);
       },
       onResponse: (response, handler) {
@@ -151,7 +187,7 @@ class OdooClient implements AuthGateway {
         if (_activeRpc > 0) _activeRpc--;
         if (error.requestOptions.path.contains('/lab/client/updates/assets/') &&
             [401, 302, 303].contains(error.response?.statusCode)) {
-          _notifySessionInvalid();
+          _notifySessionInvalid(request: error.requestOptions);
         }
         handler.next(error);
       },
@@ -211,6 +247,74 @@ class OdooClient implements AuthGateway {
   /// The password is used for this one request and is never logged: the request
   /// body is not logged either (see dio_interceptor.dart).
   @override
+  /// Atomic server switch used by "切换到内网 / 切回公网".
+  ///
+  /// Authenticates on a THROW-AWAY client first. The live uid and cookie jar
+  /// are replaced only when the new server accepted the credentials, so a
+  /// rejection or a transport failure leaves the operator signed in where they
+  /// were. Cancellation/generation handling stays with the auth layer.
+  @override
+  Future<int> authenticateAt({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    final normalized = OdooConfig.normalizeBaseUrl(baseUrl);
+    if (!OdooConfig.isValidBaseUrl(normalized)) {
+      throw OdooValidationException(
+        'Invalid Odoo server URL: "$baseUrl". Expected http://host:port.',
+      );
+    }
+    OdooConfig.ensureCleartextAllowed(normalized);
+    final trimmedDb = database.trim();
+    if (trimmedDb.isEmpty) {
+      throw OdooValidationException('Odoo database name must not be empty.');
+    }
+
+    final probe = OdooClient(baseUrl: normalized, database: trimmedDb);
+    final uid = await probe.authenticate(login, password);
+
+    // Commit. Nothing above this line changed this client.
+    this.baseUrl = normalized;
+    this.database = trimmedDb;
+    _dio.options.baseUrl = normalized;
+    _sessionGeneration++;
+    _uid = null;
+    await _cookieJar.deleteAll();
+    final origin = Uri.parse(normalized);
+    final cookies = await probe._cookieJar.loadForRequest(origin);
+    if (cookies.isNotEmpty) {
+      await _cookieJar.saveFromResponse(origin, cookies);
+    }
+    _uid = uid;
+    return uid;
+  }
+
+  /// Credential check that never changes this client's session.
+  @override
+  Future<int> probe({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    final normalized = OdooConfig.normalizeBaseUrl(baseUrl);
+    if (!OdooConfig.isValidBaseUrl(normalized)) {
+      throw OdooValidationException(
+        'Invalid Odoo server URL: "$baseUrl". Expected http://host:port.',
+      );
+    }
+    OdooConfig.ensureCleartextAllowed(normalized);
+    final trimmedDb = database.trim();
+    if (trimmedDb.isEmpty) {
+      throw OdooValidationException('Odoo database name must not be empty.');
+    }
+    return OdooClient(baseUrl: normalized, database: trimmedDb)
+        .authenticate(login, password);
+  }
+
+  @override
   Future<int> authenticate(String login, String password) async {
     try {
       _ensureConfigured();
@@ -219,6 +323,7 @@ class OdooClient implements AuthGateway {
 
       final response = await _dio.post(
         OdooConfig.authPath,
+        cancelToken: _inFlightToken,
         data: {
           'jsonrpc': '2.0',
           'params': {
@@ -313,6 +418,7 @@ class OdooClient implements AuthGateway {
       try {
         response = await _dio.get<List<int>>(
           current.toString(),
+          cancelToken: _inFlightToken,
           options: Options(
             responseType: ResponseType.bytes,
             // Followed by hand so each hop's origin can be checked before the
@@ -421,6 +527,7 @@ class OdooClient implements AuthGateway {
     try {
       response = await _dio.post<dynamic>(
         routePath,
+        cancelToken: _inFlightToken,
         data: <String, dynamic>{
           'jsonrpc': '2.0',
           'method': 'call',
@@ -447,6 +554,7 @@ class OdooClient implements AuthGateway {
         body['error'],
         statusCode: response.statusCode,
         path: routePath,
+        request: response.requestOptions,
       );
     }
 
@@ -517,7 +625,7 @@ class OdooClient implements AuthGateway {
     final status = error.response?.statusCode;
 
     if (status == 401) {
-      _notifySessionInvalid();
+      _notifySessionInvalid(request: error.requestOptions);
       return LabSessionExpiredException(
         statusCode: status,
         originalError: error,
@@ -527,7 +635,7 @@ class OdooClient implements AuthGateway {
     final inner = error.error;
     if (inner is OdooRpcException) {
       if (_isSessionError(inner.rpcErrorCode, inner.message)) {
-        _notifySessionInvalid();
+        _notifySessionInvalid(request: error.requestOptions);
         return LabSessionExpiredException(originalError: error);
       }
       // Odoo puts the human-readable text (often Chinese) in `data.message`;
@@ -572,6 +680,7 @@ class OdooClient implements AuthGateway {
     Object? rpcError, {
     required int? statusCode,
     required String path,
+    RequestOptions? request,
   }) {
     if (rpcError is Map) {
       final data = rpcError['data'];
@@ -580,7 +689,7 @@ class OdooClient implements AuthGateway {
       final message = detail ?? rpcError['message']?.toString();
 
       if (_isSessionError(code is int ? code : null, message)) {
-        _notifySessionInvalid();
+        _notifySessionInvalid(request: request);
         return LabSessionExpiredException(
           statusCode: statusCode,
           originalError: rpcError,
@@ -630,11 +739,19 @@ class OdooClient implements AuthGateway {
   ///
   /// The uid is dropped first, so any further business call fails fast as
   /// `NOT_AUTHENTICATED` instead of hammering the server.
-  void _notifySessionInvalid() {
+  void _notifySessionInvalid({RequestOptions? request}) {
+    // A request issued under an older session (a server switch already bumped
+    // the generation) says nothing about the CURRENT session: ignore its 401.
+    final issuedUnder = request?.extra[_sessionGenerationKey];
+    if (issuedUnder is int && issuedUnder != _sessionGeneration) {
+      return;
+    }
     _uid = null;
     final handler = _onSessionInvalid;
     if (handler == null) return;
     try {
+      // The auth layer also compares [sessionGeneration] with the generation it
+      // recorded after sign-in, as a second guard.
       handler();
     } catch (e) {
       logger.w('session-invalid handler failed: ${redactForLog(e.toString())}');
@@ -969,6 +1086,7 @@ class OdooClient implements AuthGateway {
   /// must not contact the server at all.
   @override
   void resetLocalSession() {
+    _sessionGeneration++;
     _uid = null;
     // The jar is in-memory only, so this cannot fail in a way that matters.
     unawaited(_cookieJar.deleteAll());

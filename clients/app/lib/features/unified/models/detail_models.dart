@@ -84,6 +84,9 @@ class LabStockLocation {
     required this.name,
     required this.path,
     this.quantity,
+    this.bagCount,
+    this.bagQuantity,
+    this.usage,
     this.raw = const <String, dynamic>{},
   });
 
@@ -97,11 +100,31 @@ class LabStockLocation {
   final String path;
 
   /// Quantity held here, when the server reports it for one item.
+  ///
+  /// With `locations(with_stats: true)` this is the sum of every `stock.quant`
+  /// at THIS location (no subtree) - the authoritative on-hand figure.
   final double? quantity;
+
+  /// Bags with a non-zero quantity at this exact location.
+  ///
+  /// Null means "the server did not compute statistics" (a plain
+  /// `locations()` call), NOT zero: showing "0 袋" for a location that merely
+  /// was not counted would misinform the operator.
+  final int? bagCount;
+
+  /// Sum of the bags' own quantities (what the bag labels claim), as opposed to
+  /// [quantity] which comes from `stock.quant`.
+  final double? bagQuantity;
+
+  /// Odoo `usage` (`internal`, `view`, ...), when reported.
+  final String? usage;
 
   final Map<String, dynamic> raw;
 
   bool get hasId => id != null && id! > 0;
+
+  /// True when this row carries the `with_stats` columns.
+  bool get hasStats => bagCount != null || bagQuantity != null || quantity != null;
 
   /// `K000001 · R01`, or whatever exists.
   String get display {
@@ -117,12 +140,23 @@ class LabStockLocation {
   String get labelPayload => locationPayload(code);
 
   factory LabStockLocation.fromJson(Map<String, dynamic> json) {
+    // Some endpoints (the catalog detail overlay) send only a `location`
+    // display string. Reading it into `path` keeps the row readable instead of
+    // rendering 「未命名库位」 for a location the server DID name.
+    final fallbackLabel =
+        firstString(json, const ['location', 'display', 'label']) ?? '';
     return LabStockLocation(
       id: firstInt(json, const ['id', 'location_id']),
-      code: firstString(json, const ['code', 'location_code', 'barcode', 'name']) ?? '',
-      name: firstString(json, const ['name', 'display_name', 'location_name']) ?? '',
-      path: firstString(json, const ['path', 'complete_name', 'location_path']) ?? '',
+      code: firstString(json, const ['code', 'location_code', 'barcode', 'name']) ??
+          '',
+      name: firstString(json, const ['name', 'display_name', 'location_name']) ??
+          '',
+      path: firstString(json, const ['path', 'complete_name', 'location_path']) ??
+          fallbackLabel,
       quantity: firstDouble(json, const ['quantity', 'qty', 'on_hand', 'available']),
+      bagCount: firstInt(json, const ['bag_count', 'bagCount']),
+      bagQuantity: firstDouble(json, const ['bag_quantity', 'bagQuantity']),
+      usage: firstString(json, const ['usage']),
       raw: json,
     );
   }
@@ -146,6 +180,10 @@ class LabBag {
     required this.supplier,
     required this.note,
     required this.createdAt,
+    this.availableQuantity,
+    this.outstandingQuantity,
+    this.locationPath = '',
+    this.uom = '',
     this.raw = const <String, dynamic>{},
   });
 
@@ -162,13 +200,31 @@ class LabBag {
   final int? locationId;
   final String locationCode;
   final String locationName;
+  /// On-hand quantity, from the LIVE `stock.quant` sum when the server reports
+  /// it (the `/inventory/bags` list does); the bag's cached figure otherwise.
   final double? quantity;
+
+  /// Free to issue (reserved stock excluded), when reported.
+  final double? availableQuantity;
+
+  /// Quantity already issued out of this bag and not yet returned.
+  final double? outstandingQuantity;
+
+  /// Full location path (`Lab/R01`), when reported.
+  final String locationPath;
+
+  /// Unit of measure display name, when reported.
+  final String uom;
+
   final String supplier;
   final String note;
   final DateTime? createdAt;
   final Map<String, dynamic> raw;
 
   bool get hasId => id != null && id! > 0;
+
+  /// True when any quantity is still on hand.
+  bool get hasStock => (quantity ?? 0) > 0;
 
   /// Bag label payload (`LABB:TRACE000001`).
   String get labelPayload => bagPayload(traceCode);
@@ -209,6 +265,16 @@ class LabBag {
         json,
         const ['quantity', 'qty', 'remaining_quantity', 'on_hand'],
       ),
+      availableQuantity: firstDouble(
+        json,
+        const ['available_quantity', 'free_quantity'],
+      ),
+      outstandingQuantity: firstDouble(
+        json,
+        const ['outstanding_quantity', 'issued_quantity'],
+      ),
+      locationPath: firstString(json, const ['location_path', 'path']) ?? '',
+      uom: firstString(json, const ['uom', 'uom_name', 'unit']) ?? '',
       supplier: firstString(
             json,
             const ['supplier', 'supplier_name', 'supplier_metadata', 'source'],
@@ -221,6 +287,24 @@ class LabBag {
       raw: json,
     );
   }
+}
+
+/// One page of `/lab/api/inventory/bags`.
+///
+/// The server pages by KEYSET (`next_cursor` = the last bag id), not by offset,
+/// so a bag created while the operator scrolls cannot shift a page boundary and
+/// duplicate or skip a row.
+class BagPage {
+  const BagPage({required this.bags, required this.nextCursor});
+
+  final List<LabBag> bags;
+
+  /// Opaque cursor for the next page; null means the list is complete.
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
+
+  static const BagPage empty = BagPage(bags: <LabBag>[], nextCursor: null);
 }
 
 /// One captured file (datasheet / manual) of a catalog item.

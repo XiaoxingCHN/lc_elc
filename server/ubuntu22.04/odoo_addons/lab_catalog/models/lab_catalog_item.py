@@ -28,6 +28,8 @@ from odoo.exceptions import AccessError
 
 from odoo.addons.lab_inventory.tools.param_search import (
     build_search_params, search_tokens)
+from odoo.addons.lab_inventory.tools.equivalent_match import (
+    compare as compare_equivalent, confidence as equivalent_confidence)
 
 from .lab_catalog_identity import normalize_catalog_code
 
@@ -390,9 +392,27 @@ class LabCatalogItem(models.Model):
                 [('product_id.product_tmpl_id', 'in', tids),
                  ('location_id.usage', '=', 'internal'), ('quantity', '!=', 0)],
                 ['product_id', 'location_id', 'quantity', 'available_quantity']):
-            loc = q['location_id'][1] if q['location_id'] else '?'
-            slot = locations.setdefault(loc, {'location': loc, 'quantity': 0.0,
-                                              'available_quantity': 0.0})
+            # `location_id` arrives as (id, display_name) only. That is NOT
+            # enough for the client: it renders 库码 · 名称 and needs the code,
+            # so sending the bare display name made every row show
+            # 「未命名库位」. Resolve the real record and send the same shape
+            # `/inventory/locations` uses.
+            loc_id = q['location_id'][0] if q['location_id'] else False
+            slot = locations.get(loc_id)
+            if slot is None:
+                if not loc_id:
+                    continue
+                location = self.env['stock.location'].browse(loc_id)
+                slot = locations[loc_id] = {
+                    'id': loc_id,
+                    'code': location.lab_code or '',
+                    'name': location.name or '',
+                    'path': location.complete_name or location.display_name or '',
+                    # Kept for older clients that only read `location`.
+                    'location': location.display_name or '',
+                    'quantity': 0.0,
+                    'available_quantity': 0.0,
+                }
             slot['quantity'] += q.get('quantity') or 0.0
             slot['available_quantity'] += q.get('available_quantity') or 0.0
 
@@ -411,7 +431,7 @@ class LabCatalogItem(models.Model):
             ['id', 'bag_id', 'operation_id', 'quantity', 'create_date'],
             order='create_date desc', limit=200)
 
-        return sorted(locations.values(), key=lambda x: x['location']), bags, issues, history
+        return sorted(locations.values(), key=lambda x: (x['path'] or x['location'])), bags, issues, history
 
     # ------------------------------------------------------------------ cursor
     @api.model
@@ -1004,6 +1024,215 @@ class LabCatalogItem(models.Model):
                                'available_quantity': avail_by_tmpl.get(tmpl.id, 0.0)}],
             'locations': _wf_locations, 'bags': _wf_bags,
             'issues': _wf_issues, 'history': _wf_history,
+        }
+
+    # ------------------------------------------------------------- equivalents
+    @api.model
+    def equivalents(self, lines, limit_per_line=5):
+        """BOM 等效件检索（S5）：一条 BOM 行一次调用，批量一次返回。
+
+        **主匹配永远是 C 编号**；这里只负责「给出候选」，是否替换由操作员勾选。
+        硬冲突（容值/阻值不同、耐压或功率低于需求）的候选**直接丢弃**，
+        不展示、不可勾选 —— 见 REQUIREMENTS.md S5 规则 4。
+
+        :param lines: ``[{'item_key': 'lcsc:C123', 'quantity': 4}, ...]``
+        :param limit_per_line: 每条 BOM 行最多返回多少候选
+        :return: ``{'lines': [...]}``，顺序与入参一致
+        """
+        self._check_catalog_read_access()
+        limit_per_line = max(1, min(int(limit_per_line or 5), 20))
+        from .lab_catalog_identity import parse_item_key, normalize_catalog_code
+
+        # 库存快照整批只算一次：100 行 BOM 不该触发 100 次 quant 查询。
+        _stocked, _qty_by_tmpl, avail_by_tmpl, _cq = self._live_state()
+
+        out = []
+        for raw in (lines or [])[:200]:
+            if not isinstance(raw, dict):
+                continue
+            item_key = str(raw.get('item_key') or '').strip()
+            kind, val = parse_item_key(item_key)
+            if not kind:
+                bare = normalize_catalog_code(item_key)
+                if bare:
+                    kind, val = 'lcsc', bare
+            if kind != 'lcsc' or not val:
+                out.append({'item_key': item_key, 'basis': 'none',
+                            'source': None, 'candidates': []})
+                continue
+            out.append(self._equivalents_for_code(
+                val, limit_per_line, avail_by_tmpl))
+        return {'lines': out}
+
+    @api.model
+    def _equivalents_for_code(self, code, limit_per_line, avail_by_tmpl):
+        """单个 C 编号的等效候选。"""
+        item = self.search([('catalog_code', '=', code),
+                            ('market', '=', MARKET_CN)], limit=1)
+        if not item:
+            return {'item_key': 'lcsc:%s' % code, 'basis': 'none',
+                    'source': None, 'candidates': []}
+
+        source_params = [{'name': p.name or '', 'value': p.value or ''}
+                         for p in item.param_ids]
+        source = {
+            'item_key': 'lcsc:%s' % code,
+            'catalog_code': code,
+            'name': item.name or '',
+            'package': item.package or '',
+            'category_name': item.category_name or '',
+            'parameters': source_params,
+        }
+
+        package = (item.package or '').strip()
+        if not package:
+            # 没有封装就无从缩小范围，宁可返回空也不猜。
+            return {'item_key': 'lcsc:%s' % code, 'basis': 'none',
+                    'source': source, 'candidates': []}
+
+        has_params = bool(source_params)
+        basis = 'params' if has_params else 'package_category'
+
+        where = ['i.market = %s', 'i.package = %s', 'i.catalog_code <> %s']
+        args = [MARKET_CN, package, code]
+        if item.category_id:
+            # 分类用 PG 祖先路径，与 search/facets 同一套语义。
+            where.append('(i.category_id = %s OR i.category_path LIKE %s)')
+            args.append(item.category_id.id)
+            args.append('%%/%d/%%' % item.category_id.id)
+        self.env.cr.execute(
+            'SELECT i.id FROM lab_catalog_item i WHERE ' + ' AND '.join(where) +
+            ' LIMIT 400', args)
+        candidate_ids = [row[0] for row in self.env.cr.fetchall()]
+        if not candidate_ids:
+            return {'item_key': 'lcsc:%s' % code, 'basis': basis,
+                    'source': source, 'candidates': []}
+
+        candidates = self.browse(candidate_ids)
+        # 候选必须有实验室库存，且可用量 > 0 —— 没库存的"等效件"帮不上忙。
+        tids_by_code = self._template_ids_by_codes(
+            [c.catalog_code for c in candidates])
+
+        # 参数一次性取回：逐个 candidate.param_ids 会变成 N+1，
+        # 400 个同封装候选就是 400 次查询。
+        params_by_item = {}
+        self.env.cr.execute(
+            'SELECT item_id, name, value FROM lab_catalog_param '
+            'WHERE item_id = ANY(%s) ORDER BY item_id, sequence, id',
+            (candidate_ids,))
+        for item_id, name, value in self.env.cr.fetchall():
+            params_by_item.setdefault(item_id, []).append(
+                {'name': name or '', 'value': value or ''})
+
+        scored = []
+        for candidate in candidates:
+            tids = tids_by_code.get(candidate.catalog_code, [])
+            available = sum(avail_by_tmpl.get(t, 0.0) for t in tids)
+            if available <= 0:
+                continue
+            candidate_params = params_by_item.get(candidate.id, [])
+            result = compare_equivalent(source_params, candidate_params)
+            level = equivalent_confidence(result)
+            if level is None:
+                if basis == 'package_category' and not result['hard']:
+                    # 源器件没有参数可比：退化为「同封装 + 同类别」，
+                    # 按 S5 规则 5 明确标注依据较弱，而不是当成硬冲突丢掉。
+                    level = 'weak'
+                else:
+                    continue                   # 硬冲突或无从判定：不展示
+            scored.append({
+                'candidate': candidate,
+                'tids': tids,
+                'available': available,
+                'result': result,
+                'confidence': level,
+            })
+
+        scored.sort(key=lambda entry: (-entry['available'],
+                                       entry['candidate'].catalog_code))
+        picked = scored[:limit_per_line]
+        if not picked:
+            return {'item_key': 'lcsc:%s' % code, 'basis': basis,
+                    'source': source, 'candidates': []}
+
+        all_tids = sorted({t for entry in picked for t in entry['tids']})
+        _locations, bags, _issues, _history = self._workflow_overlay(all_tids)
+
+        # 库位按候选自己的模板归集：_workflow_overlay 把一批模板合在一起，
+        # 直接复用会把 A 候选的库位挂到 B 候选上。
+        # 一次查询拿到 product_id -> template_id 映射，避免逐行 browse 的 N+1。
+        self.env.cr.execute(
+            'SELECT id, product_tmpl_id FROM product_product WHERE product_tmpl_id = ANY(%s)',
+            (all_tids,))
+        pid2tid = {row[0]: row[1] for row in self.env.cr.fetchall()}
+        loc_by_tid = {}
+        for quant in self.env['stock.quant'].search_read(
+                [('product_id', 'in', list(pid2tid) or [0]),
+                 ('location_id.usage', '=', 'internal'), ('quantity', '!=', 0)],
+                ['product_id', 'location_id', 'quantity', 'available_quantity']):
+            tid = pid2tid.get(quant['product_id'][0] if quant['product_id'] else None)
+            if not tid:
+                continue
+            loc_by_tid.setdefault(tid, []).append(quant)
+
+        location_cache = {}
+
+        def location_slot(loc_id):
+            slot = location_cache.get(loc_id)
+            if slot is None:
+                location = self.env['stock.location'].browse(loc_id)
+                # ``lab_code`` 定义在 lab_workflow（lab_catalog 不依赖它），
+                # 未装 lab_workflow 时该字段不存在；用 getattr 而不是属性访问，
+                # 否则这里会 AttributeError 把整个等效件接口打挂。
+                slot = location_cache[loc_id] = {
+                    'id': loc_id,
+                    'code': getattr(location, 'lab_code', '') or '',
+                    'name': location.name or '',
+                    'path': location.complete_name or location.display_name or '',
+                    'location': location.display_name or '',
+                    'quantity': 0.0,
+                    'available_quantity': 0.0,
+                }
+            return slot
+
+        for entry in picked:
+            slots = {}
+            for tid in entry['tids']:
+                for quant in loc_by_tid.get(tid, []):
+                    loc_id = quant['location_id'][0] if quant['location_id'] else False
+                    if not loc_id:
+                        continue
+                    slot = slots.get(loc_id)
+                    if slot is None:
+                        slot = slots[loc_id] = dict(location_slot(loc_id),
+                                                    quantity=0.0,
+                                                    available_quantity=0.0)
+                    slot['quantity'] += quant.get('quantity') or 0.0
+                    slot['available_quantity'] += quant.get('available_quantity') or 0.0
+            entry['locations'] = sorted(
+                slots.values(), key=lambda x: (x['path'] or x['location']))
+            entry['bags'] = [bag for bag in bags
+                             if (bag.get('product_tmpl_id') or [None])[0] in entry['tids']]
+
+        return {
+            'item_key': 'lcsc:%s' % code,
+            'basis': basis,
+            'source': source,
+            'candidates': [{
+                'item_key': 'lcsc:%s' % entry['candidate'].catalog_code,
+                'catalog_code': entry['candidate'].catalog_code,
+                'name': entry['candidate'].name or '',
+                'brand': entry['candidate'].brand or '',
+                'package': entry['candidate'].package or '',
+                'available': entry['available'],
+                'locations': entry.get('locations', []),
+                'bags': [{'id': bag.get('id'), 'trace_code': bag.get('trace_code') or '',
+                          'available_quantity': bag.get('outstanding_quantity') or 0}
+                         for bag in entry.get('bags', [])],
+                'matched': entry['result']['matched'],
+                'conflicts': entry['result']['conflicts'],
+                'confidence': entry['confidence'],
+            } for entry in picked],
         }
 
     @api.model

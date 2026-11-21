@@ -2,7 +2,7 @@ name: lab_inventory_client
 description: Flutter cross-platform client for the laboratory component inventory system (Odoo 19 JSON-RPC, no middleware).
 publish_to: 'none'
 
-version: 1.3.2+10
+version: 1.3.5+25
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -69,6 +69,14 @@ dependencies:
   cryptography: 2.9.0
   archive: 4.5.2
   path: ^1.9.1
+
+  # `dart:ffi` helpers (Utf8 conversion, malloc/calloc) for the NIIMBOT (精臣)
+  # thermal label printer on Windows: lib/services/niimbot_printer.dart drives
+  # jcPrinterApi.dll from the vendor's PC C++ SDK 4.0.6. `ffi` was already
+  # resolved transitively (2.2.0); declaring it directly makes the dependency
+  # explicit and pins it in pubspec.lock the same way. It is pure Dart, so the
+  # Android and Linux builds are unaffected.
+  ffi: ^2.2.0
 
   # ---------------------------------------------------------------------------
   # Unified business UI (lib/features/unified + lib/services/lab_api_client.dart).

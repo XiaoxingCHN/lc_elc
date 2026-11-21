@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/unified/unified_routes.dart';
 import '../providers/auth_provider.dart';
+import 'lan_acceleration_sheet.dart';
 
 /// The signed-in home screen.
 ///
@@ -24,6 +25,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: LabAppBar(
         title: const Text('实验室库存'),
         actions: <Widget>[
+          const LanAccelerationButton(),
           IconButton(
             tooltip: '退出登录',
             onPressed: () async {

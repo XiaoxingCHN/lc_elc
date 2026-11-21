@@ -9,6 +9,7 @@ import 'services/odoo_client.dart';
 import 'updates/desktop_update.dart';
 import 'updates/update_ui.dart';
 import 'widgets/lab_ui.dart';
+import 'widgets/lan_acceleration_hint.dart';
 
 void main() {
   // Bindings first: the secure-storage plugin (remembered login) is used from
@@ -23,8 +24,8 @@ void main() {
   // manuals through `fetchAssetBytes` on the SAME jar. Creating a second client
   // anywhere would mean a second, empty cookie jar and anonymous business calls.
   final client = OdooClient(
-    baseUrl: OdooConfig.defaultBaseUrl,
-    database: OdooConfig.defaultDatabase,
+    baseUrl: OdooConfig.fallbackBaseUrl,
+    database: OdooConfig.fallbackDatabase,
   );
 
   runApp(
@@ -55,7 +56,16 @@ class MyApp extends ConsumerWidget {
       darkTheme: LabTheme.dark,
       themeMode: ThemeMode.dark,
       builder: (context, child) => GlassBackdrop(
-        child: UpdateHost(child: child ?? const SizedBox.shrink()),
+        child: UpdateHost(
+          child: Column(
+            children: [
+              // Foreground/resume SSID check (>= 60 s apart). It only OFFERS
+              // the LAN switch; it never switches or signs in by itself.
+              const LanAccelerationHint(),
+              Expanded(child: child ?? const SizedBox.shrink()),
+            ],
+          ),
+        ),
       ),
       routerConfig: router,
       debugShowCheckedModeBanner: false,

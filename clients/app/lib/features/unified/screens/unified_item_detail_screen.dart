@@ -888,6 +888,8 @@ class _CatalogRefreshSectionState
                       status: status,
                       onChoose: (candidate) =>
                           unawaited(_fetch.chooseCandidate(candidate)),
+                      onQueryAgain:
+                          status.isQueryable ? () => unawaited(_fetch.resume()) : null,
                     ),
             ),
         ],

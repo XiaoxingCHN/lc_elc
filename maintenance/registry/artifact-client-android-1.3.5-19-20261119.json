@@ -1,0 +1,9 @@
+{
+  "file": "clients/android/releases/1.3.5+19/LC_ELC-Android-1.3.5+19.apk",
+  "bytes": 108025672,
+  "sha256": "16dbdf345ddd3756498935df5754593180aa39cd7e7d3b8b5ea1402c13228e0e",
+  "version": "1.3.5+19",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-19-20261119.json",
+  "source_tree_sha256": "9d58bf779cf39af952d47089f9f48a47d7f6b7f03acd8876c0ffdded1107b7eb",
+  "validation": "pending; add actual build/test environment and results before release"
+}

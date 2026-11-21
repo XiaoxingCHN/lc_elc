@@ -1,5 +1,81 @@
 # 变更日志
 
+## 3.2.0
+
+### 免登录（凭证存在桥接，不在插件）
+
+以前每次重开 EDA 都要重新输密码，因为桥接的 Odoo `session_id` cookie 和插件的
+`globalThis` 运行时**两处都是内存态**。现在：
+
+- 桥接新增 `POST /session/restore`：先把上次的 cookie 灌回 jar 并探测
+  `/web/session/get_session_info`；有效就直接登录，失效就用保存的密码自动重登，
+  都失败返回 `restored: 'none'`，插件照常显示登录表单。
+- 凭证落在 `bridge/lab-credentials.dat`，内容是 **Windows DPAPI 加密**后的 JSON
+  （cookie 与密码同一个文件——`session_id` 本身就是 bearer 凭证）。
+- 「注销」会**删除保存的密码**，下次必须手动输。
+- `--no-save-credentials` 启动参数不读写任何凭证文件，供公用机器。
+- 非 Windows（Linux 桥接）不存密码，退回手动登录。
+- 插件端仍然一个密码都不碰：`sys_Storage` 只有明文键值，自加密等于没加密。
+
+DPAPI 防的是「文件被拷到别的机器 / 别的账户读取」，**防不住以同一 Windows 账户
+身份运行的其他程序**。这与浏览器保存密码同一水位。
+
+### 等效件（S5 同型号不同编号）
+
+BOM 缺料时，不再只是显示「缺料」了事——会列出实验室里规格相符、只是 C 编号/
+品牌不同的器件，供操作员勾选替换。
+
+- 服务端新增 `/lab/api/catalog/equivalents`，**一次请求处理整张 BOM**，共享一次
+  库存快照（100 行不会触发 100 次 quant 查询）。
+- 判定：容值/阻值不同，或耐压/功率**低于**需求 → 硬冲突，**直接丢弃不展示**
+  （一个 25V 电容摆在 50V 需求旁边，即使标灰也迟早被误勾）。
+- 参数不足时退化为「同封装 + 同类别」，标 `confidence: 'weak'` 并显式提示依据较弱。
+- 候选必须有可用库存，没库存的不展示。
+- **绝不自动替换**：默认出库只含 C 编号精确匹配的行；勾选后才进入分配，领用备注
+  写明 `C14663 → C1525 替代`。
+- 主表列定义与 C 编号精确匹配逻辑完全不变（S5 规则 1）。
+
+### 版本
+
+`package.json`、`extension.json`、`src/main/index.js`、`src/iframe/app.js` 的
+VERSION 统一为 3.2.0。
+
+## 3.1.0
+
+### 定位调整：画图助手
+
+插件只在画原理图/PCB 时提供价值：查这个器件有没有库存、有的话在哪个库位和袋、整张 BOM 一键出库。
+
+### 移除
+
+- **入库（receipt）、手动领用（issue）、归还（return）、袋/库位追溯（trace）四个页签与菜单。**
+  这些能力在 Odoo 网页端和 Flutter 客户端已经完整存在，在 EDA 里重复实现等于维护三套
+  写库存状态机，也是误报成功与重复领用的来源。
+- 移除对应 `renderReceipt` / `renderReceiptSuccess` / `queryReceiptItem` /
+  `buildReceiptPayload` / `submitReceipt`、`renderIssue` / `renderIssueSuccess` /
+  `prefillIssueBag` / `resolveIssueBag` / `buildIssuePayload` / `submitIssue`、
+  `renderReturn` / `renderReturnSuccess` / `loadReturnIssues` / `buildReturnPayload` /
+  `submitReturn`、`renderTrace` / `resolveTrace`，以及 `state.receipt` / `state.issue` /
+  `state.return` / `state.trace`。
+- `extension.json` 删除 `openReceipt`、`openIssue`、`openReturn`、`openTrace` 菜单
+  （含 PCB 菜单的 `openTrace`）；`src/main/index.js` 删除同名导出。
+
+### 变更
+
+- **「BOM 对比」改名「原理图库存」**：菜单标题、页签、页面标题同步；说明改为
+  “选中器件后可直接查看库存与库位”。
+- **默认范围改为「选中器件」**（原为「当前工程 BOM」），仍保留工程 BOM / 当前图页 /
+  已加载图页三个选项。
+- **对比结果新增「袋」列**：在「库位」之后显示该行袋追溯码，最多 3 个，超出显示
+  `+N`；复制对比表（TSV）与导出 CSV 同步增加该列。
+- 保留「器件库」「原理图库存」「连接/账户」「诊断」四个页签；「一键出库」仍在
+  原理图库存页内，行为不变。
+- 器件详情页移除「入库此器件」按钮与袋列表的「领用」按钮，改为提示到网页端/客户端办理。
+
+### 版本
+
+- `package.json`、`extension.json`、`src/iframe/app.js` 的 VERSION 统一为 3.1.0。
+
 ## 3.0.3
 
 ### 修复

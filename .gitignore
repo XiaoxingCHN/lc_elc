@@ -15,6 +15,11 @@
 /dependencies/linux-runtime/out/
 /dependencies/server/out/
 /plugins/jlc-eda/bridge/runtime/
+# Machine-bound secrets written by the relay at runtime. lab-credentials.dat is
+# a DPAPI blob holding the Odoo password and session cookie; relay-token.txt is
+# the fixed pairing token. Neither may ever be committed.
+/plugins/jlc-eda/bridge/lab-credentials.dat
+/plugins/jlc-eda/bridge/relay-token.txt
 **/node_modules/
 **/build/
 **/dist/

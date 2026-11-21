@@ -270,6 +270,86 @@ LabelLayout planLabels(LabelSpec spec) {
   );
 }
 
+/// One label's STRUCTURED content, as returned by
+/// `/lab/api/labels/preview` when `include_content` is true.
+///
+/// This is the exact same `build_contents` result the server renders into the
+/// A4 PDF, so the thermal printer and the PDF cannot drift apart:
+///   * [payload] is the ONE QR value (`LABB:` bag / `LABL:` location);
+///   * [title] is the bold first line (usually the SN or 库码);
+///   * [lines] are the remaining prefixed lines (追溯码：…、名称：…).
+///
+/// The server already removed lines that merely repeat the title and already
+/// expanded `copies`, so [LabelPdfResult.contents] has one entry per physical
+/// label.
+class LabelContent {
+  const LabelContent({
+    required this.kind,
+    required this.refId,
+    required this.payload,
+    required this.traceCode,
+    required this.title,
+    required this.lines,
+  });
+
+  /// `bag`, `pending` or `location`.
+  final String kind;
+
+  /// Bag id or `stock.location` id (null when the server omitted it).
+  final int? refId;
+
+  /// The single QR payload. Empty means the label has no scannable code and
+  /// must not be sent to a printer as if it had one.
+  final String payload;
+
+  final String traceCode;
+  final String title;
+  final List<String> lines;
+
+  bool get hasQr => payload.isNotEmpty;
+
+  /// Every text line the label prints, title first.
+  List<String> get allLines => <String>[
+        if (title.isNotEmpty) title,
+        ...lines,
+      ];
+
+  factory LabelContent.fromJson(Map<String, dynamic> json) {
+    return LabelContent(
+      kind: asStringOr(json['kind']),
+      refId: asInt(json['ref_id']),
+      payload: asStringOr(json['payload']),
+      traceCode: asStringOr(json['trace_code']),
+      title: asStringOr(json['title']),
+      lines: asStringList(json['lines']),
+    );
+  }
+
+  /// Parses the optional `labels` array of a preview response.
+  ///
+  /// A malformed entry is skipped rather than failing the whole job: the PDF is
+  /// still printable, and a single bad row must not blank the dialog.
+  static List<LabelContent> listFromJson(Object? value) {
+    return <LabelContent>[
+      for (final entry in asMapList(value)) LabelContent.fromJson(entry),
+    ];
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'kind': kind,
+      'ref_id': refId,
+      'payload': payload,
+      'trace_code': traceCode,
+      'title': title,
+      'lines': lines,
+    };
+  }
+
+  @override
+  String toString() => 'LabelContent($kind, $payload, $title, ${lines.length} 行)';
+}
+
 /// `/lab/api/labels/preview` result: a REAL PDF, decoded from base64.
 class LabelPdfResult {
   const LabelPdfResult({
@@ -278,6 +358,7 @@ class LabelPdfResult {
     required this.pageCount,
     required this.labelCount,
     required this.mimeType,
+    this.contents = const <LabelContent>[],
   });
 
   final Uint8List bytes;
@@ -285,6 +366,13 @@ class LabelPdfResult {
   final int pageCount;
   final int labelCount;
   final String mimeType;
+
+  /// Structured per-label content, present only when the request asked for
+  /// `include_content: true`. Empty otherwise (never invented).
+  final List<LabelContent> contents;
+
+  /// True when the server sent structured content for a thermal printer.
+  bool get hasContents => contents.isNotEmpty;
 
   bool get isPdf => bytes.length > 3 &&
       bytes[0] == 0x25 &&
@@ -303,6 +391,7 @@ class LabelPdfResult {
       pageCount: firstInt(json, const ['page_count', 'pages']) ?? 0,
       labelCount: firstInt(json, const ['label_count', 'labels']) ?? 0,
       mimeType: firstString(json, const ['mime_type', 'mimetype']) ?? 'application/pdf',
+      contents: LabelContent.listFromJson(json['labels']),
     );
   }
 }

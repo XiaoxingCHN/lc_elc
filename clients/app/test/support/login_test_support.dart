@@ -32,9 +32,17 @@ class FakeAuthGateway implements AuthGateway {
   int logoutCount = 0;
   int resetSessionCount = 0;
 
+  /// Bumps the generation WITHOUT clearing the session. Lets a test model the
+  /// gateway being repointed at another server outside the auth layer.
+  void bumpGeneration() => _generation++;
+
   String _baseUrl = '';
   String _database = '';
   int? _uid;
+  int _generation = 0;
+
+  /// Number of times the auth layer cancelled in-flight requests.
+  int cancelCount = 0;
 
   @override
   String get baseUrl => _baseUrl;
@@ -48,6 +56,9 @@ class FakeAuthGateway implements AuthGateway {
   @override
   bool get isAuthenticated => _uid != null;
 
+  @override
+  int get sessionGeneration => _generation;
+
   /// Passwords actually handed to the network layer, in order.
   List<String> get submittedPasswords =>
       calls.map((call) => call.password).toList(growable: false);
@@ -57,7 +68,69 @@ class FakeAuthGateway implements AuthGateway {
     _baseUrl = baseUrl;
     _database = database;
     _uid = null;
+    _generation++;
     configureCount++;
+  }
+
+  /// Non-atomic default; [switchServer] is the atomic production path and is
+  /// overridden below the same way [OdooClient] does it.
+  @override
+  Future<int> authenticateAt({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    // Authenticate WITHOUT committing first: on failure nothing changes.
+    final previousBase = _baseUrl;
+    final previousDb = _database;
+    final previousUid = _uid;
+    final previousGeneration = _generation;
+
+    _baseUrl = baseUrl;
+    _database = database;
+    _uid = null;
+    calls.add((
+      login: login,
+      password: password,
+      baseUrl: baseUrl,
+      database: database,
+    ));
+    final Object? pending = failure;
+    if (pending != null) {
+      _baseUrl = previousBase;
+      _database = previousDb;
+      _uid = previousUid;
+      _generation = previousGeneration;
+      throw pending;
+    }
+
+    _uid = successUid;
+    _generation++;
+    return successUid;
+  }
+
+  @override
+  Future<int> probe({
+    required String baseUrl,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    calls.add((
+      login: login,
+      password: password,
+      baseUrl: baseUrl,
+      database: database,
+    ));
+    final Object? pending = failure;
+    if (pending != null) throw pending;
+    return successUid;
+  }
+
+  @override
+  void cancelInFlightRequests() {
+    cancelCount++;
   }
 
   @override
@@ -73,6 +146,7 @@ class FakeAuthGateway implements AuthGateway {
     if (pending != null) throw pending;
 
     _uid = successUid;
+    _generation++;
     return successUid;
   }
 
@@ -80,12 +154,14 @@ class FakeAuthGateway implements AuthGateway {
   Future<void> logout() async {
     logoutCount++;
     _uid = null;
+    _generation++;
   }
 
   @override
   void resetLocalSession() {
     resetSessionCount++;
     _uid = null;
+    _generation++;
   }
 
   void Function()? _onSessionInvalid;

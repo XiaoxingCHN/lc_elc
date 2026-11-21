@@ -132,3 +132,52 @@ class LabP3Api(http.Controller):
             role=data.get('role'),
             enabled=data.get('enabled'),
         )
+
+    # ------------------------------------------------------------------
+    # 账号维护（管理页「账号」区块）
+    #
+    # 以前只能在 Odoo 原生后台做：建号 / 改密 / 停用 / 系统管理员。
+    # 安全边界全部在模型方法里（_lab_require_manager、
+    # _lab_admin_require_system、最后管理员保护），控制器只做转发。
+    # ------------------------------------------------------------------
+    @http.route(API + '/admin/user_create', type='jsonrpc', auth='user',
+                methods=POST, csrf=False)
+    @envelope
+    def admin_user_create(self, **kwargs):
+        data = params()
+        return request.env['lab.workflow.common'].lab_admin_user_create(
+            login=data.get('login'),
+            name=data.get('name'),
+            password=data.get('password'),
+            role=data.get('role'),
+        )
+
+    @http.route(API + '/admin/user_set_password', type='jsonrpc', auth='user',
+                methods=POST, csrf=False)
+    @envelope
+    def admin_user_set_password(self, **kwargs):
+        data = params()
+        return request.env['lab.workflow.common'].lab_admin_user_set_password(
+            user_id=data.get('user_id'),
+            password=data.get('password'),
+        )
+
+    @http.route(API + '/admin/user_toggle_active', type='jsonrpc', auth='user',
+                methods=POST, csrf=False)
+    @envelope
+    def admin_user_toggle_active(self, **kwargs):
+        data = params()
+        return request.env['lab.workflow.common'].lab_admin_user_toggle_active(
+            user_id=data.get('user_id'),
+            active=data.get('active'),
+        )
+
+    @http.route(API + '/admin/user_set_system_group', type='jsonrpc', auth='user',
+                methods=POST, csrf=False)
+    @envelope
+    def admin_user_set_system_group(self, **kwargs):
+        data = params()
+        return request.env['lab.workflow.common'].lab_admin_user_set_system_group(
+            user_id=data.get('user_id'),
+            enabled=data.get('enabled'),
+        )

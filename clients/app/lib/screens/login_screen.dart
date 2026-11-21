@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/odoo_config.dart';
+import '../models/odoo_exception.dart';
 import '../updates/update_ui.dart';
 import '../features/unified/unified_routes.dart';
 import '../providers/auth_provider.dart';
 import '../routes/offline_access.dart';
 import '../services/login_memory_store.dart';
+import 'lan_acceleration_sheet.dart';
 
 /// Login screen.
 ///
@@ -41,6 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// The single operator choice on this screen.
   bool _rememberLogin = OdooConfig.rememberLoginDefault;
 
+
   /// A build with `--dart-define=LAB_ODOO_URL=...` hides the address field, so
   /// daily use is just account + password. "切换服务器" reveals it again —
   /// a wrong build must never be a dead end.
@@ -65,10 +68,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final saved = authState.savedAccount;
 
     _urlController = TextEditingController(
-      text: saved?.baseUrl ?? OdooConfig.defaultBaseUrl,
+      text: saved?.baseUrl ?? OdooConfig.fallbackBaseUrl,
     );
     _dbController = TextEditingController(
-      text: saved?.database ?? OdooConfig.defaultDatabase,
+      text: saved?.database ?? OdooConfig.fallbackDatabase,
     );
     _userController = TextEditingController(
       text: saved?.login ?? OdooConfig.defaultLogin,
@@ -76,10 +79,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _passwordController = TextEditingController();
 
     _rememberLogin = authState.rememberLogin;
+    _lastTypedLan = _typedLanAddress;
 
     _urlController.addListener(_onIdentityFieldChanged);
     _dbController.addListener(_onIdentityFieldChanged);
     _userController.addListener(_onIdentityFieldChanged);
+    // The session-only banner depends on the typed scheme/host.
+    _urlController.addListener(_onUrlChanged);
 
     if (saved != null) {
       // Pre-fill the password only when the operator asked to be remembered and
@@ -103,6 +109,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     database: _dbController.text,
     login: _userController.text,
   );
+
+  bool _lastTypedLan = false;
+
+  /// Rebuilds only when the LAN/session-only banner would change.
+  void _onUrlChanged() {
+    if (!mounted) return;
+    final current = _typedLanAddress;
+    if (current == _lastTypedLan) return;
+    setState(() => _lastTypedLan = current);
+  }
 
   /// The typed password belongs to the account captured in [_passwordScope].
   /// Any change of server/database/user invalidates it immediately.
@@ -157,6 +173,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!OdooConfig.isValidBaseUrl(url)) {
       return '服务器地址必须以 http:// 或 https:// 开头';
     }
+    // `https://` on the intranet port is a typo every time it has been seen:
+    // 8069 speaks plain HTTP, and the LAN deployment has no certificate. Saying
+    // so BEFORE the request saves the operator from reading
+    // "无法连接 https://192.168.31.105:8069" and wondering whether the server
+    // is down.
+    final schemeIssue = OdooConfig.intranetSchemeHint(url);
+    if (schemeIssue != null) return schemeIssue;
     if (_dbController.text.trim().isEmpty) {
       return '请填写 Odoo 数据库名';
     }
@@ -175,6 +198,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _formError = error);
       return;
     }
+    // A private HTTP address typed here IS the current intranet address for
+    // this run (memory only). Public hosts are refused by the setter itself.
+    if (_typedLanAddress) {
+      OdooConfig.setRuntimeLanBaseUrl(_urlController.text);
+    }
+    // Refuse an HTTP address that is not one of the configured intranet hosts
+    // (build default, the address entered in "服务器与内网加速", or the legacy
+    // lab host). HTTPS is always accepted.
+    try {
+      OdooConfig.ensureCleartextAllowed(_urlController.text);
+    } on OdooValidationException catch (e) {
+      setState(() => _formError = e.message);
+      return;
+    }
 
     setState(() {
       _formError = null;
@@ -185,13 +222,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final notifier = ref.read(authProvider.notifier);
     // Navigation on success and the error snack bar are handled by the
     // ref.listen callback below.
+    //
+    // A private HTTP address is a LAN acceleration login: session-only, so it
+    // is never written to the account list / key store and can never become the
+    // last-used account.
     await notifier.login(
       baseUrl: scope.baseUrl,
       database: scope.database,
       login: scope.login,
       password: _passwordController.text,
       rememberLogin: _rememberLogin,
+      // NOT `ephemeral: _typedLanAddress` - see the note on that getter. A LAN
+      // address is the lab's actual server and must be rememberable like any
+      // other, or every restart asks for the password again.
+      ephemeral: false,
     );
+  }
+
+  /// A private HTTP address used to force a session-only login, on the
+  /// assumption that the intranet was a temporary accelerator and the public
+  /// server was the real one.
+  ///
+  /// That assumption is wrong for the way the lab actually runs: the intranet
+  /// address IS the server, it speaks plain HTTP only, and the operator signs
+  /// in there every day. Forcing `ephemeral` on it meant the password was never
+  /// written to the key store, so every restart asked for it again - reported
+  /// as "登陆没办法保持".
+  ///
+  /// What the session-only path was protecting is still protected, by the
+  /// "记住登录" switch and by the key store: a LAN password goes through the
+  /// SAME OS credential storage as any other, and the offline cache stays keyed
+  /// per session. So the LAN address is now an ordinary, rememberable account.
+  ///
+  /// Only the explicit LAN-acceleration switch (the settings sheet, which
+  /// re-authenticates an already-signed-in operator) stays session-only.
+  bool get _typedLanAddress {
+    final url = OdooConfig.normalizeBaseUrl(_urlController.text);
+    if (!url.startsWith('http://')) return false;
+    return OdooConfig.isPrivateNetworkHost(Uri.tryParse(url)?.host ?? '');
   }
 
   Future<void> _onRememberLoginChanged(bool value) async {
@@ -246,8 +314,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     _programmaticEdit = true;
-    _urlController.text = OdooConfig.defaultBaseUrl;
-    _dbController.text = OdooConfig.defaultDatabase;
+    // "Nothing remembered" means the public server, never a stale LAN address.
+    _urlController.text = OdooConfig.fallbackBaseUrl;
+    _dbController.text = OdooConfig.fallbackDatabase;
     _userController.text = OdooConfig.defaultLogin;
     _passwordController.clear();
     _programmaticEdit = false;
@@ -323,6 +392,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         title: const Text('实验室库存系统 - 登录'),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: '服务器与内网加速',
+            onPressed: () => showLanAcceleration(context),
+            icon: const Icon(Icons.speed),
+          ),
           PopupMenuButton<String>(
             tooltip: '登录记录',
             onSelected: (value) {
@@ -387,6 +461,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         icon: Icons.sync_problem,
                         color: Theme.of(context).colorScheme.secondary,
                         text: _scopeChangedNotice!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    // A private HTTP address is the lab's own server. It used to
+                    // be announced as a one-off "加速会话"; that is no longer
+                    // true (the account is remembered like any other), so the
+                    // banner now states what actually differs: the transport.
+                    if (_typedLanAddress) ...[
+                      _Banner(
+                        icon: Icons.lan,
+                        color: Theme.of(context).colorScheme.primary,
+                        text: '这是内网明文地址（HTTP）。账号可以像公网一样记住登录；'
+                            '密码保存在系统凭据存储中，不写入明文文件。',
                       ),
                       const SizedBox(height: 12),
                     ],

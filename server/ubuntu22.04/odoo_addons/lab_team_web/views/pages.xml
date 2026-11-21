@@ -70,6 +70,17 @@
                 <div t-attf-class="lc-shell #{'' if lc_nav else 'lc-shell-plain'}">
                     <t t-if="lc_nav">
                         <aside class="lc-rail" id="lc-nav">
+                            <!-- 抽屉内的独立关闭手柄（≤1023px 显示）。窄屏抽屉整层盖在
+                                 顶栏之上，顶栏菜单按钮此时被遮罩覆盖，触控用户需要一个
+                                 始终可见的关闭入口；桌面固定侧栏不显示这个按钮。 -->
+                            <div class="lc-nav-head">
+                                <span class="lc-nav-head-title" aria-hidden="true">主导航</span>
+                                <button class="lc-nav-close" type="button"
+                                        data-lc-action="nav-close" aria-label="关闭主导航">
+                                    <span aria-hidden="true">×</span>
+                                    <span>关闭</span>
+                                </button>
+                            </div>
                             <nav class="lc-nav" aria-label="主导航">
                                 <t t-foreach="lc_nav" t-as="nav">
                                     <a t-attf-class="lc-nav-link #{'is-active' if nav.get('active') else ''}"

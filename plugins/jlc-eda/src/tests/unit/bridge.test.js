@@ -84,12 +84,12 @@ test('dispatch errors are serialized without stacks or secrets', async () => {
 
 test('Odoo action URLs are built only from the allow-list', () => {
   assert.equal(
-    odooActionUrl('http://lc.rm.com', 'bag_list'),
-    'http://lc.rm.com/odoo/action-lab_workflow.action_lab_bag',
+    odooActionUrl('http://lab.example.test', 'bag_list'),
+    'http://lab.example.test/odoo/action-lab_workflow.action_lab_bag',
   );
   assert.equal(
-    odooActionUrl('http://lc.rm.com/', 'label_open'),
-    'http://lc.rm.com/odoo/action-lab_workflow.action_lab_label_open',
+    odooActionUrl('http://lab.example.test/', 'label_open'),
+    'http://lab.example.test/odoo/action-lab_workflow.action_lab_label_open',
   );
-  assert.throws(() => odooActionUrl('http://lc.rm.com', '<script>'), (error) => error.code === 'VALIDATION_ERROR');
+  assert.throws(() => odooActionUrl('http://lab.example.test', '<script>'), (error) => error.code === 'VALIDATION_ERROR');
 });

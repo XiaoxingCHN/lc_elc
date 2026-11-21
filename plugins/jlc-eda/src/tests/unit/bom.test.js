@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupBom, compareLine, summarize, bomTsv, BOM_STATUS } from '../../shared/bom.js';
+import { groupBom, compareLine, summarize, bomTsv, bagTraceSummary, BOM_STATUS } from '../../shared/bom.js';
 
 const components = [
   { designator: 'R1', code: 'C1', name: '10k', addIntoBom: true },
@@ -94,6 +94,47 @@ test('bomTsv marks unknown stock explicitly', () => {
   ]);
   assert.match(tsv, /未知/);
   assert.match(tsv, /C9/);
+});
+
+test('bagTraceSummary lists up to three trace codes and collapses the rest', () => {
+  assert.equal(bagTraceSummary([]), '—');
+  assert.equal(bagTraceSummary(null), '—');
+  assert.equal(bagTraceSummary([{ trace_code: 'LABB:1' }]), 'LABB:1');
+  assert.equal(
+    bagTraceSummary([{ trace_code: 'LABB:1' }, { trace_code: 'LABB:2' }, { trace_code: 'LABB:3' }]),
+    'LABB:1 LABB:2 LABB:3',
+  );
+  assert.equal(
+    bagTraceSummary([
+      { trace_code: 'LABB:1' },
+      { trace_code: 'LABB:2' },
+      { trace_code: 'LABB:3' },
+      { trace_code: 'LABB:4' },
+      { trace_code: 'LABB:5' },
+    ]),
+    'LABB:1 LABB:2 LABB:3 +2',
+  );
+});
+
+test('bomTsv carries the bag column after locations', () => {
+  const tsv = bomTsv([
+    {
+      status: BOM_STATUS.OK,
+      code: 'C1',
+      name: 'X',
+      mpn: 'M',
+      designators: ['R1'],
+      need: 1,
+      available: 5,
+      gap: 0,
+      locations: [{ location: 'R01', available_quantity: 5 }],
+      bags: [{ trace_code: 'LABB:7' }],
+    },
+  ]);
+  const header = tsv.split('\n')[0].split('\t');
+  assert.equal(header[header.length - 1], '袋');
+  const cells = tsv.split('\n')[1].split('\t');
+  assert.equal(cells[cells.length - 1], 'LABB:7');
 });
 
 test('real grouped BOM retains demand through comparison, totals and TSV',()=>{

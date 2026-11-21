@@ -180,10 +180,17 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
   int get pageSize => _pageSize;
 
   /// Replaces the query and loads the first page (the list resets).
+  ///
+  /// Switching the query stops the local fetch subscription but does NOT
+  /// discard a server task that is still queued: [CatalogFetchController.cancel]
+  /// keeps its task id in a queryable `still_running` status, and that status is
+  /// carried into the new state so the operator can ask about it later. A
+  /// settled (terminal) status belongs to the query being left and is dropped.
   Future<void> updateQuery(CatalogQuery query) {
     _requestToken++;
     _seenKeys.clear();
     _fetch.cancel();
+    final keptFetchStatus = _fetch.status;
     state = state.copyWith(
       query: query,
       items: const <UnifiedItem>[],
@@ -194,7 +201,7 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
       error: null,
       errorCode: null,
       fetchSuggestion: null,
-      fetchStatus: null,
+      fetchStatus: keptFetchStatus,
       fetchBusy: false,
     );
     return _loadFirstPage(_requestToken);
@@ -226,6 +233,12 @@ class CatalogNotifier extends StateNotifier<CatalogState> {
     if (candidate.catalogCode.isEmpty) return Future<void>.value();
     return startFetch(catalogCode: candidate.catalogCode);
   }
+
+  /// Asks the server again about a task retained after a query switch.
+  ///
+  /// Explicit human action only: nothing is submitted, and the list is not
+  /// touched until the server answers.
+  Future<void> resumeFetch() => _fetch.resume();
 
   /// Reloads the first page of the current query (used after a write).
   Future<void> refresh() {

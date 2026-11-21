@@ -762,3 +762,177 @@ class LabWorkflowP3Api(models.AbstractModel):
             'lab_workflow 库存角色变更 actor=%s target=%s role=%s enabled=%s company=%s',
             self.env.uid, target.id, role_key, enabled_value, company.id)
         return {'member': self._lab_member_dict(target), 'changed': True}
+
+    # ==================================================================
+    # 5b. 账号维护（管理页「账号」区块）
+    #
+    # 这些操作以前只能在 Odoo 原生后台完成。搬进来的前提是**不降低任何
+    # 安全标准**：
+    #   * 全部走 _lab_require_manager 门禁；
+    #   * 授予 base.group_system 额外要求操作者自己就是系统管理员——
+    #     库存管理员不能给自己提权；
+    #   * 停用最后一个管理员会被拒（与撤销角色同一 fail-closed 规则）；
+    #   * 不能停用自己（否则会把自己锁在门外）；
+    #   * 密码永不进日志。
+    # ==================================================================
+    SYSTEM_GROUP = 'base.group_system'
+
+    @api.model
+    def _lab_admin_user_dict(self, user):
+        return {
+            'id': user.id,
+            'login': user.login,
+            'name': user.name,
+            'active': bool(user.active),
+            'is_system': user.has_group(self.SYSTEM_GROUP),
+        }
+
+    @api.model
+    def _lab_admin_require_system(self, action):
+        """系统级操作（授予/撤销 base.group_system）的额外门禁。"""
+        if self.env.su:
+            return True
+        if not self.env.user.has_group(self.SYSTEM_GROUP):
+            raise LabApiError.forbidden(
+                '只有系统管理员可以%s；库存管理员不能授予系统权限' % action,
+                {'group': self.SYSTEM_GROUP})
+        return True
+
+    @api.model
+    def _lab_admin_target(self, user_id):
+        try:
+            uid = p3_rules.parse_int(user_id, 'user_id', minimum=1, required=True)
+        except p3_rules.RuleError as error:
+            raise self._lab_rule_error(error)
+        target = self.env['res.users'].sudo().browse(uid).exists()
+        if not target:
+            raise LabApiError.not_found('账号不存在：%s' % uid, {'user_id': 'not_found'})
+        company = self.env.company
+        if target.company_ids and company not in target.company_ids:
+            raise LabApiError.forbidden('账号「%s」不属于当前公司' % target.name,
+                                        {'user_id': 'wrong_company'})
+        return target
+
+    @api.model
+    def lab_admin_user_create(self, login=None, name=None, password=None, role=None):
+        """建账号（manager）。
+
+        新账号默认只有 ``base.group_user``（内部用户），没有任何库存角色；
+        可选 ``role`` 直接授予一个库存角色。**不能**在这里授予系统组——
+        那要走 lab_admin_user_set_system_group。
+        """
+        self._lab_require_manager('新建账号')
+        try:
+            # required=True：空登录名/空姓名是**输入错误**，必须报 VALIDATION，
+            # 不能静默返回空串再让 create() 抛 Odoo 的底层错误。
+            login_text = p3_rules.parse_text(login, 'login', p3_rules.MAX_QUERY_LEN,
+                                             required=True)
+            name_text = p3_rules.parse_text(name, 'name', p3_rules.MAX_QUERY_LEN,
+                                            required=True)
+        except p3_rules.RuleError as error:
+            raise self._lab_rule_error(error)
+        if not str(password or '').strip():
+            raise LabApiError.validation('请填写初始密码', {'password': 'required'})
+
+        Users = self.env['res.users'].sudo()
+        if Users.with_context(active_test=False).search_count([('login', '=', login_text)]):
+            raise LabApiError.conflict('登录名「%s」已被占用' % login_text,
+                                       {'login': 'duplicate'})
+
+        groups = [(4, self.env.ref('base.group_user').id)]
+        if role:
+            try:
+                role_key = p3_rules.normalize_role(role)
+            except p3_rules.RuleError as error:
+                raise self._lab_rule_error(error, 'FORBIDDEN')
+            xmlid = p3_rules.group_xmlid_for_role(role_key)
+            group = self.env.ref(xmlid, raise_if_not_found=False)
+            if group:
+                groups.append((4, group.id))
+
+        user = Users.with_context(no_reset_password=True).create({
+            'name': name_text,
+            'login': login_text,
+            'password': password,
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+            'group_ids': groups,
+        })
+        _logger.info('lab_admin 建账号 actor=%s login=%s role=%s company=%s',
+                     self.env.uid, login_text, role or '-', self.env.company.id)
+        return {'user': self._lab_admin_user_dict(user)}
+
+    @api.model
+    def lab_admin_user_set_password(self, user_id=None, password=None):
+        """重置密码（manager）。密码不写日志。"""
+        self._lab_require_manager('重置密码')
+        if not str(password or '').strip():
+            raise LabApiError.validation('请填写新密码', {'password': 'required'})
+        target = self._lab_admin_target(user_id)
+        target.sudo().write({'password': password})
+        _logger.info('lab_admin 重置密码 actor=%s target=%s', self.env.uid, target.id)
+        return {'user': self._lab_admin_user_dict(target), 'changed': True}
+
+    @api.model
+    def lab_admin_user_toggle_active(self, user_id=None, active=None):
+        """停用/启用账号（manager）。
+
+        两条保护：不能停用自己；停用管理员时不能让他所属公司变成 0 管理员。
+        """
+        self._lab_require_manager('停用或启用账号')
+        try:
+            active_value = p3_rules.parse_bool(active, None)
+        except p3_rules.RuleError as error:
+            raise self._lab_rule_error(error)
+        if active_value is None:
+            raise LabApiError.validation('active 必须是布尔值', {'active': 'invalid'})
+
+        target = self._lab_admin_target(user_id)
+        if not active_value:
+            if target.id == self.env.uid:
+                raise LabApiError.precondition('不能停用自己的账号',
+                                               {'user_id': 'self'})
+            if target.has_group(LAB_MANAGER_GROUP):
+                # 停用与撤销角色是同一个风险：目标一旦不再是可用管理员，
+                # 它所属的公司必须还剩至少一名。统计口径相同（排除目标自己），
+                # 因此复用 _lab_manager_remaining_by_company。
+                remaining, deficient = self._lab_manager_remaining_by_company(target)
+                if int(remaining or 0) <= 0:
+                    fields = {'role': 'last_manager'}
+                    if deficient:
+                        fields['company'] = ', '.join(deficient)
+                    raise LabApiError.precondition(
+                        '停用后这些公司将没有任何库存管理员：%s'
+                        % '、'.join(deficient or ['(当前公司)']), fields)
+        target.sudo().write({'active': active_value})
+        _logger.info('lab_admin 账号状态 actor=%s target=%s active=%s',
+                     self.env.uid, target.id, active_value)
+        return {'user': self._lab_admin_user_dict(target), 'changed': True}
+
+    @api.model
+    def lab_admin_user_set_system_group(self, user_id=None, enabled=None):
+        """授予/撤销 ``base.group_system``。
+
+        **额外要求操作者自己就是系统管理员**：否则库存管理员可以给自己提权，
+        绕过整个权限模型。
+        """
+        self._lab_admin_require_system('授予或撤销系统管理员')
+        try:
+            enabled_value = p3_rules.parse_bool(enabled, None)
+        except p3_rules.RuleError as error:
+            raise self._lab_rule_error(error)
+        if enabled_value is None:
+            raise LabApiError.validation('enabled 必须是布尔值', {'enabled': 'invalid'})
+        target = self._lab_admin_target(user_id)
+        group = self.env.ref(self.SYSTEM_GROUP)
+        has_group = target.has_group(self.SYSTEM_GROUP)
+        if has_group == enabled_value:
+            return {'user': self._lab_admin_user_dict(target), 'changed': False}
+        target.sudo().write({
+            'group_ids': [(4, group.id)] if enabled_value else [(3, group.id)],
+        })
+        target.invalidate_recordset(
+            [name for name in ('group_ids', 'groups_id') if name in target._fields])
+        _logger.info('lab_admin 系统管理员 actor=%s target=%s enabled=%s',
+                     self.env.uid, target.id, enabled_value)
+        return {'user': self._lab_admin_user_dict(target), 'changed': True}

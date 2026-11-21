@@ -1,0 +1,44 @@
+{
+  "version": "1.3.3+11",
+  "source_manifest": "maintenance/registry/source-client-1.3.3-11-20261119.json",
+  "source_tree_sha256": "9b3acfd908b9ac8da3604035e9f5d8b895942e6dbaf00a9b301cd8612fc27ec9",
+  "build_number": 11,
+  "build_environment": {
+    "flutter": "3.47.7 stable (abaf9c5237), Dart 3.13.5",
+    "os": "Windows 11 10.0.26300 x64",
+    "dart_defines": {
+      "LAB_ODOO_URL": "https://team.l-creation.club",
+      "LAB_ODOO_DB": "LcHardwareHouse"
+    }
+  },
+  "signed_release_manifest": "未生成：工作区源码尚未提交，缺失真实 source_commit",
+  "file": "clients/android/releases/1.3.3+11/LC_ELC-Android-1.3.3+11.apk",
+  "bytes": 107647900,
+  "sha256": "cdf317857ef1b7117fe4ab93fdbd68b1f69cffc0fc56553b1d1824f11fb99184",
+  "platform": "android",
+  "arch": "arm64-v8a + armeabi-v7a",
+  "package_type": "apk",
+  "package": "com.example.lab_inventory_client",
+  "version_name": "1.3.3",
+  "version_code": 11,
+  "min_sdk": 24,
+  "target_sdk": 36,
+  "signing_certificate": {
+    "subject": "C=US, O=Android, CN=Android Debug",
+    "sha256": "8b4c2409604fcd6fdd65dc5344afca7bffb81f07df2c77c210bcef1a78a9ff43",
+    "keystore_match": true
+  },
+  "validation": "built and tested on this machine; Bluetooth printer acceptance pending",
+  "new_in_this_build": [
+    "精臣 B1 Pro 蓝牙直打（4.1.1 AAR + Kotlin 桥接 + 运行时权限）",
+    "APK 仅含 arm64-v8a / armeabi-v7a（SDK 无 x86_64）",
+    "内网加速、补抓代次、制袋贴标修复（同 Windows）"
+  ],
+  "abi_note": "x86_64 已通过 --target-platform 与 packaging.jniLibs.excludes 移除",
+  "unverified": [
+    "真机蓝牙配对与打印",
+    "Android 6–11 与 12+ 两套权限弹窗",
+    "相机扫码",
+    "应用内更新下载"
+  ]
+}

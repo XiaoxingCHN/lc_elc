@@ -347,14 +347,29 @@ class _Segment extends StatelessWidget {
                     horizontal: 14,
                     vertical: 8,
                   ),
-                  child: Center(child: text),
+                  child: Center(
+                    widthFactor: 1,
+                    heightFactor: 1,
+                    child: text,
+                  ),
                 )
               : Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 8,
                   ),
-                  child: Center(child: text),
+                  // `widthFactor`/`heightFactor` are load-bearing: a plain
+                  // `Center` EXPANDS to the biggest allowed size, so inside a
+                  // slot with a bounded height (Scaffold.bottomNavigationBar)
+                  // the segment filled the whole screen and the switcher
+                  // rendered as one giant pill. With the factors set it
+                  // shrink-wraps to the label, which is what a segment should
+                  // do everywhere.
+                  child: Center(
+                    widthFactor: 1,
+                    heightFactor: 1,
+                    child: text,
+                  ),
                 ),
         ),
       ),

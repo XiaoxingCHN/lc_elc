@@ -199,8 +199,16 @@ class LabPendingReceiptService(models.AbstractModel):
                 material = params.get('material') or {}
                 if not isinstance(material, dict) or not str(material.get('name') or '').strip():
                     raise LabApiError.validation('新建器件必须填写名称。')
+                # `is_storable` + `tracking` are NOT optional here. Without them
+                # the template is created non-storable, and the moment the bag is
+                # put away `lab_ensure_storable_tracking` refuses it with
+                # "物料当前未开启库存管理（is_storable=False）" - i.e. the operator
+                # could create a bag code but never receive it. Every other
+                # creation path (`_lab_create_minimal_material`, catalog bind)
+                # sets both; this branch was the only one that did not.
                 template = self.env['product.template'].sudo().create({
                     'name': str(material['name']).strip(), 'type': 'consu',
+                    'is_storable': True, 'tracking': 'lot',
                     'company_id': self.env.company.id, 'purchase_ok': False, 'sale_ok': False,
                     'lab_mpn': str(material.get('mpn') or '').strip(),
                     'lab_package': str(material.get('package') or '').strip(),

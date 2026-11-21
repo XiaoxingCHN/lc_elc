@@ -907,26 +907,31 @@
   /* 窄屏（≤1023px）把桌面左侧栏换成可开合抽屉（断点与 team.css 的 .lc-shell 一致）。
    * 契约：默认关闭（visibility:hidden，链接不进 Tab 序列）；Escape / 遮罩 / 点链接
    * / 视口变宽 都关闭；打开时焦点进第一个链接，关闭时还回菜单按钮。
-   * 宽屏不参与：按钮 display:none，nav 就是左侧栏里的纵向列表。 */
+   * 宽屏不参与：按钮 display:none，nav 就是左侧栏里的纵向列表。
+   * 窄屏抽屉盖在 sticky 顶栏之上（见 team.css 的层级取舍），顶栏菜单按钮被遮罩
+   * 覆盖，所以触控关闭用抽屉内的 .lc-nav-close 手柄；关闭后焦点仍回菜单按钮。 */
   function initNavDrawer() {
     var toggle = $('[data-lc-action="nav-toggle"]');
     var nav = document.getElementById('lc-nav');
     if (!toggle || !nav) return;
     var scrim = $('.lc-nav-scrim');
+    var closeHandle = $('.lc-nav-close', nav);
 
     /* 无障碍契约：窄屏关闭时侧栏加 inert + aria-hidden，链接不进 Tab 序列与无障碍树
      * （只靠 translateX 移到屏外不够）；打开时把背景（顶栏与正文）设为 inert，
      * 焦点只能在抽屉内，Esc/遮罩关闭后还回菜单按钮；视口变宽恢复为普通侧栏。 */
     var narrowQuery = window.matchMedia ? window.matchMedia('(max-width: 1023px)') : null;
-    /* 背景 = 抽屉之外所有可交互区域：正文、"跳到主要内容"、页脚、账号区（退出/登录）
-     * 与品牌链接。顶栏本身不能整体 inert —— 菜单按钮就在里面，它就是关闭手柄；
-     * 所以按子元素逐个 inert，把焦点/读屏都锁在「抽屉 + 菜单按钮」这一圈里。 */
+    /* 背景 = 抽屉之外所有可交互区域：正文、"跳到主要内容"、页脚、账号区（退出/登录）、
+     * 品牌链接，以及顶栏菜单按钮（抽屉盖在顶栏之上，它已被遮罩覆盖，不能再被读屏
+     * 找到或 Tab 到；关闭时先解除 inert 再把焦点还给它）。逐个 inert 而不是把整个
+     * 顶栏 inert，是为了不牵连将来可能加在顶栏里的其它元素——目前它们都已列出。 */
     var backdrop = [
       document.getElementById('lc-main'),
       document.querySelector('.lc-skip'),
       document.querySelector('.lc-footer'),
       document.querySelector('.lc-account'),
-      document.querySelector('.lc-brand')
+      document.querySelector('.lc-brand'),
+      toggle
     ].filter(Boolean);
 
     function isNarrow() {
@@ -963,9 +968,10 @@
     }
 
     /* 抽屉刚加上 .lc-nav-open 时样式还没重算，此时 focus() 会被 visibility:hidden 拒绝，
-     * 所以在下一帧重试几次，直到焦点真的进了抽屉。 */
+     * 所以在下一帧重试几次，直到焦点真的进了抽屉。
+     * 目标是第一条导航链接（不是顶部的关闭手柄）：打开抽屉的意图是去某个页面。 */
     function focusFirstLink(attempt) {
-      var first = nav.querySelector('a, button');
+      var first = nav.querySelector('.lc-nav a[href]');
       if (!first || !first.focus) return;
       first.focus();
       var inside = document.activeElement && nav.contains(document.activeElement);
@@ -991,13 +997,20 @@
     if (scrim) {
       scrim.addEventListener('click', function () { close(true); });
     }
-    /* 焦点循环：抽屉打开时能 Tab 到的只有「菜单按钮（同时是关闭手柄）+ 侧栏链接」。
-     * 到最后一项回第一个，Shift+Tab 到第一项回最后一个；焦点若跑到别处也拉回来。
-     * 不新造可见 UI：关闭按钮就是现有的顶栏菜单按钮。 */
+    /* 抽屉内关闭手柄：窄屏抽屉在顶栏之上，菜单按钮被遮罩盖住，触控关闭走这里。 */
+    if (closeHandle) {
+      closeHandle.addEventListener('click', function () { close(true); });
+    }
+    /* 焦点循环：抽屉打开时能 Tab 到的只有「抽屉内关闭手柄 + 侧栏链接」。
+     * 顶栏菜单按钮此时被遮罩覆盖、不可见，不放进循环，否则 Tab 会落到看不见的
+     * 元素上；关闭时仍把焦点还给它（用户下次打开/收起都从同一入口继续）。
+     * 到最后一项回第一个，Shift+Tab 到第一项回最后一个；焦点若跑到别处也拉回来。 */
     function trapTargets() {
-      var list = [toggle];
+      var list = [];
+      // 桌面侧栏不渲染手柄（display:none），不能把不可见节点放进 Tab 循环
+      if (closeHandle && closeHandle.getClientRects().length) list.push(closeHandle);
       Array.prototype.forEach.call(
-        nav.querySelectorAll('a[href], button:not([disabled])'),
+        nav.querySelectorAll('a[href], button:not([disabled]):not(.lc-nav-close)'),
         function (node) {
           if (node.getClientRects().length) list.push(node);
         });

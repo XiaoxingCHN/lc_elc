@@ -38,30 +38,6 @@
       "maintained_source_manifest": "maintenance/registry/source-client-archive-final.json"
     },
     {
-      "id": "eda-eext",
-      "path": "plugins/jlc-eda/releases/3.0.3/lab-inventory-odoo_v3.0.3.eext",
-      "bytes": 102828,
-      "sha256": "69665cbf3fac0732db7f6b01188014ac773dbc3d43e12062e8ffd039016998ef",
-      "version": "3.0.3",
-      "component": "eda",
-      "source_manifest": "maintenance/registry/source-eda-baseline.json",
-      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
-      "maintained_source_manifest": "maintenance/registry/source-eda-baseline.json"
-    },
-    {
-      "id": "eda-bundle",
-      "path": "plugins/jlc-eda/releases/3.0.3/lab-inventory-odoo_v3.0.3-bundle.zip",
-      "bytes": 92969083,
-      "sha256": "5b48babfe8cb365c30588f79bb6e1c549769899ee95d75dabde4a6328cbf784b",
-      "version": "3.0.3",
-      "component": "eda",
-      "source_manifest": "maintenance/registry/source-eda-baseline.json",
-      "provenance": "imported-existing-artifact; original source/build evidence verified; not built from the future Git commit in this archive",
-      "acceptance": "see CURRENT_STATE; this task only archives and runs specified new-path checks",
-      "maintained_source_manifest": "maintenance/registry/source-eda-baseline.json"
-    },
-    {
       "id": "odoo-addons",
       "path": "server/releases/2026-10-18/odoo-addons-20261018-1.0.2.zip",
       "bytes": 11540092,
@@ -147,6 +123,30 @@
       "provenance": "Complete 175-file source archive; only lab_team_web 18 files installed. Existing production theme/script content differences preserved; no old module upgraded.",
       "acceptance": "Installed in production after verified full DB/filestore/source backup; new18 raw hashes match, previous133 unchanged, stock baseline unchanged; public/session HTTP and update channel checked. Fresh sessions require existing database-selection login. Real-user production end-to-end, mobile and catalogue performance unverified.",
       "deployment_audit": "maintenance/audit/team-web-production-20261025.md"
+    },
+    {
+      "id": "eda-eext",
+      "path": "plugins/jlc-eda/releases/3.1.1/lab-inventory-odoo_v3.1.1.eext",
+      "bytes": 98809,
+      "sha256": "49a726c316695c1f89731be7e356505f634efc6bd57b07b9c442dae36d4853da",
+      "version": "3.1.1",
+      "component": "eda",
+      "source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "maintained_source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "provenance": "built from this working tree on 2026-11-20; unit 125 / package 15 pass, PACKAGE VERIFY OK",
+      "acceptance": "unit 125 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client session persistence NOT verified"
+    },
+    {
+      "id": "eda-bundle",
+      "path": "plugins/jlc-eda/releases/3.1.1/lab-inventory-odoo_v3.1.1-bundle.zip",
+      "bytes": 92967258,
+      "sha256": "d1bc8a7d00f0b3bd59b9862348f420f3362befef7551cd9cd65f85e5b1d26e37",
+      "version": "3.1.1",
+      "component": "eda",
+      "source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "maintained_source_manifest": "maintenance/registry/source-eda-relay-token-20261120.json",
+      "provenance": "built from this working tree on 2026-11-20; unit 125 / package 15 pass, PACKAGE VERIFY OK",
+      "acceptance": "unit 125 pass / 0 fail; package 15 pass / 0 fail; verify PACKAGE VERIFY OK; real EDA client session persistence NOT verified"
     }
   ]
 }

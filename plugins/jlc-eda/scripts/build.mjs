@@ -10,7 +10,6 @@ const BUILD = path.join(ROOT, 'build');
 const STAGE = path.join(BUILD, 'stage');
 const BUNDLE_STAGE = path.join(BUILD, 'bundle-stage');
 const DIST = path.join(ROOT, 'dist');
-const NODE_EXE = path.join(ROOT, 'bridge', 'runtime', 'node.exe');
 const FIXED_DATE = new Date('2026-01-01T00:00:00.000Z');
 
 const INCLUDED = [
@@ -27,37 +26,32 @@ const INCLUDED = [
   'LICENSE',
 ];
 
-const INSTALL_TEXT = `实验室库存插件 3.0.3 安装说明
+const installText = (version) => `实验室库存插件 ${version} 安装说明
 
 一、安装 EDA 插件
 1. 打开嘉立创 EDA 专业版。
 2. 进入「高级 → 扩展管理器 → 导入」。
-3. 选择本压缩包内的 lab-inventory-odoo_v3.0.3.eext。
+3. 选择本压缩包内的 lab-inventory-odoo_v${version}.eext。
 4. 启用「实验室库存联动（Odoo 19）」，并开启「外部交互」权限。
 5. 顶部菜单出现「库存联动」。
 
-二、启动本机桥接（推荐）
-1. 双击 bridge\\start-windows.cmd。
-2. 窗口会显示「地址」和「配对码」，使用期间不要关闭。
-3. 桥接只监听本机，不需要对局域网开放端口。
+二、获取 EDA 密钥
+1. 打开网页端 https://team.l-creation.club/team/lab/settings 的「管理」页。
+2. 在「EDA 插件密钥」区块选择你自己的账号，点「发放」。
+3. 复制显示的密钥（形如 eda_xxxxxxxx）。它只显示这一次，请立即保存。
 
 三、连接
 1. 打开「库存联动 → 连接与账户」。
-2. 连接方式选「本机桥接（推荐）」。
-3. 本机地址保持 http://127.0.0.1:49621。
-4. 复制桥接窗口中的配对码。
-5. 填写 Odoo 登录名和密码，点击「连接并登录」。
-6. 登录成功后即可查询器件库、BOM、袋追溯和库存作业。
+2. 服务器地址保持默认 https://team.l-creation.club（内网可改 http://192.168.31.105:8069）。
+3. 粘贴上面的 EDA 密钥，点「保存并连接」。
+4. 连接成功后即可查询器件库、原理图库存与库位，并对整张 BOM 一键出库。
 
 四、说明
-- 配对码每次启动都会变化，只保存在内存中。
-- 插件不保存密码，不把 Odoo 会话 Cookie 返回给 EDA。
-- 桥接只绑定 127.0.0.1，固定连接实验室库存服务器和 LcHardwareHouse 数据库。
-- 入库、领用、归还必须在确认弹窗后才会写入 Odoo。
-- 如果连接失败，先确认 start-windows.cmd 窗口仍然打开。
-
-五、Linux
-使用 bridge/start-linux.sh，需要系统已安装 Node.js（>= 20.5）。
+- 密钥绑定到你的账号：插件里做的每一次出库，操作人都是你。
+- 密钥明文保存在本机 EDA 配置里（与浏览器保存密码同一水位）；离职或换机时请管理员吊销。
+- 一键出库必须在确认弹窗后才会写入 Odoo；入库、归还、扫码追溯请在网页端或 Flutter 客户端办理。
+- 连接失败先检查服务器地址与密钥是否有效（管理员可在「管理」页看到最近使用时间）。
+- 本版本不需要安装任何额外程序，也不需要本机桥接。
 `;
 
 function sha256(buffer) {
@@ -161,32 +155,16 @@ async function makeZip() {
 }
 
 async function stageBundle(eextPath, extension) {
+  // 4.0.0 起没有本机桥接：插件直连 Odoo，用 API 密钥认证。
+  // 包里只有 .eext 本身 + 说明，体积从 89 MB 降到 100 KB 量级。
   await ensureClean(BUNDLE_STAGE);
   await fs.copyFile(eextPath, path.join(BUNDLE_STAGE, path.basename(eextPath)));
   await fs.copyFile(path.join(ROOT, 'README.md'), path.join(BUNDLE_STAGE, 'README.md'));
-  await fs.writeFile(path.join(BUNDLE_STAGE, '安装说明.txt'), INSTALL_TEXT, 'utf8');
-  const bridgeDir = path.join(BUNDLE_STAGE, 'bridge');
-  await fs.mkdir(path.join(bridgeDir, 'runtime'), { recursive: true });
-  for (const rel of ['server.mjs', 'start-windows.cmd', 'start-linux.sh', '快速启动.txt']) {
-    await fs.copyFile(path.join(ROOT, 'bridge', rel), path.join(bridgeDir, rel));
-  }
-  await fs.copyFile(
-    path.join(ROOT, 'bridge', 'runtime', 'NODE-LICENSE.txt'),
-    path.join(bridgeDir, 'runtime', 'NODE-LICENSE.txt'),
-  );
-  const stat = await fs.stat(NODE_EXE).catch(() => null);
-  if (!stat) throw new Error('缺少 bridge/runtime/node.exe；请先复制随包 Node 运行时');
-  await fs.copyFile(NODE_EXE, path.join(bridgeDir, 'runtime', 'node.exe'));
-  const hashes = [];
-  for (const rel of [
-    'lab-inventory-odoo_v' + extension.version + '.eext',
-    'bridge/server.mjs',
-    'bridge/runtime/node.exe',
-  ]) {
-    const content = await fs.readFile(path.join(BUNDLE_STAGE, rel));
-    hashes.push(sha256(content) + '  ' + rel);
-  }
-  await fs.writeFile(path.join(BUNDLE_STAGE, 'SHA256.txt'), hashes.join('\n') + '\n', 'utf8');
+  await fs.writeFile(path.join(BUNDLE_STAGE, '安装说明.txt'), installText(extension.version), 'utf8');
+  const rel = 'lab-inventory-odoo_v' + extension.version + '.eext';
+  const content = await fs.readFile(path.join(BUNDLE_STAGE, rel));
+  await fs.writeFile(path.join(BUNDLE_STAGE, 'SHA256.txt'),
+    sha256(content) + '  ' + rel + '\n', 'utf8');
 }
 
 async function makeBundleZip() {
@@ -195,13 +173,12 @@ async function makeBundleZip() {
   const manifestFiles = [];
   for (const rel of files) {
     const content = await fs.readFile(path.join(BUNDLE_STAGE, rel));
-    const isRuntime = rel === 'bridge/runtime/node.exe';
     const isScript = rel.endsWith('.sh') || rel.endsWith('.cmd');
     zip.file(rel, content, {
       date: FIXED_DATE,
-      unixPermissions: isRuntime || isScript ? 0o100755 : 0o100644,
+      unixPermissions: isScript ? 0o100755 : 0o100644,
       createFolders: false,
-      compression: isRuntime ? 'STORE' : 'DEFLATE',
+      compression: 'DEFLATE',
     });
     manifestFiles.push({ path: rel, bytes: content.length, sha256: sha256(content) });
   }

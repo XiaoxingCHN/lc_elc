@@ -121,9 +121,9 @@ async function runHost(options = {}) {
   return { events, storage, services, sandbox };
 }
 
-test('menu handlers open the panel through the injected bare `eda` binding', async () => {
+test('retained menu handlers open the panel through the injected bare `eda` binding', async () => {
   const extension = JSON.parse(await fs.readFile(path.join(ROOT, 'extension.json'), 'utf8'));
-  for (const menu of ['showInventoryPanel', 'openReceipt', 'openIssue', 'openReturn', 'openTrace', 'openSettings']) {
+  for (const menu of ['showInventoryPanel', 'bomCompare', 'openSettings', 'showDebugLog']) {
     const { events } = await runHost({ menu });
     assert.equal(events.opened.length, 1, menu + ' must open exactly one iframe window');
     assert.equal(events.opened[0].htmlFileName, '/iframe/app.html');
@@ -134,6 +134,17 @@ test('menu handlers open the panel through the injected bare `eda` binding', asy
     assert.ok(events.topics.includes(TOPIC), 'private MessageBus service must be registered');
   }
   assert.equal(extension.version, JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8')).version);
+});
+
+test('removed menu handlers no longer exist in the built bundle', async () => {
+  const code = await fs.readFile(BUNDLE, 'utf8');
+  for (const menu of ['openReceipt', 'openIssue', 'openReturn', 'openTrace']) {
+    assert.equal(code.includes('function ' + menu + '('), false, 'bundle still defines ' + menu);
+    assert.equal(code.includes(menu + ' = menuAction'), false, 'bundle still exports ' + menu);
+  }
+  for (const menu of ['showInventoryPanel', 'bomCompare', 'openSettings', 'showDebugLog']) {
+    assert.ok(code.includes(menu + ' = menuAction'), 'bundle missing export ' + menu);
+  }
 });
 
 test('the private bridge answers app.init without window.eda/globalThis.eda', async () => {

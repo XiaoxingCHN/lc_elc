@@ -19,6 +19,9 @@ final sessionScopeSourceProvider = Provider<LabSessionScope>((ref) {
     baseUrl: auth.baseUrl ?? '',
     database: auth.database ?? '',
     uid: auth.uid,
+    // A session-only (LAN acceleration) login keeps its cache in memory: no
+    // scope directory, no sidecar, no pins on disk.
+    ephemeral: auth.ephemeral,
   );
 });
 
@@ -160,8 +163,9 @@ final assetCacheProvider = Provider<AssetCacheStore>((ref) {
     resolveDirectory: ref.watch(assetCacheDirectoryProvider),
     scopeKey: scope.key,
     // Signed out => a hash exists but there is no session: nothing business-
-    // carrying may be written or read.
+    // carrying may be written or read. Ephemeral => memory only.
     persistBusinessData: scope.canPersistBusinessData,
+    memoryOnly: scope.ephemeral,
     authenticatedFetcher: ref.watch(assetAuthenticatedFetcherProvider),
     baseUriResolver: () async => ref.read(odooBaseUriProvider),
   );

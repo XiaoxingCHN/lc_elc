@@ -2,24 +2,53 @@ package com.example.lab_inventory_client
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import android.Manifest
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import java.security.MessageDigest
 
 class MainActivity : FlutterActivity() {
     private var installing = false
-    companion object { var finishInstall: ((String?, String?) -> Unit)? = null }
+    private var pendingSsidResult: MethodChannel.Result? = null
+    private var pendingPrinterPermission: ((Boolean) -> Unit)? = null
+    companion object {
+        var finishInstall: ((String?, String?) -> Unit)? = null
+        private const val SSID_PERMISSION_REQUEST = 4701
+        private const val PRINTER_PERMISSION_REQUEST = 4702
+    }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // 精臣 B1 Pro 蓝牙直打。初始化、扫描、连接、打印都在桥接类里，这里只
+        // 负责通道装配与运行时权限回调（权限请求必须由 Activity 发起）。
+        val bridge = NiimbotPrinterBridge(this, application) { permissions, done ->
+            requestPrinterPermissions(permissions, done)
+        }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lab/printer")
+            .setMethodCallHandler { call, result -> bridge.handle(call, result) }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "lab/printer/scan")
+            .setStreamHandler(bridge)
+        // Wi-Fi SSID for the in-memory LAN acceleration hint. The value is read
+        // on demand and never written anywhere by this channel.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lab/wifi_ssid")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "currentSsid" -> reportSsid(result)
+                    "requestPermission" -> requestSsidPermission(result)
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lab/client_update")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -99,6 +128,115 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    // ------------------------------------------------------------------
+    // lab/wifi_ssid
+    //
+    // Android only reports the SSID when the app holds the fine location
+    // permission AND location services are switched on. Every other outcome is
+    // reported as an error code so Dart can explain it; nothing is cached or
+    // persisted here.
+    // ------------------------------------------------------------------
+
+    // minSdk is 23, so the framework's own runtime-permission API is enough
+    // (no androidx dependency is added just for this).
+    private fun hasSsidPermission(): Boolean =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun locationEnabled(): Boolean {
+        val manager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return false
+        return if (Build.VERSION.SDK_INT >= 28) {
+            manager.isLocationEnabled
+        } else {
+            @Suppress("DEPRECATION")
+            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun reportSsid(result: MethodChannel.Result) {
+        if (!hasSsidPermission()) {
+            result.error("PERMISSION_DENIED", "需要位置权限才能读取 WiFi 名称", null)
+            return
+        }
+        if (!locationEnabled()) {
+            result.error("LOCATION_OFF", "请打开系统位置服务后再读取 WiFi 名称", null)
+            return
+        }
+        val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        if (manager == null || !manager.isWifiEnabled) {
+            // Wired network or Wi-Fi switched off: unknown, not an error.
+            result.success("")
+            return
+        }
+        val info = manager.connectionInfo
+        val raw = info?.ssid ?: ""
+        val ssid = raw.trim().trim('"')
+        // Android reports "<unknown ssid>" / "0x" when it cannot resolve it.
+        result.success(if (ssid == "<unknown ssid>" || ssid == "0x") "" else ssid)
+    }
+
+    private fun requestSsidPermission(result: MethodChannel.Result) {
+        if (hasSsidPermission()) {
+            result.success(true)
+            return
+        }
+        if (pendingSsidResult != null) {
+            // A request is already open: do not stack dialogs.
+            result.success(false)
+            return
+        }
+        pendingSsidResult = result
+        requestPermissions(
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+            SSID_PERMISSION_REQUEST,
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PRINTER_PERMISSION_REQUEST) {
+            val done = pendingPrinterPermission ?: return
+            pendingPrinterPermission = null
+            done(grantResults.isNotEmpty() &&
+                grantResults.all { it == PackageManager.PERMISSION_GRANTED })
+            return
+        }
+        if (requestCode != SSID_PERMISSION_REQUEST) return
+        val result = pendingSsidResult ?: return
+        pendingSsidResult = null
+        result.success(hasSsidPermission())
+    }
+
+    /**
+     * 请求蓝牙直打所需权限（Android 12+ 的 BLUETOOTH_SCAN/CONNECT，或
+     * Android 6–11 的 ACCESS_FINE_LOCATION）。不堆叠对话框：已有请求在等结果
+     * 时直接回 false，由 Dart 侧提示用户稍后重试。
+     */
+    private fun requestPrinterPermissions(
+        permissions: Array<String>,
+        done: (Boolean) -> Unit,
+    ) {
+        if (permissions.isEmpty() ||
+            permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+        ) {
+            done(true)
+            return
+        }
+        if (pendingPrinterPermission != null) {
+            done(false)
+            return
+        }
+        pendingPrinterPermission = done
+        requestPermissions(permissions, PRINTER_PERMISSION_REQUEST)
     }
 }
 

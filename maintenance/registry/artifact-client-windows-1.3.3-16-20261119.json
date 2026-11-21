@@ -1,0 +1,25 @@
+{
+  "file": "clients/windows/releases/1.3.3+16/LC_ELC-Windows-1.3.3+16-x64.zip",
+  "bytes": 36623195,
+  "sha256": "3690b9ab42d2cefdd83469a054d3da0024c7587cc7b083a06c972dc1702112f1",
+  "version": "1.3.3+16",
+  "source_manifest": "maintenance/registry/source-client-1.3.3-16-20261119.json",
+  "source_tree_sha256": "260529ed38dca2df29c23ed08e06a3f76564d0307dac5c185e46af39af0d24f2",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 16,
+  "files": 30,
+  "validation": "built and tested on this machine; label layout covered by unit tests, real print pending",
+  "changes_in_this_build": [
+    "标签换行：长名称按宽度自动折行（CJK 逐字、ASCII 在空格/连字符处断），不再整行丢弃或省略号截断",
+    "每个字段最多折 2 行，避免长描述挤掉型号/封装",
+    "二维码 11mm 贴左上角 (1,1)，文字区 24.5mm",
+    "标题与正文值重复时自动去重",
+    "至少保留一行，绝不打空白标签"
+  ],
+  "unverified": [
+    "真实打印观感与扫码",
+    "真实登录与入库/领用",
+    "实体扫码"
+  ]
+}

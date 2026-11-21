@@ -113,6 +113,15 @@ WORKFLOW_ENDPOINTS = {
     'mappingRemove': '/lab/api/inventory/mapping_remove',
     'members': '/lab/api/inventory/members',
     'memberSetRole': '/lab/api/inventory/member_set_role',
+    # 账号维护（管理页「账号」区块）：以前只能在 Odoo 原生后台做
+    'adminUserCreate': '/lab/api/admin/user_create',
+    'adminUserSetPassword': '/lab/api/admin/user_set_password',
+    'adminUserToggleActive': '/lab/api/admin/user_toggle_active',
+    'adminUserSetSystemGroup': '/lab/api/admin/user_set_system_group',
+    # EDA 插件密钥（管理页「EDA 密钥」区块）
+    'edaTokens': '/lab/api/eda/manage/tokens',
+    'edaIssue': '/lab/api/eda/manage/issue',
+    'edaRevoke': '/lab/api/eda/manage/revoke',
     # 扫码 / 两阶段入库
     'resolve': '/lab/api/inventory/resolve_code',
     'pendingList': '/lab/api/inventory/pending/list',

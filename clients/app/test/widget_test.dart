@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_inventory_client/features/unified/screens/unified_catalog_screen.dart';
+import 'package:lab_inventory_client/features/unified/unified_routes.dart';
+import 'package:lab_inventory_client/features/warehouse/screens/stock_overview_screen.dart';
+import 'package:lab_inventory_client/features/warehouse/widgets/warehouse_section_switcher.dart';
 import 'package:lab_inventory_client/main.dart';
 import 'package:lab_inventory_client/providers/auth_provider.dart';
 import 'package:lab_inventory_client/routes/app_router.dart';
@@ -203,16 +206,18 @@ void main() {
         UncontrolledProviderScope(container: container, child: const MyApp()),
       );
 
-      await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
+      // The signed-in home is 库存速览, the shell's first section.
+      await pumpUntil(tester, find.byType(StockOverviewScreen));
       await settleRoute(tester);
 
-      // The signed-in home is the one unified library ...
-      expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
-      expect(find.text('仓库'), findsOneWidget);
-      // ... it really queried the contract endpoint ...
+      expect(find.byType(StockOverviewScreen), findsOneWidget);
+      expect(find.text('库存速览'), findsOneWidget);
+      // The overview reads the same contract endpoints as the library ...
       expect(api.requestedPaths, contains('/lab/api/catalog/search'));
-      // ... and it rendered the captured row (lab stock and mall stock separate).
-      expect(find.text('10k 0603 resistor'), findsWidgets);
+      // ... and the four sections are all reachable from here.
+      for (final label in <String>['库存', '仓位', '器件库', '作业']) {
+        expect(find.text(label), findsWidgets, reason: label);
+      }
       // The automatic sign-in happened exactly once, reusing the stored secret.
       expect(gateway.calls, hasLength(1));
       expect(gateway.calls.single.password, password);
@@ -221,6 +226,132 @@ void main() {
       expect(find.text('P0 原型 - 功能菜单'), findsNothing);
     },
   );
+
+  testWidgets(
+    'an operational page covers the shell (no section switcher on it)',
+    (tester) async {
+      useDesktopSurface(tester);
+      final container = buildAuthContainer(
+        backend: backend,
+        gateway: gateway,
+        now: now,
+        apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+      );
+      addTearDown(container.dispose);
+
+      await seedRememberedLogin(
+        store: container.read(loginMemoryStoreProvider),
+        lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+        password: password,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await pumpUntil(tester, find.byType(StockOverviewScreen));
+      await settleRoute(tester);
+
+      final router = container.read(appRouterProvider);
+      for (final job in <String>['/receipt/prepare', '/receipt', '/labels']) {
+        router.push(job);
+        await settleRoute(tester);
+
+        // 入库 / 标签 are full-screen jobs. They used to be pushed onto the
+        // shell branch's navigator, so the section switcher stayed visible
+        // underneath and the page never really covered the app.
+        expect(
+          find.byType(WarehouseSectionSwitcher),
+          findsNothing,
+          reason: '$job must cover the shell, not sit inside it',
+        );
+        expect(find.byType(StockOverviewScreen), findsNothing, reason: job);
+      }
+    },
+  );
+
+  testWidgets('the session survives moving between sections', (tester) async {
+    // Reported: "登陆没办法保持，切换页面显示未登录". Whatever the cause, moving
+    // between the four sections must never sign the operator out - so this
+    // walks every section and asserts the session is still there afterwards.
+    useDesktopSurface(tester);
+    final container = buildAuthContainer(
+      backend: backend,
+      gateway: gateway,
+      now: now,
+      apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+    );
+    addTearDown(container.dispose);
+
+    await seedRememberedLogin(
+      store: container.read(loginMemoryStoreProvider),
+      lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+      password: password,
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await pumpUntil(tester, find.byType(StockOverviewScreen));
+    await settleRoute(tester);
+
+    expect(container.read(authProvider).isAuthenticated, isTrue,
+        reason: 'signed in after the automatic login');
+
+    final router = container.read(appRouterProvider);
+    for (final route in <String>[
+      '/catalog',
+      '/stock',
+      '/stock/manage',
+      '/stock/locations',
+      '/stock',
+    ]) {
+      router.go(route);
+      await settleRoute(tester);
+
+      final auth = container.read(authProvider);
+      expect(auth.isAuthenticated, isTrue,
+          reason: '$route signed the operator out '
+              '(status=${auth.status}, reason=${auth.manualLoginReason}, '
+              'error=${auth.errorMessage})');
+      expect(find.byType(LoginScreen), findsNothing, reason: route);
+    }
+  });
+
+  testWidgets('the library is one tap away and still renders captured rows', (
+    tester,
+  ) async {
+    useDesktopSurface(tester);
+    final container = buildAuthContainer(
+      backend: backend,
+      gateway: gateway,
+      now: now,
+      apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+    );
+    addTearDown(container.dispose);
+
+    await seedRememberedLogin(
+      store: container.read(loginMemoryStoreProvider),
+      lastSuccessfulLoginAt: now.subtract(const Duration(days: 1)),
+      password: password,
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await pumpUntil(tester, find.byType(StockOverviewScreen));
+    await settleRoute(tester);
+
+    // Switching to 器件库 must not lose the library, and the captured row must
+    // render there with lab stock and mall stock kept separate.
+    await tester.tap(find.text('器件库').first);
+    await settleRoute(tester);
+    await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
+    await settleRoute(tester);
+
+    expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
+    expect(find.text('仓库'), findsOneWidget);
+    expect(find.text('10k 0603 resistor'), findsWidgets);
+  });
 
   testWidgets('legacy /home and /products redirect to the unified library', (
     tester,
@@ -243,13 +374,15 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const MyApp()),
     );
-    await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
+    await pumpUntil(tester, find.byType(StockOverviewScreen));
     await settleRoute(tester);
 
     final router = container.read(appRouterProvider);
 
     for (final legacy in <String>['/home', '/products', '/products/42']) {
       router.go(legacy);
+      await settleRoute(tester);
+      await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
       await settleRoute(tester);
 
       final location = router.routerDelegate.currentConfiguration.uri.path;
@@ -262,6 +395,40 @@ void main() {
       expect(find.text('仓库'), findsOneWidget);
     }
   });
+
+  testWidgets(
+    'the read-only offline browser shows no section switcher',
+    (tester) async {
+      useDesktopSurface(tester);
+      final container = buildAuthContainer(
+        backend: backend,
+        gateway: gateway,
+        now: now,
+        apiClient: FakeOdooApiClient(items: <Map<String, dynamic>>[catalogRow]),
+      );
+      addTearDown(container.dispose);
+
+      // NO remembered login: the offline entry is the unauthenticated path.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await pumpUntil(tester, find.byType(LoginScreen));
+      await settleRoute(tester);
+
+      final router = container.read(appRouterProvider);
+      router.go(UnifiedRoutes.offlineCatalog);
+      await settleRoute(tester);
+      await pumpUntil(tester, find.byType(UnifiedCatalogScreen));
+      await settleRoute(tester);
+
+      expect(find.byType(UnifiedCatalogScreen), findsOneWidget);
+      // Offering 仓位 / 作业 to a signed-out visitor would lead straight into
+      // routes the router refuses, so the shell must not render the switcher.
+      expect(find.byType(WarehouseSectionSwitcher), findsNothing);
+      expect(find.text('作业'), findsNothing);
+      expect(find.text('仓位'), findsNothing);
+    },
+  );
 
   testWidgets(
     'an expired remembered login lands on the login form with a notice',

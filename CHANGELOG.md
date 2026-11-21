@@ -1,5 +1,317 @@
 # 变更记录
 
+## 2026.11.20 修「内网加速后检测不到更新」
+
+- **问题**（用户："为啥我内网加速后就检测不到更新了"）。
+- **根因**：`/lab/client/updates/manifest` 是 `auth='none'` 路由，Odoo 必须先确定
+  数据库才能处理它。
+  - 公网链路：Cloudflare Tunnel → nginx `18443` → Odoo，nginx 的 `location /` 里
+    写死了 `X-Odoo-Database: LcHardwareHouse`（配置注释：「固定 X-Odoo-Database，
+    避免 fresh 会话 "No database is selected" 的 404」），所以能选中库；
+  - **内网加速直连 `http://192.168.31.105:8069` 绕过了 nginx**，没有这个 header，
+    `/etc/odoo.conf` 里又既没有 `db_name` 也没有 `dbfilter` → 「No database is
+    selected」→ 404 → 客户端判定「没有更新」。
+  - 同一个原因也解释了更早那次「内网 `/web/login` 303 跳到库选择器」。
+- **修法**：`/etc/odoo.conf` 增加 `dbfilter = ^LcHardwareHouse$`（原文件备份为
+  `/etc/odoo.conf.bak-20261120`），重启 Odoo。这样直连也能选中库，不再依赖 nginx
+  注入的 header。
+- **实测**（改后）：内网 `8069` 的 manifest / health / root 连续 **3/3 全部 200**；
+  公网 manifest 连续 **3/3 全部 200**；`/team/login` 200。
+- **未验证**：客户端在内网加速状态下点「关于与更新」的完整流程（需实机）；
+  公网 `https://team.l-creation.club/` 偶发 000，属 Cloudflare Tunnel 链路抖动，
+  与本次改动无关（改动前后都存在）。
+
+## 2026.11.20 三端 1.3.5+25 发布到应用内更新通道
+
+- **问题**（用户："更新各个客户端能不能直接通过服务器更新啊"）。可以——项目里本来就有
+  应用内更新通道（`/lab/client/updates/manifest` + 签名清单 + `/assets/` 下载），
+  「关于与更新」按钮在登录页、器件库、内网加速页都有。问题是**服务器上的通道停在
+  Android 1.1.3+6（10-19）**，比客户端实际版本落后 20 多个版本，所以只能手动装包。
+- **本次发布**（`key_id=release-20261019`，Ed25519 签名）：
+  | 平台 | 版本 | 大小 | release_id |
+  |---|---|---|---|
+  | Windows x64 | 1.3.5 build 25 | 37,739,160 B | `windows-1.3.5-build25-20261120` |
+  | Android universal | 1.3.5 build 25 | 108,025,748 B | `android-1.3.5-build25-20261120` |
+  | Linux x64 | 1.3.5 build 25 | 16,600,460 B | `linux-1.3.5-build25-20261120` |
+- **顺带修掉的客户端 bug**：`WifiSsidService.platformOverride` 原先与 `Platform.isX` 做
+  `||`，在 Linux 主机上即使强制 Android 分支也仍走 `nmcli`，导致 4 条 Android 契约测试
+  在 Linux 上必失败。改为「只要设置了 override 就完全取代平台检测」。
+- **Linux 构建的两个环境坑**（记入交接）：
+  - 必须 `PKG_CONFIG_PATH` 指向归档 sysroot，否则 `flutter_secure_storage_linux`
+    找不到 libsecret；
+  - **不能**设 `PKG_CONFIG_SYSROOT_DIR`，否则 GTK 头文件路径被重复前缀、CMake 报
+    「non-existent path」。
+- **发布过程中修的服务端问题**：发布用 `sudo bash -c` 创建的文件归 root，Odoo 进程
+  （用户 `odoo`）读不到，manifest 一直 404。`chown -R odoo:odoo` 后恢复正常。
+- **验证**：三端公网 `https://team.l-creation.club/lab/client/updates/manifest` 均返回
+  `1.3.5 build 25` 与正确的 release_id/大小；三端 `flutter test` 各 **515 passed / 5 skipped**。
+- **未验证**：客户端「关于与更新」里的实际下载与安装流程（需在装了旧版的机器上点一次）。
+
+## 2026.11.20 客户端 1.3.5+25：入库改为「先扫库位，再连续扫袋码」
+
+- 版本：`clients/app` `1.3.5+24 → 1.3.5+25`。
+- **问题**（用户）："制袋打印完需要批量入库的时候应该要扫描一次库码然后可以一直扫袋码入库
+  一直到当前仓库所属器件录完，但是你现在还是说必须要扫一下袋码才能扫库码"。上一轮我只做了
+  收尾按钮，**没有按流程图实现扫描顺序**。
+- **根因**：`_resolve()` 第一句就是 `_locationId = null`——每扫一个袋码都把库位清空，
+  所以操作员每袋都得重扫库位，与流程图相反。
+- **修法**（按业界成熟的 bin-first putaway 模式，参考 Oracle WMS Cloud、Acumatica、
+  SKUSavvy 的实现）：
+  - 新增**粘性库位** `_putawayLocationId`：扫一次库位码后一直有效，扫袋码不再清空；
+  - 一个扫描框承担两步：未选库位时提示「扫描库位码」，选定后变为「扫描袋追溯码」；
+  - 扫到 `LABL:` 开头的一律按库位处理（无论当前哪一步）；
+  - 每袋确认后自动清空输入框、**保留库位**，提示「已入库到 K000004 · R1，请扫描下一袋」；
+  - 顶部常驻显示「入库库位：…」和「换库位」按钮；
+  - 删掉袋码表单里那个重复的「或扫描库位码」输入框（它正是逼着每袋重扫库位的原因）；
+  - 从下拉列表手选库位同样开启粘性会话。
+- **实测**：`flutter test --no-pub` **515 passed / 5 skipped / 0 failed**（新增 1 条：
+  扫库位后连扫袋码，库位必须保留）；`flutter analyze` 0 error / 0 warning。
+
+## 2026.11.20 详情页库位显示「未命名库位」；客户端 1.3.5+24 / lab_catalog 19.0.2.0.18
+
+- **问题**（用户截图）：器件详情页「库位分布」一栏全部显示「未命名库位」，尽管该库位在
+  系统里有库码和名称。
+- **根因**：`lab_catalog_item._workflow_overlay` 构造库位分布时，只从
+  `stock.quant.search_read` 的 `location_id` 里取了 `display_name`
+  （`q['location_id'][1]`），发出去的是 `{'location': '名字'}` 一个字符串——
+  **没有 id、没有库码、没有完整路径**。客户端 `LabStockLocation.fromJson` 认不出
+  `location` 这个键，`code`/`name`/`path` 全为空，`display` 就落到兜底文案
+  「未命名库位」。
+- **修法（服务端，主修）**：改为按 `location_id` 解析真实记录，发送与
+  `/inventory/locations` 一致的形状：`id` / `code`（库码）/ `name` / `path`
+  （完整路径）/ `location`（保留给旧客户端）。
+- **修法（客户端，兜底）**：`LabStockLocation.fromJson` 现在会把 `location` 读进
+  `path`——即使服务端只发一个字符串，也不会再显示「未命名库位」。
+- **实测**：在服务器上用真实数据验证 `_workflow_overlay` 的返回：
+  `id=17 code='K000004' name='R1' path='WH/库存/R区/R1' qty=100.0`，
+  客户端会显示 `K000004 · R1`。`lab_catalog` 已升级到 `19.0.2.0.18` 并重启，
+  服务 active、`/web/health` 200。
+- **客户端**：`flutter test` **514 passed / 5 skipped / 0 failed**；
+  `flutter analyze` 0 error / 0 warning。新增 2 条测试：只发字符串时仍能显示名称、
+  完整形状时优先用库码。
+
+## 2026.11.20 EDA 插件 3.1.1：修「切页面回来显示未登录」
+
+- 版本：`plugins/jlc-eda` `3.1.0 → 3.1.1`。
+- **问题**（用户："登陆没办法保持，切换页面显示未登录"）。上一轮我误判成 Flutter 客户端的
+  问题去改了客户端（1.3.5+23），用户澄清是 EDA 插件。
+- **根因**：本机桥接的配对码是 `crypto.randomBytes(32)` **每次启动随机生成**、只打印一次
+  （`bridge/server.mjs` 里自己写着「配对码每次启动都会变化」）。桥接一重启（或 EDA 宿主
+  重新执行扩展），插件保存的旧配对码就作废，之后所有请求 401，面板显示「未登录」。
+  这是设计缺陷，不是偶发 bug——只要桥接进程重启过就必然发生。
+- **修法**：
+  - 桥接新增 `--token <固定配对码>` 与环境变量 `LAB_RELAY_TOKEN`；
+  - `start-windows.cmd` / `start-linux.sh` 把配对码存到同目录 `relay-token.txt`
+    （首次运行自动生成），**重启桥接不再变化**；
+  - 配对码格式校验 16~128 位字母/数字/下划线/短横线，非法值直接报错而不是静默忽略；
+  - 启动横幅区分「已固定」与「每次都会变化」两种状态。
+- **顺带修掉的版本硬编码**：`scripts/build.mjs` 的安装说明、`package.test.js` 的两处版本
+  断言原先写死 `3.1.0`，升级时必然漏改。现在都从 `package.json` 读取。
+- **实测**：单元测试 **125 pass / 0 fail**；打包测试 **15 pass / 0 fail**；
+  `npm run verify` → **PACKAGE VERIFY OK**。
+- **产物**（`plugins/jlc-eda/releases/3.1.1/`，Git 排除）：
+  `lab-inventory-odoo_v3.1.1.eext`（98,809 B，sha256 `49a726c3…d4853da`）、
+  `lab-inventory-odoo_v3.1.1-bundle.zip`（92,967,258 B，sha256 `d1bc8a7d…5b1d26e37`）。
+- **升级后需要做一次**：首次启动新桥接会生成 `relay-token.txt`，请在插件「连接与账户」
+  里重新填一次配对码，之后重启桥接不再需要重填。
+- **未验证**：真实 EDA 客户端里重启桥接后会话是否保持（需实机验证）。
+
+## 2026.11.20 客户端 1.3.5+23：内网地址也能记住登录（修「登陆没办法保持」）
+
+- 版本：`clients/app` `1.3.5+22 → 1.3.5+23`。
+- **问题**（用户："登陆没办法保持，切换页面显示未登录，要增加密码保存自动登录"）。
+- **根因**：登录页把「`http://` + 私有网段」一律当成 LAN 加速，用
+  `ephemeral: _typedLanAddress` 登录。`ephemeral` 的含义是**什么都不落盘**——
+  不写账号、不写密码、不刷新时间戳，所以下次启动必然要重输密码。
+  而实验室的服务器**就是** `http://192.168.31.105:8069`（明文 HTTP，无证书），
+  于是每一次登录都走了 ephemeral 分支，密码从未被保存过。
+  这条设计假设的是「内网只是临时加速、公网才是常态」，与实际使用场景相反。
+- **修法**：登录页改为 `ephemeral: false`，内网地址与公网地址同等对待——账号被记住、
+  密码进系统凭据存储（Windows Credential Manager / Android Keystore / Linux libsecret），
+  重启后自动登录。「记住登录」开关和十天有效期照旧生效。
+- **仍然只保存在内存的**：设置页里显式发起的「切换到内网加速」（那是给已登录操作员
+  换服务器用的，不创建账号）。这条路径的语义没变。
+- 登录页横幅文案同步更正：原来写「仅本次运行有效，不保存账号」，现在说明
+  「账号可以像公网一样记住登录；密码保存在系统凭据存储中，不写入明文文件」。
+- **实测**：`flutter test --no-pub` **512 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning。
+  新增两条回归测试：
+  - `auth_provider_test`：内网地址登录 → 重建容器 bootstrap → **自动登录成功**，
+    密码在 key store 里、不在明文偏好文档里；
+  - `widget_test`：登录后遍历 `/catalog`、`/stock`、`/stock/manage`、
+    `/stock/locations` 四个分区，会话始终有效、不出现登录页。
+- **未验证**：真机冷启动自动登录（需实际安装后重启应用）。
+
+## 2026.11.19 EDA 插件 3.1.0 发布（画图助手）
+
+- 版本：`plugins/jlc-eda` `3.0.3 → 3.1.0`。这是 3.1.0 源码完成后的**首次发布**——
+  此前 `package.json` 已是 3.1.0，但 `releases/` 里只有 3.0.3，发布索引也停在 3.0.3。
+- **定位**：画图助手。只在画原理图/PCB 时提供价值——查器件有没有库存、在哪个库位与袋、
+  整张 BOM 一键出库。
+- **移除**：入库 / 手动领用 / 归还 / 袋追溯四个页签与菜单。这些在 Odoo 网页端与 Flutter
+  客户端已完整存在，在 EDA 里重复实现等于维护三套写库存状态机，也是误报成功与重复领用的来源。
+- **改名**：「BOM 对比」→「原理图库存」，默认范围从「当前工程 BOM」改为「选中器件」。
+- **新增**：对比结果加「袋」列（库位之后，最多 3 个，超出 `+N`），复制 TSV 与导出 CSV 同步。
+- 保留「器件库 / 原理图库存 / 连接账户 / 诊断」四个页签；一键出库行为不变。
+- **验证**：单元测试 **123 pass / 0 fail**；打包测试 **15 pass / 0 fail**；
+  `npm run verify` → **PACKAGE VERIFY OK**。构建产物时间戳（02:04）晚于全部源码，
+  `node.exe` SHA256 与 bundle-manifest 一致。
+- **产物**（`plugins/jlc-eda/releases/3.1.0/`，Git 排除）：
+  - `lab-inventory-odoo_v3.1.0.eext`，98,616 B，sha256 `fa20561d…14aed3c`，11 文件
+  - `lab-inventory-odoo_v3.1.0-bundle.zip`，92,965,355 B，sha256 `2376e4c4…b20da2`，
+    10 文件（含 `node.exe` 运行时与中文安装说明）
+  - `release-manifest.json`、`SHA256.txt`、`bundle-manifest.json`
+- 登记 `maintenance/registry/releases.json` 的 `eda-eext` / `eda-bundle` 指向 3.1.0；
+  3.0.3 成品保留不覆盖。发布索引 `releases/README.md` 同步。
+- **未验证**：真实 EDA 专业版客户端安装与菜单出现、真实原理图选中器件查库存、
+  真实整张 BOM 一键出库（会产生真实领用单）。
+
+## 2026.11.19 追查 is_storable 根因；全库 8 个物料修复；Odoo 测试实跑
+
+- **根因**：Odoo 19 的 `is_storable` 默认是 **`False`**
+  （`addons/stock/models/product.py:839`，`default=False, precompute=True`）。任何忘记显式
+  写 `is_storable=True` 的 `create()` 都会静默建出不可库存的物料——制袋码照常生成，
+  到「扫码上架」才报错。我们的 `lab_pending_receipt.py`「新建器件」分支正是漏了这一个。
+  另两条建档路径（`_lab_create_minimal_material`、`catalog_api.create_material`）都设了，
+  所以只有「新建器件」出的物料会坏。
+- **数据佐证**：7 个坏物料全部 `lab_lcsc_code` 为空、`create_date` 都是 2026-11-19、
+  `create_uid=2`——用户当天连续用「新建器件」建了 7 条，每条都撞同一个 bug。
+  我第一轮只修了截图里那一条（#16），第二次截图换成 4P（#17）才去查全量，这是判断失误。
+- **已全部修复**：`type='consu' AND is_storable=false` 共 7 条（#13/14/15/17/18/19/20），
+  逐条确认无无批次正库存后写 `is_storable=True / tracking='lot'`。全库残留 **0**。
+- **防回归**：新增 `test_every_creation_path_makes_a_receivable_material`，
+  **逐条**走两条建档路径，断言 `is_storable=True` + `tracking in (lot,serial)`，
+  并真的执行一次入库证明可用——不是只测修好的那一条。
+- **在服务器上实跑 Odoo 测试**（此前误以为本机跑不了）：`/lab_workflow`
+  **88 个测试全部通过（0 failed / 0 error）**。四个必须项：`--workers 0`（否则 workers
+  模式不执行测试）、`--http-port=8199`（8069 被占用）、`--log-level=test`、
+  结果去 `/var/log/odoo/odoo.log` 读（配置里的 `logfile` 会接管 stdout）。
+- **顺带修测试隔离缺陷**：`test_01_bags_pagination_and_filters` 断言全公司袋数 == 2，
+  但测试跑在生产库上，有真实袋就必失败。改为只断言本测试的袋落在哪一侧；同时确认
+  `has_stock` 语义是「true 加 `quantity>0`，false 不加任何条件」。
+
+## 2026.11.19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
+
+- 版本：`clients/app` `1.3.5+21 → 1.3.5+22`。
+- **作业页带着分区切换器**（用户截图：采购入库页底部还有「库存 / 仓位 / 器件库」）：
+  `context.push` 在 `StatefulShellRoute` 分支内部会推到**该分支自己的导航器**上，所以
+  入库/领料/归还/标签/历史被套在外壳里。给这 7 条根级路由加
+  `parentNavigatorKey: rootNavigatorKey`，它们现在总是覆盖外壳。
+  导航器 key 抽到 `lib/routes/navigator_keys.dart`，避免 `unified_routes` 与 `app_router`
+  循环依赖。
+- **顺带修掉一处重复定义**：`/catalog` 同时存在于 shell 分支和 `unifiedRoutes`，根级那份
+  赢得匹配，导致器件库其实不在外壳里、切走再切回会丢页面栈。删掉根级那份。
+- **服务端已部署**（lc-nas，2026-11-19 13:54 UTC）：
+  `lab_workflow 19.0.2.0.3 → 19.0.2.0.4`，`lab_team_web` 同步换代码（窄屏抽屉关闭手柄）。
+  备份点 `/var/backups/lc-elc/20261119T135447Z-before-upgrade`。
+- **存量数据修复**：截图里报错的 `GH1.25 端子 2P`（模板 #16，`LAB-000025`）原本
+  `is_storable=False / tracking=none`。代码修复只影响新建，所以单独改了这一条：
+  先确认无无批次正库存（0 条），再按 `lab_ensure_storable_tracking` 的同一规则写成
+  `is_storable=True / tracking=lot`。
+- **实测**：`flutter test --no-pub` **510 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning；新增回归测试钉住
+  「作业页不带切换器」。服务端升级退出码 0、0 条 ERROR/Traceback，服务 active，
+  `/web/health` 200，公网 `https://team.l-creation.club/` 200。
+- **产物**：Windows `LC_ELC-Windows-1.3.5+22-x64.zip`（37,739,348 B，sha256 `7e5b6a72…c900e6fa`）；
+  Android `LC_ELC-Android-1.3.5+22.apk`（108,025,712 B，sha256 `b87c5d82…afdcfa78`，
+  versionCode 22，证书与登记 keystore 一致）。`repo_check` **PASS 53**。
+- **未验证**：Android 实机观感；真实打印与扫码。
+
+## 2026.11.19 客户端 1.3.5+21：修手机切换器撑满整屏；拦下内网 https 手误
+
+- 版本：`clients/app` `1.3.5+20 → 1.3.5+21`。
+- **手机布局 bug**（用户截图：分区切换器变成占满整屏的绿色胶囊）：`_Segment` 里的
+  `Center` 在**有限高度**约束下会扩张到最大可用尺寸。桌面端 `Column` 给的是无界高度，
+  所以只在手机上炸。实测 412×915 屏幕上切换器被撑到 **412×907**；给 `Center` 加
+  `widthFactor: 1, heightFactor: 1` 后回到 **412×52**。新增回归测试断言底部栏里高度 <120。
+- **内网协议手误**：截图底部「无法连接 https://192.168.31.105:8069」——该端口是明文 HTTP，
+  没有证书（实测 `http://…:8069/web/health` → 200，https → 不通）。新增
+  `OdooConfig.intranetSchemeHint()`，登录页在发请求**之前**就拦下并给出可改的地址：
+  「内网 8069 端口是明文 HTTP，没有证书。请把地址改成 http://…」。`18443`（网关自己终结
+  TLS）与公网地址不受影响。
+- **实测**：`flutter test --no-pub` **509 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning。
+- **未验证**：服务端修复仍未部署；Android 实机；真实打印与扫码。未提交/未推送。
+
+## 2026.11.19 修「新建器件」建出的物料不可入库；制袋贴标补完成按钮
+
+- **服务端 bug（用户截图里的报错）**：`lab_pending_create` 的「新建器件」分支建模板时**漏了
+  `is_storable` 与 `tracking`**，于是模板以 `is_storable=False` 建出来；制袋码能生成，但到
+  「扫码上架」确认时 `lab_ensure_storable_tracking` 直接拒绝——「物料『GH1.25 端子 2P』当前
+  未开启库存管理（is_storable=False）」。其它建档路径（`_lab_create_minimal_material`、
+  资料库绑定）都设了这两项，只有这一条没有。已补 `is_storable=True` + `tracking='lot'`。
+  测试 `test_pending_create_key_replay_and_manual_archive` 增断言：手工建档的物料必须
+  `is_storable` 且能真正入库（确认后数量从 0 变 20）。
+- **制袋贴标没有完成按钮**：这一页原本结束在「预览并打印」上——打印完既不告诉操作员这一步
+  结束了，也没有去下一步的入口。新增收尾区「第 1 步 · 制袋贴标」：说明当前勾选了几袋、
+  打印按钮，以及 **「完成贴标，进入『扫码上架』」**（切到页签 2 并清空上一袋的核对状态）。
+- **实测**：`flutter test --no-pub` **504 passed / 5 skipped / 0 failed**；
+  `flutter analyze --no-pub lib test` 0 error / 0 warning；服务端文件 `py_compile` 通过。
+- **版本**：客户端 `1.3.5+19 → 1.3.5+20`；`lab_workflow` `19.0.2.0.3 → 19.0.2.0.4`。
+- **产物**：
+  - Windows `clients/windows/releases/1.3.5+20/LC_ELC-Windows-1.3.5+20-x64.zip`
+    （37,734,716 B，sha256 `6fcc3d25…a4eed6`，30 文件，exe sha256 `8c5be592…a2a1169`）。
+  - Android `clients/android/releases/1.3.5+20/LC_ELC-Android-1.3.5+20.apk`
+    （108,025,712 B，sha256 `9a31d0a0…0eb5ff`，versionCode 20，arm64-v8a + armeabi-v7a，
+    证书 `8b4c2409…9ff43` 与登记 keystore 一致）。
+  - 清单 `source-client-1.3.5-20-20261119.json`（220 文件）与服务端清单
+    `source-server-pending-storable-20261119.json`（274 文件）均已激活。`repo_check` **PASS 53 项**。
+- **未验证**：服务端 Odoo 测试本机跑不了（Windows 上没有 Odoo 运行时），
+  `test_workflow_business.py` 的新断言需在服务器上跑；**服务端修复未部署**
+  （需在服务器上 `upgrade_modules.sh lab_workflow`，属生产写入，需授权）；未提交/未推送。
+
+## 2026.11.19 客户端 1.3.5+19：修卡片对比度；库位标签改为「库码在下、名称放大」
+
+- 版本：`clients/app` `1.3.4+18 → 1.3.5+19`（`pubspec.yaml`、`components.json` 一致）。
+- **对比度**（用户原话「你这个色调的对比度完全看不清好吧」）：库存管理的五张卡片把 `prominent: true` 传给了 `GlassPanel`，整张卡铺荧光绿（`#C9FF3F` @94%），而标题/说明仍用 `onSurface`/`muted` —— 实测对比度 **1.2:1**，等于看不见。`GlassSurface` 自己的文档就写着「每屏最多一个 prominent」，五张并列本来就违背了它。改为中性玻璃面板 + 荧光绿图标（44×44 圆角底），文字回到面板色。新增 `test/features/warehouse/warehouse_contrast_test.dart`（11 条）：用 WCAG 相对亮度算真实合成色上的对比度，钉住「正文/次要文字/禁用原因 ≥4.5:1」，并把「onSurface 压在 accent 上 <4.5:1」这条错误组合也钉住，防止回退。
+- **桌面切换器**：宽度 ≥900 时不再拉满整行（那看起来像第二条工具栏），改为左侧紧凑胶囊。
+- **库位标签版式**（用户要求「库码放在二维码下面，库名称放大放在左边要能看得见」）：`planThermalLabel` 为 `kind == 'location'` 单独出一条几何 —— QR 11 mm @ (1,1)，**库码在 QR 正下方**（6 pt，宽 8.3 mm，严格落在 11 mm 码列内），**名称在右侧 17 pt**（`kThermalMaxLocationNameFontMm`）。名称取自 `名称：` 那一行而不是 `title`：服务端给库位标签的 `title` 是**库码**（`lab_code or name`），照抄会把编码打成标题。库码取自 payload，保证打出来的和扫出来的是同一个串。器件袋标签版式完全不变（有测试钉住）。Windows FFI 与 Android 桥接都按「caption 用自己的 x/width」绘制。
+- **实测**：`flutter test --no-pub` **504 passed / 5 skipped / 0 failed**；`flutter analyze --no-pub lib test` 0 error / 0 warning。真实 Windows 进程截图确认卡片文字清晰可读、顶部切换器为紧凑胶囊。
+- **未验证**：真实打印库位标签的观感与扫码、Android 实机。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.4+18：登录后拆成四个分区（库存速览 / 仓位速览 / 器件库 / 库存管理）
+
+- 版本：`clients/app` `1.3.3+17 → 1.3.4+18`（`pubspec.yaml`、`components.json` 一致）。
+- **为什么改**（用户原话「我们还是太集中了，应该通过几个菜单把功能做分流」）：登录后唯一落点是器件库，入库只有一个浮动按钮、领料/归还/标签/历史散落在详情页；仓位更是没有任何页面，只能先知道要找什么器件才能问「它在哪」。现在按**看什么**分区：
+  - **库存速览** `/stock`（新落点）：器件种类 / 有库存器件 / 仓位 / 实物袋 / 在库数量，仓位分布前 5，有库存器件列表。
+  - **仓位速览** `/stock/locations`：每个仓位的袋数与数量；`/stock/locations/:id` 是**仓位内容页**（按仓位分页的实物袋列表 + 录入库存 + 打印仓位标签）。
+  - **器件库** `/catalog`：原 `UnifiedCatalogScreen`，一行未改。
+  - **库存管理** `/stock/manage`：入库 / 领料 / 归还 / 标签打印 / 历史追溯 五个入口，按 `InventoryPermissions` 决定可点。
+- **切换**：`GlassSegmentedControl`，宽度 ≥900 在顶部、窄屏在底部；200% 文本换成下拉（阈值与入库页步骤切换一致）。四个分支由 `StatefulShellRoute.indexedStack` 承载，各自保留页面栈。
+- **作业页仍在根级、全屏 push**（`/receipt`、`/receipt/prepare`、`/issue`、`/return`、`/labels`、`/history`），深链、扫码 intent、返回栈不变；库存管理只是入口。`/home`、`/products`、`/products/:id` 仍重定向到 `/catalog`。
+- **数据层（纯增量）**：`LabStockLocation` 解析 `usage`/`bag_count`/`bag_quantity`（缺失为 null，不默认 0）；`locations({withStats})` 传 `with_stats`；新增 `bags()` 接 `/lab/api/inventory/bags`（`limit` 夹到服务端上限 100，`next_cursor` 键集分页）；`LabBag` 补 `availableQuantity`/`outstandingQuantity`/`locationPath`/`uom`。服务端**零改动**。
+- **统计口径**：器件数/有库存数取 `/catalog/search` 的 `total`（一次不带 `stock_only`、一次带）；仓位数与在库数量取 `locations(with_stats:1)` 的 `stock.quant` 合计。客户端不累加一页数据冒充总数。
+- **离线边界**：`/catalog?offline=1` 现在位于外壳内，但无会话时外壳**不渲染分区切换器**（否则会把未登录访客引向路由会拒绝的页面），有专门测试钉住。
+- **实测**：`flutter test --no-pub` **488 passed / 5 skipped / 0 failed**（新增 18 条：分区切换与无障碍、200% 文本回退、`bags()` 分页与 `limit` 夹取、`with_stats` 只在需要时发、仓位统计 null 与 0 的区分、离线不出现切换器）；`flutter analyze --no-pub lib test` 0 error / 0 warning。`tools/build_client.py --platform windows --test` 三步 **exit 0 / 0 / 0**（构建内同样 488 passed），产物冒烟 RUNNING → STOPPED；`repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：`clients/windows/releases/1.3.4+18/LC_ELC-Windows-1.3.4+18-x64.zip`，37,731,644 B，sha256 `6cd4ca0e…c2472317`，30 文件，exe sha256 `74c53bf9…df7a6f`，`NotSigned`。清单 `source-client-1.3.4-18-20261119.json`（218 文件，已 `--activate`），产物登记 `artifact-client-windows-1.3.4-18-20261119.json`。
+- **未验证**：真实登录后的四区切换手感（尤其 320px 手机底部栏高度）、仓位内容页在 >100 袋时的分页、真实打印仓位标签与扫码、Android 实机布局。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.3+17：有线接入的内网加速；标签排版先完整后字号
+
+- 版本：`clients/app` `1.3.3+16 → 1.3.3+17`（`pubspec.yaml`、`components.json` 一致）。
+- **有线接入**（用户原话「Windows 平台有时候我的内网是通过有线接入的」）：内网加速提示原先只按 WiFi SSID 匹配，插网线的台式机永远没有 SSID，功能在最该用的机器上静默失效。新增 `lib/services/lan_probe.dart`：对配置的内网地址发一次 `GET /web/health`（3 秒上限、不带任何凭据、只探私有网段），`statusCode < 500` 即视为可达。判定改为「平台报告了 SSID → 仍以名称为准；没有 SSID（有线或读不到）→ 探测成功才提示」，因此**填过 WiFi 名但今天插网线**的机器也能提示。`LanAccelerationState` 增 `lanReachable`/`dismissedWired`；换地址清空旧探测结果；无 SSID 时「忽略」记的是有线标志。提示条文案与图标（`Icons.lan`）分两种，设置页在无 SSID 时显示探测结论；未填 WiFi 名时不再申请定位权限。
+- **标签排版修 bug**（`niimbot_layout.dart`）：`wrappedBody()` 每次尝试都 `omitted.clear()`，把「超出四行上限的源行」也一并清掉 —— 第五个字段（封装）没打出来，`truncated` 却报 `false`，界面告诉操作员「打全了」。现拆为 `capOmitted`（一次性）与 `wrapOmitted`（每次重算）两个列表。
+- **字号让位于完整性**：适配改成两遍 —— 第一遍找「放得下且一行不丢」的最大字号，找不到才退到「放得下就行」并如实上报丢弃项。此前 7.4 pt 下长描述要折三行（超两行上限被丢），而 7.0 pt 两行就够，旧代码宁可丢字段也要 7.4 pt。
+- **清理**：删除 `DrawLableBarCode` 的 FFI 绑定与 `drawBarCode()`（条形码方案已按用户要求放弃；保留未使用的符号查找只会在 DLL 变动时多一个失败点）。
+- **实测**：`flutter test --no-pub` **468 passed / 5 skipped / 0 failed**（新增有线分支、探测拒公网、长描述缩字号等用例）；`flutter analyze --no-pub lib test` 0 error / 0 warning（119 条既有风格 info）。`tools/build_client.py --platform windows --test` 三步 **exit 0 / 0 / 0**（构建内同样 468 passed），产物冒烟进程 RUNNING → STOPPED。`python tools/repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：`clients/windows/releases/1.3.3+17/LC_ELC-Windows-1.3.3+17-x64.zip`，37,666,952 B，sha256 `f09957ae…32580c`，30 文件，exe sha256 `a22c5871…c0fa96`，`NotSigned`。清单 `source-client-1.3.3-17-20261119.json`（206 文件，tree `0322ce1d…182d`，已 `--activate`），产物登记 `artifact-client-windows-1.3.3-17-20261119.json`。
+- **未验证**：真实插拔网线时的提示时机、现网 `GET /web/health` 实际返回、真实打印与扫码、Android 蓝牙出纸、应用内更新。未提交/未推送。
+
+## 2026.11.19 客户端 1.3.3+11：精臣 B1 Pro 热敏标签直打（Windows USB / Android 蓝牙）
+
+- 版本：`clients/app` `1.3.2+10 → 1.3.3+11`（`pubspec.yaml`、`components.json` 一致）。
+- **为什么改**：现有标签是“服务端毫米排版 → A4 PDF → 系统打印”，无法直接驱动热敏标签机；用户机型为精臣 **B1 Pro**，需要 40×20 mm 标签直接出纸。
+- **服务端**：`lab_labels_preview` 新增可选参数 `include_content`（默认 false，旧契约不变）。为 true 时额外返回 `labels` 数组，每张含 `title`、`lines[]`、`payload`（唯一二维码 `LABB:`/`LABL:`）；数据与 PDF 同源（同一份 `build_contents`），两条打印路径不会漂移。新增 2 条 ORM 测试。
+- **Windows（USB）**：新增 `lib/services/niimbot_printer.dart`（`dart:ffi` 绑定 `jcPrinterApi.dll` 的 14 个函数）、`niimbot_layout.dart`（纯 Dart 排版，可单测）、`tools/restore_niimbot_runtime.py`（从登记 zip 恢复 x64 DLL 与字体并校验 SHA256）。8 个 DLL + `icudtl.dat` + `font/ZT001.ttf` 随包分发、不入 Git。40×20 版式：QR 13×13 @ (1.5, 3.5)，标题 6.49 pt，正文 5.50 pt × 3 行（第 4 行「封装」省略并返回 `truncated`）。
+- **Android（蓝牙）**：集成 `4.1.1-release.aar` + `image-1.9.5.aar`，新增 `NiimbotPrinterBridge.kt`（`lab/printer` 通道 + 扫描事件流）、`proguard-rules.pro`（Flutter release 默认 R8，不保留 SDK 类会破坏反射/native 回调）、四组蓝牙与定位权限。按 SDK 文档纠正 4 处：扫描参数是秒数、`isConnection()==0` 才是已连接、`drawLabelText` 行模式用 6、`drawEmptyLabel` 用 List 重载。
+- **ABI**：APK 仅 `arm64-v8a` + `armeabi-v7a`。`build_client.py` 加 `--target-platform android-arm64 --target-platform android-arm`；`packaging.jniLibs.excludes += "lib/x86_64/**"` 清掉插件 AAR 里预编译的 x86_64 JNI 库。包体 135 MB → 102.6 MB。
+- **构建（本机真实执行）**：Windows 三步 exit 0 / 0 / 0，`flutter test` **456 passed / 5 skipped**；Android 三步 exit 0 / 0 / 0，Gradle 约 142 s，同样 456 passed。`flutter analyze` 0 error / 119 info（全部既有风格提示）。`repo_check.py` **PASS 53 项 / 0 errors**。
+- **产物**：
+  - Windows `clients/windows/releases/1.3.3+11/LC_ELC-Windows-1.3.3+11-x64.zip`，36,622,042 B，sha256 `5e5d2e6a02b8c09f8ecd17ad017abc2c9c4f375f64e83ed2541248de9651cce9`，30 文件，exe `aa8ced4c…967e`，`NotSigned`。
+  - Android `clients/android/releases/1.3.3+11/LC_ELC-Android-1.3.3+11.apk`，107,647,900 B，sha256 `cdf317857ef1b7117fe4ab93fdbd68b1f69cffc0fc56553b1d1824f11fb99184`，1.3.3 / code 11 / minSdk 24 / target 36，证书 `8b4c2409…9ff43` 与登记 keystore 一致。
+- **清单**：客户端 `source-client-1.3.3-11-20261119.json`（204 文件，tree `9b3acfd9…`）、服务端 `source-server-labels-print-20261119.json`、EDA `source-eda-drawing-assistant-20261119.json`，三份均已 `--activate`。
+- **未验证**：真实 USB 打印（缺纸/开盖/超时）、真机蓝牙配对与出纸、Android 6–11 与 12+ 两套权限弹窗、实体扫码、DPAPI、应用内更新。未提交/未推送。
+
 ## 2026.11.18 Flutter 客户端 Linux 1.3.2+10 构建（WSL Ubuntu 22.04；未实机验收）
 
 - 在 WSL Ubuntu 22.04 用归档工具链（Flutter 3.47.7 + `dependencies/wsl-build-tools/wsl-build-tools-20261019.tar.gz` 的 pubcache/sysroot/prebuilt）执行 `tools/build_client.py --platform linux --test`，pub get / flutter test / flutter build linux 三步 **exit 0 / 0 / 0**，`flutter test` **340 passed / 5 skipped**。

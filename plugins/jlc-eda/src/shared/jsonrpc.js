@@ -133,7 +133,13 @@ function mapEnvelopeError(error, httpStatus) {
     return new ApiError(ERROR_CODES.SESSION_EXPIRED, message, { httpStatus, action: 'relogin' });
   }
   if (FORBIDDEN_CODES.has(code)) {
-    return new ApiError(ERROR_CODES.FORBIDDEN, message, { httpStatus, action: 'contact_admin' });
+    // fields 里带着「缺哪个组」「哪个字段不允许」这类可操作信息，
+    // 丢掉它 UI 就只能说「没有权限」，用户不知道找谁要什么。
+    return new ApiError(ERROR_CODES.FORBIDDEN, message, {
+      httpStatus,
+      fields: error.fields || {},
+      action: 'contact_admin',
+    });
   }
   if (code === 'AMBIGUOUS_MATERIAL') {
     return new ApiError(ERROR_CODES.AMBIGUOUS_MATERIAL, message, {

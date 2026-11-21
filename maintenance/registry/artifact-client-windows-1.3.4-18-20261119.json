@@ -1,0 +1,32 @@
+{
+  "file": "clients/windows/releases/1.3.4+18/LC_ELC-Windows-1.3.4+18-x64.zip",
+  "bytes": 37731644,
+  "sha256": "6cd4ca0ea4ea9f1eb6203c138170e2f7e417c58b280528cfb7aa1d33c2472317",
+  "version": "1.3.4+18",
+  "source_manifest": "maintenance/registry/source-client-1.3.4-18-20261119.json",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 18,
+  "files": 30,
+  "executable_sha256": "74c53bf9bb1344da80c803c5a0cfbf7cab2b035e344630cc2ddb39a4b1df7a6f",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 488 passed / 5 skipped; real sign-in, real data paging and real label printing not verified",
+  "changes_in_this_build": [
+    "登录落点改为库存速览 /stock，不再是器件库",
+    "四个分区：库存速览 / 仓位速览 / 器件库 / 库存管理，各保留自己的页面栈",
+    "切换控件沿用 GlassSegmentedControl：桌面顶部、窄屏底部、200% 文本回退下拉",
+    "新增仓位速览与仓位内容页（按仓位分页的实物袋列表），接 /lab/api/inventory/bags",
+    "locations 支持 with_stats：袋数 / 袋内数量 / 在库数量",
+    "新增库存管理页：入库 / 领料 / 归还 / 标签打印 / 历史追溯 五个入口，按权限禁用",
+    "入库页接受 ?location_id= 预选仓位（从仓位内容页进入时）",
+    "离线只读浏览不渲染分区切换器",
+    "作业页仍在根级全屏 push，深链与返回栈不变；/home、/products 仍重定向到 /catalog"
+  ],
+  "unverified": [
+    "真实登录后的四区切换手感（尤其 320px 手机底部栏高度）",
+    "仓位内容页在 >100 袋时的分页表现",
+    "真实打印仓位标签与扫码",
+    "Android 实机布局",
+    "应用内更新"
+  ]
+}

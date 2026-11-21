@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Rear camera for mobile_scanner (bag / location / supplier QR codes).
@@ -11,6 +12,34 @@
 
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Reading the current Wi-Fi SSID (in-memory LAN acceleration hint).
+         Android only returns the SSID with ACCESS_FINE_LOCATION granted AND
+         location services enabled; the value is never written to disk.
+         ACCESS_WIFI_STATE is a normal (install-time) permission. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- 精臣 B1 Pro 蓝牙直打（NIIMBOT Android SDK 4.1.1）。
+         权限组合照 `注意事项/Android 打印机蓝牙相关注意事项` 第 2.1 节：
+           * Android 6.0–11：BLUETOOTH / BLUETOOTH_ADMIN + 位置权限（上面
+             已有的 ACCESS_FINE_LOCATION 同时服务 WiFi SSID 与蓝牙搜索）；
+           * Android 12+：旧的 BLUETOOTH / BLUETOOTH_ADMIN 只保留到 API 30，
+             搜索改用 BLUETOOTH_SCAN（neverForLocation，不读取位置），连接改用
+             BLUETOOTH_CONNECT。
+         运行时请求由 MainActivity 的 requestPrinterPermissions() 发起，
+         `lab/printer` 通道的 requestPermissions 方法触发。 -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
     <application
         android:networkSecurityConfig="@xml/network_security_config"
         android:label="实验室库存系统"

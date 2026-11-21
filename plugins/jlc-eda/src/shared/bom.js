@@ -151,6 +151,110 @@ export function summarize(rows) {
 }
 
 /* ------------------------------------------------------------------------- */
+/* BOM equivalents (S5)                                                       */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * How many pieces a substitute has to cover: the gap when stock is known,
+ * otherwise the full demand (a not-in-catalog line has no stock at all).
+ */
+function equivalentQuantity(row) {
+  const gap = row.gap === null || row.gap === undefined ? null : Number(row.gap);
+  if (gap !== null && Number.isFinite(gap) && gap > 0) return gap;
+  return Number(row.need) || 0;
+}
+
+/**
+ * Request payload for `/lab/api/catalog/equivalents`: only lines whose stock is
+ * actually missing. The main table's exact C-code match is never replaced.
+ */
+export function equivalentsRequestLines(rows) {
+  const lines = [];
+  for (const row of rows || []) {
+    if (!row || !row.code) continue;
+    if (row.status !== BOM_STATUS.SHORT && row.status !== BOM_STATUS.NOT_IN_CATALOG) continue;
+    const quantity = equivalentQuantity(row);
+    if (quantity <= 0) continue;
+    lines.push({ item_key: 'lcsc:' + row.code, quantity });
+  }
+  return lines;
+}
+
+/**
+ * Merge the batch response back onto the comparison rows. Returns NEW row
+ * objects; the input array and its rows are left untouched. Rows without a
+ * response entry get `equivalents: null`. A previously chosen substitute is
+ * kept only while the server still offers it — a vanished candidate must never
+ * be issued silently.
+ */
+export function attachEquivalents(rows, response) {
+  const byKey = new Map();
+  for (const entry of response && Array.isArray(response.lines) ? response.lines : []) {
+    if (entry && entry.item_key) byKey.set(String(entry.item_key), entry);
+  }
+  return (rows || []).map((row) => {
+    if (!row) return row;
+    const key = row.itemKey || (row.code ? 'lcsc:' + row.code : '');
+    const entry = key ? byKey.get(key) : null;
+    const candidates = entry && Array.isArray(entry.candidates) ? entry.candidates : [];
+    const substitute =
+      row.substitute && candidates.some((candidate) => candidate && candidate.item_key === row.substitute.item_key)
+        ? row.substitute
+        : null;
+    const next = Object.assign({}, row, {
+      equivalents: entry ? { basis: entry.basis || 'none', source: entry.source || null, candidates } : null,
+    });
+    if (substitute) next.substitute = substitute;
+    else delete next.substitute;
+    return next;
+  });
+}
+
+/**
+ * Outbound lines for `inventory.outbound`. A substituted line issues ONLY the
+ * candidate's item_key (the original C code is never issued twice) for the gap.
+ */
+export function substituteLines(rows) {
+  const lines = [];
+  for (const row of rows || []) {
+    if (!row || !row.code) continue;
+    const candidate = row.substitute;
+    if (candidate && candidate.item_key) {
+      lines.push({ item_key: String(candidate.item_key), quantity: equivalentQuantity(row) });
+    } else {
+      lines.push({ item_key: 'lcsc:' + row.code, quantity: Number(row.need) || 0 });
+    }
+  }
+  return lines;
+}
+
+const NOTE_PREFIX = 'BOM 一键出库';
+const NOTE_MAX = 500; // matches optionalText(input.note, 'note', 500) in main/api.js
+
+/** Issue note: `BOM 一键出库；替代：C14663 → C1525 ×2, C25804 → C7711 ×1`. */
+export function substitutionNote(rows) {
+  const parts = [];
+  for (const row of rows || []) {
+    const candidate = row && row.substitute;
+    if (!candidate || !candidate.item_key || !row.code) continue;
+    const to = String(candidate.item_key).replace(/^lcsc:/, '');
+    parts.push(row.code + ' → ' + to + ' ×' + equivalentQuantity(row));
+  }
+  if (!parts.length) return NOTE_PREFIX;
+  const head = NOTE_PREFIX + '；替代：';
+  let note = head;
+  for (const part of parts) {
+    const next = note === head ? head + part : note + ', ' + part;
+    if (next.length > NOTE_MAX - 1) {
+      note += '…';
+      break;
+    }
+    note = next;
+  }
+  return note;
+}
+
+/* ------------------------------------------------------------------------- */
 /* Project BOM import (EDA "Manufacture > BOM" CSV export)                    */
 /* ------------------------------------------------------------------------- */
 
@@ -317,8 +421,20 @@ export function allocateBags(bags, need) {
   };
 }
 
+/** Bag trace codes for one BOM row: up to 3 shown, the rest collapsed to +N. */
+export const BAG_PREVIEW_LIMIT = 3;
+
+export function bagTraceSummary(bags) {
+  const codes = (Array.isArray(bags) ? bags : [])
+    .map((bag) => String((bag && bag.trace_code) || '').trim())
+    .filter(Boolean);
+  if (!codes.length) return '—';
+  const shown = codes.slice(0, BAG_PREVIEW_LIMIT).join(' ');
+  return codes.length > BAG_PREVIEW_LIMIT ? shown + ' +' + (codes.length - BAG_PREVIEW_LIMIT) : shown;
+}
+
 export function bomTsv(rows) {
-  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位'];
+  const header = ['状态', 'C 编号', '名称', '型号', '位号', '需求', '可用', '缺口', '库位', '袋'];
   const body = rows.map((row) => {
     const locations = (row.locations || [])
       .map((location) => {
@@ -337,6 +453,7 @@ export function bomTsv(rows) {
       row.available === null ? '未知' : row.available,
       row.gap === null ? '未知' : row.gap,
       locations,
+      bagTraceSummary(row.bags),
     ]
       .map((value) => String(value).replace(/[\t\r\n]+/g, ' '))
       .join('\t');

@@ -322,6 +322,8 @@
         cursor = (data && data.next_cursor) || null;
         refreshLocks();      // 先恢复未决提交（决定 checkbox 是否禁用），再渲染
         render();
+        // 账号维护区的目标下拉框跟着成员列表走：列表变了，可选项也要变。
+        fillAdminTargets();
         LC.show(nodes.loading, false);
         LC.setBusy(button, false);
       }).catch(function (err) {
@@ -496,6 +498,266 @@
         load(null, false);
       });
     }
+
+    /* ================================================================
+     * 账号维护：建号 / 重置密码 / 停用 / 系统管理员
+     *
+     * 这些操作以前只能在 Odoo 原生后台完成。前端只做转发与展示，
+     * 安全边界全部在服务端：
+     *   - 全部要 manager 门禁；
+     *   - 授予 base.group_system 额外要求操作者是系统管理员；
+     *   - 不能停用自己、不能停用最后一个管理员。
+     * ================================================================ */
+    var adminNodes = {
+      newLogin: LC.qs('[data-lc-field="new_login"]', root),
+      newName: LC.qs('[data-lc-field="new_name"]', root),
+      newPassword: LC.qs('[data-lc-field="new_password"]', root),
+      newRole: LC.qs('[data-lc-field="new_role"]', root),
+      target: LC.qs('[data-lc-field="admin_target"]', root),
+      newPw: LC.qs('[data-lc-field="admin_password"]', root),
+      sysTarget: LC.qs('[data-lc-field="system_target"]', root),
+      edaTarget: LC.qs('[data-lc-field="eda_target"]', root),
+      edaName: LC.qs('[data-lc-field="eda_name"]', root),
+      edaDays: LC.qs('[data-lc-field="eda_days"]', root),
+      edaRows: LC.qs('[data-lc-rows="eda_tokens"]', root),
+      edaNew: LC.qs('[data-lc-inv-eda-result="new"]', root),
+      edaNewToken: LC.qs('[data-lc-eda="token"]', root),
+      edaError: LC.qs('[data-lc-inv-eda-result="error"]', root),
+      edaErrorText: LC.qs('[data-lc-eda="error"]', root)
+    };
+
+    /// 目标下拉框跟随成员列表刷新（用当前已加载的 members）。
+    function fillAdminTargets() {
+      [adminNodes.target, adminNodes.sysTarget, adminNodes.edaTarget].forEach(function (select) {
+        if (!select) return;
+        var keep = select.value;
+        select.innerHTML = '<option value="">（先在上方列表里搜索，再选择）</option>';
+        members.forEach(function (member) {
+          var option = document.createElement('option');
+          option.value = String(member.id);
+          option.textContent = (member.name || member.login || ('#' + member.id)) +
+            ' · ' + (member.login || '');
+          select.appendChild(option);
+        });
+        if (keep && members.some(function (m) { return String(m.id) === keep; })) {
+          select.value = keep;
+        }
+      });
+    }
+
+    function adminValue(node) {
+      return node && node.value ? String(node.value).trim() : '';
+    }
+
+    function adminError(err) {
+      var message = (err && err.message) || '操作失败。';
+      LC.status.show({ kind: 'error', code: err && err.code, message: message });
+    }
+
+    function adminDone(message) {
+      LC.status.show({ kind: 'success', message: message });
+    }
+
+    LC.on(root, '[data-lc-action="admin-create-user"]', 'click', function (ev, btn) {
+      var login = adminValue(adminNodes.newLogin);
+      var name = adminValue(adminNodes.newName);
+      var password = adminNodes.newPassword ? adminNodes.newPassword.value : '';
+      var role = adminValue(adminNodes.newRole);
+      if (!login || !name || !password) {
+        LC.status.show({ kind: 'error', message: '请填写登录名、姓名和初始密码。' });
+        return;
+      }
+      btn.disabled = true;
+      LC.rpc('adminUserCreate', {
+        login: login, name: name, password: password,
+        role: role || undefined
+      }).then(function (res) {
+        var user = (res && res.data && res.data.user) || {};
+        adminDone('已创建账号「' + (user.name || name) + '」（' + (user.login || login) + '）');
+        if (adminNodes.newLogin) adminNodes.newLogin.value = '';
+        if (adminNodes.newName) adminNodes.newName.value = '';
+        if (adminNodes.newPassword) adminNodes.newPassword.value = '';
+        if (adminNodes.newRole) adminNodes.newRole.value = '';
+        load(null, false);
+      }).catch(adminError).then(function () { btn.disabled = false; });
+    });
+
+    LC.on(root, '[data-lc-action="admin-set-password"]', 'click', function (ev, btn) {
+      var userId = adminValue(adminNodes.target);
+      var password = adminNodes.newPw ? adminNodes.newPw.value : '';
+      if (!userId || !password) {
+        LC.status.show({ kind: 'error', message: '请选择目标账号并填写新密码。' });
+        return;
+      }
+      btn.disabled = true;
+      LC.rpc('adminUserSetPassword', {
+        user_id: LC.parse.int(userId, null), password: password
+      }).then(function (res) {
+        var user = (res && res.data && res.data.user) || {};
+        adminDone('已重置「' + (user.name || user.login || userId) + '」的密码');
+        if (adminNodes.newPw) adminNodes.newPw.value = '';
+      }).catch(adminError).then(function () { btn.disabled = false; });
+    });
+
+    LC.on(root, '[data-lc-action="admin-toggle-active"]', 'click', function (ev, btn) {
+      var userId = adminValue(adminNodes.target);
+      if (!userId) {
+        LC.status.show({ kind: 'error', message: '请先选择目标账号。' });
+        return;
+      }
+      var current = members.filter(function (m) { return String(m.id) === userId; })[0];
+      var nextActive = !(current && current.active === false);
+      btn.disabled = true;
+      LC.rpc('adminUserToggleActive', {
+        user_id: LC.parse.int(userId, null), active: nextActive
+      }).then(function (res) {
+        var user = (res && res.data && res.data.user) || {};
+        adminDone((user.active ? '已启用' : '已停用') +
+          '「' + (user.name || user.login || userId) + '」');
+        load(null, false);
+      }).catch(adminError).then(function () { btn.disabled = false; });
+    });
+
+    LC.on(root, '[data-lc-action="admin-grant-system"]', 'click', function (ev, btn) {
+      var userId = adminValue(adminNodes.sysTarget);
+      if (!userId) {
+        LC.status.show({ kind: 'error', message: '请先选择目标账号。' });
+        return;
+      }
+      btn.disabled = true;
+      LC.rpc('adminUserSetSystemGroup', {
+        user_id: LC.parse.int(userId, null), enabled: true
+      }).then(function (res) {
+        var user = (res && res.data && res.data.user) || {};
+        adminDone('已授予「' + (user.name || user.login || userId) + '」系统管理员');
+        load(null, false);
+      }).catch(adminError).then(function () { btn.disabled = false; });
+    });
+
+    LC.on(root, '[data-lc-action="admin-revoke-system"]', 'click', function (ev, btn) {
+      var userId = adminValue(adminNodes.sysTarget);
+      if (!userId) {
+        LC.status.show({ kind: 'error', message: '请先选择目标账号。' });
+        return;
+      }
+      btn.disabled = true;
+      LC.rpc('adminUserSetSystemGroup', {
+        user_id: LC.parse.int(userId, null), enabled: false
+      }).then(function (res) {
+        var user = (res && res.data && res.data.user) || {};
+        adminDone('已撤销「' + (user.name || user.login || userId) + '」系统管理员');
+        load(null, false);
+      }).catch(adminError).then(function () { btn.disabled = false; });
+    });
+
+    /* ================================================================
+     * EDA 插件密钥
+     *
+     * 只有库存管理员能发放/吊销（服务端强制）。明文只在发放响应里出现一次，
+     * 列表永远不含明文或哈希。
+     * ================================================================ */
+    function showEdaNew(token) {
+      if (!adminNodes.edaNew) return;
+      adminNodes.edaNew.hidden = false;
+      if (adminNodes.edaNewToken) adminNodes.edaNewToken.textContent = token;
+    }
+
+    function hideEdaNew() {
+      if (adminNodes.edaNew) adminNodes.edaNew.hidden = true;
+      if (adminNodes.edaNewToken) adminNodes.edaNewToken.textContent = '';
+    }
+
+    function showEdaError(message) {
+      if (!adminNodes.edaError) return;
+      adminNodes.edaError.hidden = false;
+      if (adminNodes.edaErrorText) adminNodes.edaErrorText.textContent = message || '操作失败。';
+    }
+
+    function fmtWhen(value) {
+      if (!value) return '—';
+      return String(value).replace(' ', ' · ');
+    }
+
+    function renderEdaTokens(tokens) {
+      var body = adminNodes.edaRows;
+      if (!body) return;
+      body.innerHTML = '';
+      (tokens || []).forEach(function (token) {
+        var tr = document.createElement('tr');
+        [token.user_name || token.user_login || '—',
+         token.name || '—',
+         token.expires_at ? fmtWhen(token.expires_at) : '永不过期',
+         fmtWhen(token.last_used_at),
+         token.active ? '有效' : '已吊销'
+        ].forEach(function (text) {
+          var td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        var action = document.createElement('td');
+        if (token.active) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'lc-btn lc-btn-outline';
+          btn.textContent = '吊销';
+          btn.setAttribute('data-lc-action', 'eda-revoke');
+          btn.setAttribute('data-lc-eda-id', String(token.id));
+          btn.addEventListener('click', function () { revokeEdaToken(btn); });
+          action.appendChild(btn);
+        }
+        tr.appendChild(action);
+        body.appendChild(tr);
+      });
+    }
+
+    function loadEdaTokens() {
+      if (!adminNodes.edaRows) return;
+      // LC.rpc 已经把 result.data 解包出来了；再取 .data 会得到 undefined。
+      // （LC.submit 不同，它返回 {data, replayed, requestKey}。）
+      LC.rpc('edaTokens', {}).then(function (data) {
+        renderEdaTokens((data && data.tokens) || []);
+      }).catch(function (err) {
+        showEdaError((err && err.message) || '读取密钥列表失败。');
+      });
+    }
+
+    function revokeEdaToken(btn) {
+      var id = btn && btn.getAttribute('data-lc-eda-id');
+      if (!id) return;
+      btn.disabled = true;
+      LC.rpc('edaRevoke', { id: LC.parse.int(id, null) }).then(function () {
+        adminDone('已吊销该密钥，对应插件将立即无法访问。');
+        loadEdaTokens();
+      }).catch(function (err) {
+        btn.disabled = false;
+        showEdaError((err && err.message) || '吊销失败。');
+      });
+    }
+
+    LC.on(root, '[data-lc-action="eda-issue"]', 'click', function (ev, btn) {
+      var userId = adminValue(adminNodes.edaTarget);
+      if (!userId) {
+        LC.status.show({ kind: 'error', message: '请先选择要发放给谁。' });
+        return;
+      }
+      hideEdaNew();
+      if (adminNodes.edaError) adminNodes.edaError.hidden = true;
+      btn.disabled = true;
+      LC.rpc('edaIssue', {
+        user_id: LC.parse.int(userId, null),
+        name: adminValue(adminNodes.edaName) || undefined,
+        days: adminNodes.edaDays && adminNodes.edaDays.value !== ''
+          ? LC.parse.int(adminNodes.edaDays.value, null) : undefined
+      }).then(function (data) {
+        showEdaNew((data && data.token) || '');
+        adminDone('已为「' + ((data && data.user_name) || userId) + '」发放 EDA 密钥。');
+        loadEdaTokens();
+      }).catch(function (err) {
+        showEdaError((err && err.message) || '发放失败。');
+      }).then(function () { btn.disabled = false; });
+    });
+
+    if (adminNodes.edaRows) loadEdaTokens();
 
     // 角色未决按成员 id 记账：先扫一遍（成员加载失败时列表为空，仅保持状态一致）
     refreshLocks();

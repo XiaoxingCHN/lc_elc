@@ -1,0 +1,32 @@
+{
+  "file": "clients/windows/releases/1.3.3+17/LC_ELC-Windows-1.3.3+17-x64.zip",
+  "bytes": 37666952,
+  "sha256": "f09957aeaa344292ce4c649f9745e6388ea393f49a4074158d13979ca732580c",
+  "version": "1.3.3+17",
+  "source_manifest": "maintenance/registry/source-client-1.3.3-17-20261119.json",
+  "source_tree_sha256": "0322ce1d6ec316ef910ebd27dbe36b33103efba1677ace677d59fb07ac6e182d",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 17,
+  "files": 30,
+  "executable_sha256": "a22c5871cb0c01536c7b6abd28243c76dab597811e140a26a0cab3c9b0c0fa96",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 468 passed / 5 skipped; real wired-vs-wifi hint timing and real printing not verified",
+  "changes_in_this_build": [
+    "有线接入的内网加速：平台未报告 WiFi 名称时，用 GET /web/health 探测配置的内网地址（3 秒、无凭据、仅私有网段），可达才提示切换",
+    "填过 WiFi 名称但当天插网线的机器同样能提示（无 SSID 时回落到地址探测）",
+    "无 SSID 时提示条改为「内网服务器可直连」，忽略按钮记的是有线标志；设置页显示探测结论",
+    "未填 WiFi 名称时不再申请定位权限",
+    "Android 设置页补说明：系统 network_security_config 只放行 192.168.31.105 的明文 HTTP",
+    "标签排版修 bug：超出四行上限的源行不再被 wrappedBody 的 omitted.clear() 抹掉（此前第五个字段没打出来却报 truncated=false）",
+    "标签适配改两遍：先找「放得下且一行不丢」的最大字号，宁可小 0.4 pt 也不丢字段",
+    "删除未使用的 DrawLableBarCode FFI 绑定（条形码方案已放弃）"
+  ],
+  "unverified": [
+    "真实有线/无线切换下的提示出现时机",
+    "现网 GET /web/health 的实际返回",
+    "真实打印观感与扫码",
+    "真实登录与入库/领用",
+    "应用内更新"
+  ]
+}

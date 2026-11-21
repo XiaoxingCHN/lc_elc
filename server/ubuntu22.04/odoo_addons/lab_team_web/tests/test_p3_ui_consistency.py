@@ -385,5 +385,87 @@ class SharedUiContractTest(unittest.TestCase):
         self.assertIn("message: LC.errorText(err),", read(JS / "receipts.js"))
 
 
+class NarrowDrawerStackingTest(unittest.TestCase):
+    """P2-01 / M1：窄屏抽屉首项被 sticky 顶栏覆盖。
+
+    真实缺陷：抽屉从视口顶部开始但 z-index 60，顶栏 sticky z-index 100，375/768/
+    1023px 时首条链接 y=18–67.09、顶栏高 73px，中心点命中顶栏。修复选择把抽屉
+    与遮罩抬到顶栏之上（而不是给抽屉加 top 留缝），因为顶栏高度随字号/换行变化，
+    固定留缝会在 200% 字号下再次遮挡。顶栏菜单按钮被遮罩盖住后，触控关闭改由
+    抽屉内的独立手柄承担。这些断言锁定层级、手柄和焦点契约；命中坐标须在真实
+    QWeb 页面用 Chromium 复测。
+    """
+
+    def setUp(self):
+        self.css = read(CSS / "team.css")
+        self.js = read(MODULE / "static" / "src" / "js" / "team.js")
+        self.xml = read(VIEWS / "pages.xml")
+
+    def _rules(self, selector):
+        # 同一选择器会出现多次（基础规则 + @media 覆盖），全部返回。
+        return re.findall(
+            re.escape(selector) + r"\s*\{([^}]*)\}", self.css)
+
+    def _rule(self, selector):
+        blocks = self._rules(selector)
+        self.assertTrue(blocks, "team.css 缺少规则：%s" % selector)
+        return blocks[0]
+
+    def _z(self, selector):
+        # 取带 z-index 的那条（窄屏抽屉规则在 @media 里，基础规则只有 min-width）
+        for block in self._rules(selector):
+            match = re.search(r"z-index:\s*(\d+)", block)
+            if match:
+                return int(match.group(1))
+        self.fail("%s 没有 z-index" % selector)
+
+    def test_drawer_and_scrim_stack_above_sticky_header(self):
+        header = self._z("body.lc-body .lc-header")
+        drawer = self._z("body.lc-body .lc-rail")
+        scrim = self._z("body.lc-body.lc-nav-open .lc-nav-scrim")
+        self.assertGreater(drawer, header,
+                           "抽屉必须在 sticky 顶栏之上，否则首项被覆盖")
+        self.assertGreater(scrim, header,
+                           "遮罩也必须盖住顶栏，否则顶栏从遮罩上方透出")
+        self.assertGreater(drawer, scrim, "抽屉必须在遮罩之上")
+        # 跳过链接 z-index 300 仍最高，键盘用户打开时不被抽屉盖住
+        self.assertGreater(self._z("body.lc-body .lc-skip"), drawer)
+
+    def test_drawer_has_independent_close_handle(self):
+        # 抽屉内的触控关闭手柄（窄屏顶栏菜单按钮被遮罩覆盖）
+        aside = self.xml.split('class="lc-rail"', 1)[1].split("</aside>", 1)[0]
+        self.assertIn("lc-nav-close", aside)
+        self.assertIn('data-lc-action="nav-close"', aside)
+        self.assertIn('aria-label="关闭主导航"', aside)
+        close_rule = self._rule("body.lc-body .lc-nav-close")
+        self.assertIn("min-height: 44px", close_rule)
+        self.assertIn("min-width: 44px", close_rule)
+        # 桌面固定侧栏不显示这个手柄
+        self.assertIn("display: none", self._rule("body.lc-body .lc-nav-head"))
+
+    def test_close_handle_and_escape_restore_focus_to_toggle(self):
+        self.assertIn("closeHandle", self.js)
+        self.assertIn("closeHandle.addEventListener('click'", self.js)
+        self.assertIn("if (returnFocus && toggle.focus) toggle.focus();", self.js)
+        self.assertIn("event.key !== 'Escape'", self.js)
+        # 顶栏菜单按钮在遮罩下不可见，焦点循环不能再包含它
+        trap = self.js.split("function trapTargets()", 1)[1].split("}", 1)[0]
+        self.assertIn("closeHandle", trap)
+        self.assertNotIn("var list = [toggle]", trap)
+        # 桌面侧栏隐藏手柄，不能把不可见节点塞进 Tab 循环
+        self.assertIn("closeHandle.getClientRects().length", trap)
+        # 打开时焦点进第一条导航链接，而不是顶部的关闭手柄
+        focus = self.js.split("function focusFirstLink(attempt)", 1)[1]
+        self.assertIn("'.lc-nav a[href]'", focus.split("first.focus()", 1)[0])
+
+    def test_backdrop_still_inert_when_open(self):
+        self.assertIn("setInert(nav, hiddenNav)", self.js)
+        self.assertIn("backdrop.forEach(function (node) { setInert(node, narrow && opened); });",
+                      self.js)
+        for bg in (".lc-footer", ".lc-account", ".lc-brand"):
+            with self.subTest(backdrop=bg):
+                self.assertIn(bg, self.js)
+
+
 if __name__ == "__main__":
     unittest.main()

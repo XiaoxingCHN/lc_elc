@@ -1,0 +1,25 @@
+{
+  "file": "clients/windows/releases/1.3.5+20/LC_ELC-Windows-1.3.5+20-x64.zip",
+  "bytes": 37734716,
+  "sha256": "6fcc3d25b5d8b1c0cae9241780d71ac935fa680ce76472263cc78ebe69a4eed6",
+  "version": "1.3.5+20",
+  "source_manifest": "maintenance/registry/source-client-1.3.5-20-20261119.json",
+  "source_tree_sha256": "45bc53d4a1aad1010e404df7accd11f72b98959706913654190b2b234e0303ba",
+  "validation": "built and tested on this machine: pub get / flutter test / flutter build windows --release exit 0 / 0 / 0; flutter test 504 passed / 5 skipped",
+  "platform": "windows",
+  "arch": "x64",
+  "build_number": 20,
+  "files": 30,
+  "executable_sha256": "8c5be592946fcfae6833031eac780dafb26794649f06e9d2e1add5417a2a1169",
+  "signature": "NotSigned (unchanged from previous builds)",
+  "changes_in_this_build": [
+    "制袋贴标页补收尾区「第 1 步 · 制袋贴标」：打印按钮 + 「完成贴标，进入扫码上架」",
+    "此前这一页结束在打印按钮上，没有完成动作也没有下一步入口"
+  ],
+  "unverified": [
+    "服务端修复未部署（新建器件补 is_storable/tracking 需在服务器上 upgrade）",
+    "服务端 Odoo 测试本机无法运行，新断言需在服务器上跑",
+    "真实打印库位标签与扫码",
+    "Android 实机"
+  ]
+}
