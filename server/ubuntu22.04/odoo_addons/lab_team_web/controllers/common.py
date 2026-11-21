@@ -122,6 +122,12 @@ WORKFLOW_ENDPOINTS = {
     'edaTokens': '/lab/api/eda/manage/tokens',
     'edaIssue': '/lab/api/eda/manage/issue',
     'edaRevoke': '/lab/api/eda/manage/revoke',
+    # 立创开放平台密钥池（管理页「立创密钥」区块）
+    'lcscKeys': '/lab/api/lcsc/keys',
+    'lcscKeyCreate': '/lab/api/lcsc/key_create',
+    'lcscKeyToggle': '/lab/api/lcsc/key_toggle',
+    'lcscKeyRemove': '/lab/api/lcsc/key_remove',
+    'lcscKeyReset': '/lab/api/lcsc/key_reset',
     # 扫码 / 两阶段入库
     'resolve': '/lab/api/inventory/resolve_code',
     'pendingList': '/lab/api/inventory/pending/list',

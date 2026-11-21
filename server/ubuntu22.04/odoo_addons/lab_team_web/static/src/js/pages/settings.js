@@ -523,7 +523,14 @@
       edaNew: LC.qs('[data-lc-inv-eda-result="new"]', root),
       edaNewToken: LC.qs('[data-lc-eda="token"]', root),
       edaError: LC.qs('[data-lc-inv-eda-result="error"]', root),
-      edaErrorText: LC.qs('[data-lc-eda="error"]', root)
+      edaErrorText: LC.qs('[data-lc-eda="error"]', root),
+      lcscName: LC.qs('[data-lc-field="lcsc_name"]', root),
+      lcscAppId: LC.qs('[data-lc-field="lcsc_app_id"]', root),
+      lcscAk: LC.qs('[data-lc-field="lcsc_access_key"]', root),
+      lcscSk: LC.qs('[data-lc-field="lcsc_secret_key"]', root),
+      lcscRows: LC.qs('[data-lc-rows="lcsc_keys"]', root),
+      lcscError: LC.qs('[data-lc-inv-lcsc-result="error"]', root),
+      lcscErrorText: LC.qs('[data-lc-lcsc="error"]', root)
     };
 
     /// 目标下拉框跟随成员列表刷新（用当前已加载的 members）。
@@ -758,6 +765,119 @@
     });
 
     if (adminNodes.edaRows) loadEdaTokens();
+
+    /* ================================================================
+     * 立创开放平台密钥池
+     *
+     * 日额度按 AppId 算，多套轮询能叠加。SecretKey 只写不读——
+     * 列表里只显示 AppId，保存后无法再查看。
+     * ================================================================ */
+    function showLcscError(message) {
+      if (!adminNodes.lcscError) return;
+      adminNodes.lcscError.hidden = false;
+      if (adminNodes.lcscErrorText) adminNodes.lcscErrorText.textContent = message;
+    }
+
+    function hideLcscError() {
+      if (adminNodes.lcscError) adminNodes.lcscError.hidden = true;
+    }
+
+    function renderLcscKeys(keys) {
+      var body = adminNodes.lcscRows;
+      if (!body) return;
+      body.innerHTML = '';
+      (keys || []).forEach(function (item) {
+        var tr = document.createElement('tr');
+        [item.name || '—',
+         item.app_id || '—',
+         fmtWhen(item.last_used_at),
+         fmtWhen(item.rate_limited_at),
+         item.active ? '启用' : '停用'
+        ].forEach(function (text) {
+          var td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        var action = document.createElement('td');
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'lc-btn lc-btn-outline';
+        toggle.textContent = item.active ? '停用' : '启用';
+        toggle.addEventListener('click', function () {
+          toggle.disabled = true;
+          LC.rpc('lcscKeyToggle', { id: item.id, active: !item.active })
+            .then(loadLcscKeys)
+            .catch(function (err) {
+              toggle.disabled = false;
+              showLcscError((err && err.message) || '操作失败。');
+            });
+        });
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'lc-btn lc-btn-outline';
+        remove.textContent = '删除';
+        remove.style.marginLeft = '6px';
+        remove.addEventListener('click', function () {
+          remove.disabled = true;
+          LC.rpc('lcscKeyRemove', { id: item.id })
+            .then(loadLcscKeys)
+            .catch(function (err) {
+              remove.disabled = false;
+              showLcscError((err && err.message) || '删除失败。');
+            });
+        });
+        action.appendChild(toggle);
+        action.appendChild(remove);
+        tr.appendChild(action);
+        body.appendChild(tr);
+      });
+    }
+
+    function loadLcscKeys() {
+      if (!adminNodes.lcscRows) return;
+      LC.rpc('lcscKeys', {}).then(function (data) {
+        renderLcscKeys((data && data.keys) || []);
+      }).catch(function (err) {
+        showLcscError((err && err.message) || '读取密钥列表失败。');
+      });
+    }
+
+    LC.on(root, '[data-lc-action="lcsc-add"]', 'click', function (ev, btn) {
+      var payload = {
+        name: adminValue(adminNodes.lcscName),
+        app_id: adminValue(adminNodes.lcscAppId),
+        access_key: adminValue(adminNodes.lcscAk),
+        secret_key: adminNodes.lcscSk ? adminNodes.lcscSk.value : ''
+      };
+      if (!payload.name || !payload.app_id || !payload.access_key || !payload.secret_key) {
+        showLcscError('备注、AppId、AccessKey、SecretKey 都要填。');
+        return;
+      }
+      hideLcscError();
+      btn.disabled = true;
+      LC.rpc('lcscKeyCreate', payload).then(function () {
+        adminDone('已添加立创密钥「' + payload.name + '」。');
+        if (adminNodes.lcscName) adminNodes.lcscName.value = '';
+        if (adminNodes.lcscAppId) adminNodes.lcscAppId.value = '';
+        if (adminNodes.lcscAk) adminNodes.lcscAk.value = '';
+        if (adminNodes.lcscSk) adminNodes.lcscSk.value = '';
+        loadLcscKeys();
+      }).catch(function (err) {
+        showLcscError((err && err.message) || '添加失败。');
+      }).then(function () { btn.disabled = false; });
+    });
+
+    LC.on(root, '[data-lc-action="lcsc-reset"]', 'click', function (ev, btn) {
+      btn.disabled = true;
+      LC.rpc('lcscKeyReset', {}).then(function () {
+        adminDone('已重置所有密钥的超限标记。');
+        loadLcscKeys();
+      }).catch(function (err) {
+        showLcscError((err && err.message) || '重置失败。');
+      }).then(function () { btn.disabled = false; });
+    });
+
+    if (adminNodes.lcscRows) loadLcscKeys();
 
     // 角色未决按成员 id 记账：先扫一遍（成员加载失败时列表为空，仅保持状态一致）
     refreshLocks();

@@ -12,3 +12,6 @@ access_lab_catalog_fetch_user,lab.catalog.fetch.request user,model_lab_catalog_f
 access_lab_catalog_fetch_manager,lab.catalog.fetch.request manager,model_lab_catalog_fetch_request,group_lab_catalog_manager,1,1,1,1
 access_product_template_lab_user,product.template for lab catalog user,product.model_product_template,group_lab_catalog_user,1,1,1,0
 access_product_product_lab_user,product.product for lab catalog user,product.model_product_product,group_lab_catalog_user,1,1,1,0
+access_lab_lcsc_key_manager,lab.lcsc.key manager,model_lab_lcsc_key,group_lab_catalog_manager,1,1,1,1
+access_lab_lcsc_key_system,lab.lcsc.key system,model_lab_lcsc_key,base.group_system,1,1,1,1
+
