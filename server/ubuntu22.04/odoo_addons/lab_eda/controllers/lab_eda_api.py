@@ -365,27 +365,39 @@ class LabEdaApi(http.Controller):
 
                 # 值 + 封装拆开：值用于匹配规格，封装用于收窄。
                 parts = query.split()
-                value = parts[0] if parts else ''
-                package = parts[1] if len(parts) > 1 else ''
+                # 「值 封装」用空格分隔；连接器只有型号（可能含空格或特殊字符），
+                # 整串当检索词。判断依据：两段且第二段像封装才拆。
+                if len(parts) == 2 and re.match(r'^[A-Za-z0-9._()\-*]+$', parts[1]):
+                    value, package = parts[0], parts[1]
+                elif len(parts) >= 2 and re.match(r'^[CRL]?\d{4}$', parts[-1].upper()):
+                    value, package = ' '.join(parts[:-1]), parts[-1]
+                else:
+                    value, package = query, ''
 
                 domain = [('lab_sn', '!=', False)]
-                if package:
-                    # EDA 的 C0603/R0603 与实验室的 0603 是同一种封装，
-                    # 归一化后再查，否则一条都匹配不上。
-                    chip = re.match(r'^[CRL]?(\d{4})$', package.upper())
+                # 封装只在有「值」时才用来收窄：连接器按型号查，它的封装
+                # （PAD_S_2.54_2*6）和实验室登记的不是一回事，加了反而搜不到。
+                if package and value:
+                    # C0603 / R0603 / L0805 -> 0603 / 0805；
+                    # 已经是不带前缀的 0603 就原样用（不能盲目 [1:]，会切成 603）。
+                    chip = re.match(r'^([CRL])(\d{4})$', package.upper())
                     domain.append(('lab_package', '=ilike',
-                                   chip.group(1) if chip else package))
+                                   chip.group(2) if chip else package))
                 # 值用正则做**独立出现**的匹配：`ilike %1k%` 会命中 `5.1kΩ`。
                 # lab_search_specs 是归一化文本（0.1uF/100nF 互认），比抠名称可靠，
                 # 但子串匹配太松，所以拿回来后再用边界正则筛一遍。
                 if value:
-                    domain.append(('lab_search_specs', 'ilike', value))
+                    # 有「值」查规格；连接器这类没有值、只有型号，也要能查到。
+                    domain += ['|', ('lab_search_specs', 'ilike', value),
+                               ('lab_mpn', 'ilike', value)]
                 templates = Tmpl.search(domain, limit=limit * 8)
                 if value:
+                    # 值或型号任一命中即可（连接器只有型号）。
                     strict = _value_pattern(value)
                     templates = templates.filtered(
                         lambda tmpl: strict.search(
-                            str(tmpl.lab_search_specs or '').lower()))
+                            str(tmpl.lab_search_specs or '').lower())
+                        or strict.search(str(tmpl.lab_mpn or '').lower()))
 
                 rows = []
                 for tmpl in templates:

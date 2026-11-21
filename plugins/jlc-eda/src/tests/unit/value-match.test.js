@@ -163,3 +163,22 @@ test('normalizePackage handles empty and whitespace', () => {
 test('buildValueQuery uses the normalized footprint', () => {
   assert.equal(buildValueQuery({ name: '100nF', footprint: 'C0603' }), '100nF 0603');
 });
+
+/* ------------------------------------------------------------------ */
+/* 连接器：没有「值」，用实际型号查                                     */
+/* ------------------------------------------------------------------ */
+
+test('buildValueQuery falls back to the part number when there is no value', () => {
+  // 连接器没有「值」，只有型号。用户说「按照实际的型号进行查找」。
+  const conn = { designator: 'P3', name: '', mpn: 'PAD_S_2.54_2*6', footprint: 'PAD_S_2.54_2*6' };
+  assert.equal(buildValueQuery(conn), 'PAD_S_2.54_2*6');
+});
+
+test('buildValueQuery prefers the value over the part number', () => {
+  const cap = { name: '100nF', mpn: 'CL10B104KB8NNNC', footprint: 'C0603' };
+  assert.equal(buildValueQuery(cap), '100nF 0603');
+});
+
+test('buildValueQuery returns empty when neither value nor mpn exists', () => {
+  assert.equal(buildValueQuery({ name: '', mpn: '', footprint: 'X' }), '');
+});
