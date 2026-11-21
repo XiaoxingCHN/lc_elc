@@ -370,7 +370,11 @@ class LabEdaApi(http.Controller):
 
                 domain = [('lab_sn', '!=', False)]
                 if package:
-                    domain.append(('lab_package', '=ilike', package))
+                    # EDA 的 C0603/R0603 与实验室的 0603 是同一种封装，
+                    # 归一化后再查，否则一条都匹配不上。
+                    chip = re.match(r'^[CRL]?(\d{4})$', package.upper())
+                    domain.append(('lab_package', '=ilike',
+                                   chip.group(1) if chip else package))
                 # 值用正则做**独立出现**的匹配：`ilike %1k%` 会命中 `5.1kΩ`。
                 # lab_search_specs 是归一化文本（0.1uF/100nF 互认），比抠名称可靠，
                 # 但子串匹配太松，所以拿回来后再用边界正则筛一遍。
