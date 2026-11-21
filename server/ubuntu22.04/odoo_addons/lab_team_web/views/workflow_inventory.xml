@@ -580,6 +580,66 @@
 
             <section class="lc-panel">
                 <div class="lc-panel-head">
+                    <h2 class="lc-section-title">立创开放平台密钥</h2>
+                    <span class="lc-badge" data-tone="warn">SecretKey 只写不读</span>
+                </div>
+                <div class="lc-panel-body">
+                    <p class="lc-lead">
+                        开放平台的日额度<strong>按 AppId 算</strong>，多套密钥轮着用能把额度叠加起来。
+                        抓取时按顺序取用；某套返回「超限」会自动切到下一套，全部用完才停。
+                    </p>
+                    <div class="lc-toolbar">
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-lcsc-name">备注</label>
+                            <input class="lc-input" id="lc-lcsc-name" type="text"
+                                   placeholder="例如：主号 / 备用号" data-lc-field="lcsc_name"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-lcsc-appid">AppId</label>
+                            <input class="lc-input" id="lc-lcsc-appid" type="text"
+                                   placeholder="18 位数字" data-lc-field="lcsc_app_id"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-lcsc-ak">AccessKey</label>
+                            <input class="lc-input" id="lc-lcsc-ak" type="text"
+                                   data-lc-field="lcsc_access_key"/>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-lcsc-sk">SecretKey</label>
+                            <input class="lc-input" id="lc-lcsc-sk" type="password"
+                                   autocomplete="new-password" data-lc-field="lcsc_secret_key"/>
+                        </div>
+                        <button class="lc-btn lc-btn-primary" type="button"
+                                data-lc-action="lcsc-add">添加</button>
+                        <button class="lc-btn lc-btn-outline" type="button"
+                                data-lc-action="lcsc-reset">重置超限</button>
+                    </div>
+                    <p class="lc-hint">
+                        SecretKey 保存后无法再查看（列表只显示 AppId）。填错了就删掉重新加。
+                        密钥存在数据库里，不进 Git、不写日志。
+                    </p>
+                    <div class="lc-alert lc-alert-error" role="alert"
+                         data-lc-inv-lcsc-result="error" hidden="hidden">
+                        <p data-lc-lcsc="error"></p>
+                    </div>
+                    <table class="lc-table">
+                        <thead>
+                            <tr>
+                                <th>备注</th>
+                                <th>AppId</th>
+                                <th>最近使用</th>
+                                <th>最近超限</th>
+                                <th>状态</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody data-lc-rows="lcsc_keys"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="lc-panel">
+                <div class="lc-panel-head">
                     <h2 class="lc-section-title">仍需在原生后台完成</h2>
                 </div>
                 <div class="lc-panel-body">

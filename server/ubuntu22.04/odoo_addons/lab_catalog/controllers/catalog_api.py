@@ -495,3 +495,47 @@ class LabCatalogController(http.Controller):
             'item_key': 'lcsc:%s' % code,
             'reused_existing': False,
         }
+
+    # ------------------------------------------------------------------ LCSC 密钥池
+    #
+    # 用户诉求：「现在使用一个很容易就限流了我想多搞几个号做号码池」。
+    # 开放平台日额度按 appId 算，多套密钥轮询能把额度叠加。
+    # 安全边界全在模型层（_require_manager + secret_key 的 groups 限制），
+    # 控制器只转发，且**任何响应都不含 secret_key**。
+
+    @http.route('/lab/api/lcsc/keys', type='jsonrpc', auth='user',
+                methods=['POST'], csrf=False)
+    @api_route
+    def lcsc_keys(self, params):
+        return {'keys': request.env['lab.lcsc.key'].lab_web_list()}
+
+    @http.route('/lab/api/lcsc/key_create', type='jsonrpc', auth='user',
+                methods=['POST'], csrf=False)
+    @api_route
+    def lcsc_key_create(self, params):
+        return request.env['lab.lcsc.key'].lab_web_create(
+            name=params.get('name'),
+            app_id=params.get('app_id'),
+            access_key=params.get('access_key'),
+            secret_key=params.get('secret_key'),
+        )
+
+    @http.route('/lab/api/lcsc/key_toggle', type='jsonrpc', auth='user',
+                methods=['POST'], csrf=False)
+    @api_route
+    def lcsc_key_toggle(self, params):
+        return request.env['lab.lcsc.key'].lab_web_toggle(
+            key_id=params.get('id'), active=params.get('active'))
+
+    @http.route('/lab/api/lcsc/key_remove', type='jsonrpc', auth='user',
+                methods=['POST'], csrf=False)
+    @api_route
+    def lcsc_key_remove(self, params):
+        return request.env['lab.lcsc.key'].lab_web_remove(key_id=params.get('id'))
+
+    @http.route('/lab/api/lcsc/key_reset', type='jsonrpc', auth='user',
+                methods=['POST'], csrf=False)
+    @api_route
+    def lcsc_key_reset(self, params):
+        request.env['lab.lcsc.key'].reset_limits()
+        return {'ok': True}

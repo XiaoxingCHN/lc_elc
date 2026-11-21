@@ -20,7 +20,7 @@ from odoo import api, fields, models
 
 from odoo.addons.lab_inventory.tools.param_search import build_search_params
 
-from ..tools import lcsc_openapi, lcsc_remote
+from ..tools import lcsc_key_pool, lcsc_openapi, lcsc_remote
 
 _logger = logging.getLogger(__name__)
 
@@ -487,17 +487,60 @@ class LabCatalogFetchRequest(models.Model):
         """
         if deadline is not None and time.monotonic() >= deadline:
             return None
-        try:
-            client = lcsc_openapi.client_from_env(timeout=INLINE_TIMEOUT)
-        except lcsc_openapi.LcscOpenApiError:
-            return None                       # 未配置凭据：静默跳过
-        try:
-            rows = client.smt_components([code])
-        except lcsc_openapi.LcscOpenApiError as exc:
-            _logger.warning('立创官方接口不可用（%s），本轮继续用页面解析。',
-                            exc.code)
-            return None
+        rows = self._official_with_pool(code)
         return lcsc_openapi.item_from_smt(rows[0]) if rows else None
+
+    def _official_with_pool(self, code):
+        """用密钥池调用官方 SMT 通道；遇 429 自动换下一把。
+
+        以前只能从环境变量读一套密钥，限流了就整轮失败。现在密钥存在
+        ``lab.lcsc.key`` 里，按轮询取用——用户的诉求是「多搞几个号做号码池」。
+        池为空时退回环境变量（保持旧部署可用）。
+        """
+        Key = self.env['lab.lcsc.key'].sudo()
+        entries = Key._pool_entries()
+
+        if not entries:
+            try:
+                client = lcsc_openapi.client_from_env(timeout=INLINE_TIMEOUT)
+            except lcsc_openapi.LcscOpenApiError:
+                return None                   # 未配置凭据：静默跳过
+            try:
+                return client.smt_components([code])
+            except lcsc_openapi.LcscOpenApiError as exc:
+                _logger.warning('立创官方接口不可用（%s），本轮继续用页面解析。',
+                                exc.code)
+                return None
+
+        pool = lcsc_key_pool.KeyPool(entries)
+        attempts = pool.total_count()
+        for _ in range(attempts):
+            entry = pool.next()
+            try:
+                client = lcsc_openapi.LcscOpenApi(
+                    lcsc_openapi.DEFAULT_BASE_URL,
+                    entry['app_id'], entry['access_key'], entry['secret_key'],
+                    timeout=INLINE_TIMEOUT)
+                rows = client.smt_components([code])
+            except lcsc_openapi.LcscOpenApiError as exc:
+                if (lcsc_key_pool.should_rotate_on_error(exc.code)
+                        or lcsc_key_pool.should_rotate_on_error(
+                            getattr(exc, 'status', None))):
+                    # 超限：标记这把今天不可用，换下一把
+                    Key.mark_rate_limited(entry['id'])
+                    pool.mark_rate_limited(entry['id'])
+                    _logger.info('立创密钥 %s 超限，切换下一把。', entry['id'])
+                    continue
+                _logger.warning('立创官方接口不可用（%s），本轮继续用页面解析。',
+                                exc.code)
+                return None
+            except Exception:                 # noqa: BLE001 - 网络等非业务异常
+                _logger.warning('立创官方接口调用失败，本轮继续用页面解析。')
+                return None
+            Key.mark_used(entry['id'])
+            return rows
+        _logger.warning('立创密钥池已全部超限，本轮继续用页面解析。')
+        return None
 
     # ------------------------------------------------------------------ policy
     @api.model

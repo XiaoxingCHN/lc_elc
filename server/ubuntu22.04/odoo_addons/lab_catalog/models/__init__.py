@@ -6,3 +6,4 @@ from . import lab_catalog_binding
 from . import lab_catalog_import_run
 from . import lab_catalog_fetch
 from . import product_template
+from . import lab_lcsc_key
