@@ -19,8 +19,13 @@ from .envelope import (AMBIGUOUS_MATERIAL, CONFLICT, FORBIDDEN, NOT_FOUND,
                        as_int, require)
 
 FETCH_ACTIVE_STATES = ('queued', 'resolving', 'fetching')
-FETCH_ACTIVE_LIMIT = 5
-FETCH_HOURLY_LIMIT = 20
+# 0 = 不限制。
+#
+# 以前是每用户每小时 20 次，理由是「只有一套立创密钥，抓太猛会被封」。
+# 现在有密钥池（lab.lcsc.key，遇 429 自动换下一把），真正的瓶颈在立创那边，
+# 不该再由我们自己的规则拦人——采购入库时一个 BOM 就能撞满 20 次。
+FETCH_ACTIVE_LIMIT = 0
+FETCH_HOURLY_LIMIT = 0
 
 
 def _default_categ_id(env):
@@ -202,14 +207,18 @@ class LabCatalogController(http.Controller):
                                ('state', 'in', FETCH_ACTIVE_STATES)], limit=1)
         if active:
             return active.status_payload()
-        if Fetch.search_count([('requested_by', '=', user.id),
-                               ('state', 'in', FETCH_ACTIVE_STATES)]) >= FETCH_ACTIVE_LIMIT:
+        if (FETCH_ACTIVE_LIMIT
+                and Fetch.search_count([('requested_by', '=', user.id),
+                                        ('state', 'in', FETCH_ACTIVE_STATES)])
+                >= FETCH_ACTIVE_LIMIT):
             raise LabApiError(RATE_LIMITED, '你有多个抓取任务正在进行，请稍后再试。',
                               {'limit': 'active'})
         since = fields.Datetime.to_string(
             fields.Datetime.now() - timedelta(hours=1))
-        if Fetch.search_count([('requested_by', '=', user.id),
-                               ('create_date', '>=', since)]) >= FETCH_HOURLY_LIMIT:
+        if (FETCH_HOURLY_LIMIT
+                and Fetch.search_count([('requested_by', '=', user.id),
+                                        ('create_date', '>=', since)])
+                >= FETCH_HOURLY_LIMIT):
             raise LabApiError(RATE_LIMITED, '本小时抓取次数已达上限，请稍后再试。',
                               {'limit': 'hourly'})
         created = False
