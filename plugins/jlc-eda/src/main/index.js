@@ -190,6 +190,13 @@ async function dispatch(method, params) {
     case 'catalog.categories':
       return requireApi().categories();
 
+    case 'catalog.valueMatch':
+      // 无 C 编号器件：按「值 + 封装」查候选（只返回候选，不自动合并）。
+      return requireApi().valueMatch(
+        params && params.queries,
+        params && params.limit,
+      );
+
     case 'catalog.equivalents':
       return requireApi().equivalents(
         params && params.lines,
