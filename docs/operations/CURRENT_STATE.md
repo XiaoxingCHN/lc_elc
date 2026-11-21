@@ -1,5 +1,60 @@
 # 当前状态与已知限制
 
+## 2026-11-21 EDA 插件 4.0.0：去掉本机桥接，改用 API 密钥（未部署）
+
+**背景**：用户要求「只装插件，不装别的东西」。旧版带 89 MB 的 Node 桥接 + 配对码，必须先双击启动一个进程。
+
+**根因（查官方文档确认）**：EDA 的 `sys_ClientUrl.request()` 的 `options` 只有 `headers`/`integrity`，**没有 `credentials`**；而 `Cookie` 是 Fetch 规范的禁止请求头。Cookie 会话在插件里物理上不可能。`Authorization` 不是禁止头，而 Odoo 19 原生支持 `auth='bearer'`。
+
+**新增 `lab_eda` 模块**（`server/ubuntu22.04/odoo_addons/lab_eda`）：
+- `lab.eda.token`：绑定到具体用户，只存 sha256，发放权锁在 `group_lab_manager`
+- 插件端点 `/lab/api/eda/*`（`auth='none'` + bearer）
+- 管理页端点 `/lab/api/eda/manage/*`（`auth='user'` + 会话）
+- 现有 50 个 `auth='user'` 路由**一个没动**，网页端零影响
+
+**管理页**：`/lab/settings` 新增「EDA 插件密钥」区块（选择成员 → 备注 → 有效期 → 发放 → 明文只显示一次 → 列表显示前缀/到期/最近使用/状态 → 吊销）。
+
+**插件**：删除 `bridge/`（含 92 MB node.exe）、`relay.js`、`images.js`、配对码、Cookie 会话；`odoo.js` 改为 bearer；设置页只剩「服务器地址 + EDA 密钥」。包体积 **89 MB → 103 KB**。
+
+**验证（真实 Odoo + 真实 HTTP）**：
+- `lab_eda` 21 项 ORM 测试全绿；插件 119 单元 + 15 打包 = 134 项全绿
+- 无 token→MISSING_TOKEN、错 token→INVALID_TOKEN、吊销后立即失效
+- 操作员 `can_issue_for_others=false`、borrowers 只有自己；管理员可选他人
+- **操作员出库 `actor_id` = token 绑定用户**；管理员代领 `actor_id=7/borrower_id=8` 分离正确
+- 管理页 `/lab/settings` 200，EDA 区块表头 5 列、表单字段、结果区全部渲染；`data-workflow-config` 里三个端点映射正确
+- 页面级闭环：发放 → 明文 → bearer 生效 → 吊销 → 立即失效
+
+**过程中修掉的真 bug**：
+1. `lab_catalog` 和 `lab_workflow` 各有一个**同名不同类**的 `LabApiError`，`api_route` 只认自己那个 → 越权返回 `INTERNAL_ERROR` 而非 `FORBIDDEN`。已加 `_map_business_error` + 自己的 `eda_endpoint` 装饰器。
+2. `lab_web_list()` 用 `search([])` 会过滤 `active=False`，吊销后的密钥从管理页消失。已加 `with_context(active_test=False)`。
+3. `FORBIDDEN_CODES` 分支丢掉了 `error.fields`，UI 无法告诉用户缺哪个权限组。
+
+**未部署到生产**。生产仍是 `lab_catalog 19.0.2.0.19` / `lab_inventory 19.0.1.1.1`，没有 `lab_eda`。
+
+**未验证**：EDA 宿主实机（无法在此环境启动 EDA）。
+
+## 2026-11-21 域名更正：正式域名是 team.l-creation.club
+
+**`lc.rm.com` 是已停用的旧域名。** 全仓库（插件源码、默认配置、文档）已改为 `https://team.l-creation.club`；历史审计记录（`maintenance/audit/`、`maintenance/handoffs/` 与 CHANGELOG 的历史条目）保持原样，那是当时的真实记录，不改写。
+
+- nginx 只有 `team.l-creation.club` 一个业务 vhost（`/etc/nginx/sites-enabled/team-l-creation-club`），另有一个 `default-catchall` 把未匹配请求 404。
+- 实测：`https://team.l-creation.club/` 200、`/web/health` 200、内网 `http://192.168.31.105:8069/web/health` 200。
+- 插件默认上游：`src/main/config.js` `DEFAULT_SERVER_URL`、`bridge/server.mjs` `DEFAULT_UPSTREAM` 均已改为 `https://team.l-creation.club`。
+- 测试里的主机名统一改为 `lab.example.test`（占位符，避免再写死真实域名）；两条断言默认值的用例改为新域名。
+
+## 2026-11-21 EDA 插件 3.2.0 + 服务端等效件：已部署并验证
+
+- **免登录（P1+P2）**：凭证全部搬到本机桥接侧，插件端一个密码都不碰。新增 `bridge/lab-credentials.dat`，内容是 Windows DPAPI 加密后的 JSON（cookie 与密码同一个文件——`session_id` 本身就是 bearer 凭证，只加密一个没有意义）。桥接新增 `POST /session/restore`：cookie 有效直接进，失效用保存的密码自动重登，都失败返回 `restored: 'none'` 让插件回落到登录表单。`/logout` 删除保存的密码。`--no-save-credentials` 供公用机器。Linux 桥接不存密码。
+- **等效件（S5）**：新增 `/lab/api/catalog/equivalents`，一次请求处理整张 BOM。判定逻辑在 `lab_inventory/tools/equivalent_match.py`（纯逻辑、可离线测试）：容值/阻值不同或耐压/功率低于需求 = 硬冲突，**直接丢弃不展示**；参数不足退化为同封装同类别并标 `weak`。候选必须有可用库存。
+- **版本**：`lab_catalog 19.0.2.0.18 → 19.0.2.0.19`、`lab_inventory 19.0.1.1.0 → 19.0.1.1.1`、EDA 插件 `3.1.1 → 3.2.0`。
+- **部署**：`upgrade_modules.sh --code-dir` 走完整流程（备份 → 停服务 → 换代码 → `-u` → 健康检查 → 起服务）。退出码 0、0 条 ERROR、`/web/health` 200、`/web/login` 200。备份点 `/var/backups/lc-elc/20261120T162716Z-before-upgrade`。生产模块版本已确认 `lab_catalog 19.0.2.0.19` / `lab_inventory 19.0.1.1.1`。
+- **生产实测（Odoo shell，真实 stock.quant）**：造一组临时同规格器件（10kΩ ±1%，同封装），接口返回 `basis=params`、1 条 `strong` 候选、可用量 42、库位 R11、一致项「阻值 10kΩ / 精度 ±1%」。验证数据已删除，残留计数全为 0。
+- **生产真实数据无自然等效对**：现有 80 个有库存器件里没有两个同规格不同编号的，所以 S5 的验收场景在生产上**无法自然复现**——这是数据现状，不是功能缺陷。
+- **实测**：`test_equivalent_match.py` 21 项（纯逻辑，含 3 个已修 bug 的回归）；插件单元 131 + 桥接凭证 7 + 打包 15 = 153 全绿；`repo_check` PASS 53。
+- **未验证**：`test_catalog_equivalents.py`（ORM 测试）仍未在 Odoo 测试运行器上跑过——生产库不是测试靶场（AGENTS.md），隔离库需要改 `pg_hba.conf`，已试过并回滚。等效件的 ORM 路径改为在生产库上用 Odoo shell 直接验证（见上）。
+- **EDA 插件**：包已构建并交付用户，尚未在真实 EDA 宿主中实机验证。
+- 设计文档：[EDA 免登录与等效件](../../maintenance/tasks/2026-11-20-eda-persist-login-and-equivalents-design.md)
+
 ## 2026-11-19 客户端 1.3.5+22：作业页覆盖外壳；服务端已部署
 
 - 作业页（入库/领料/归还/标签/历史）曾带着分区切换器显示：`context.push` 在 shell 分支内会推到该分支的导航器。7 条根级路由加 `parentNavigatorKey: rootNavigatorKey` 后总是覆盖外壳。同时删掉 `/catalog` 在 `unifiedRoutes` 里的重复定义（根级那份赢得匹配，器件库其实不在外壳里）。

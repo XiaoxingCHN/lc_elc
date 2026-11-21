@@ -1,5 +1,5 @@
 {
   "client": "maintenance/registry/source-client-1.3.5-25b-20261120.json",
-  "server": "maintenance/registry/source-server-location-shape-20261120.json",
-  "eda": "maintenance/registry/source-eda-relay-token-20261120.json"
+  "server": "maintenance/registry/source-server-eda-token-20261121.json",
+  "eda": "maintenance/registry/source-eda-token-20261121.json"
 }

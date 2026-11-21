@@ -511,10 +511,10 @@ class LabP3BackendTest(TransactionCase):
         # 非管理员不能建号
         self._assert_code(CODE_FORBIDDEN,
                           self.common.with_user(self.operator).lab_admin_user_create,
-                          login='p3_new_a', name='新账号A', password='Passw0rd!2026')
+                          login='p3_new_a', name='新账号A', password='test-Pass2026a')
 
         created = self.common.with_user(self.manager).lab_admin_user_create(
-            login='p3_new_a', name='新账号A', password='Passw0rd!2026')
+            login='p3_new_a', name='新账号A', password='test-Pass2026a')
         self.assertTrue(created['user']['id'])
         self.assertEqual(created['user']['login'], 'p3_new_a')
         # 新账号默认只有内部用户组，没有任何库存角色
@@ -524,10 +524,10 @@ class LabP3BackendTest(TransactionCase):
 
         # 登录名重复 -> 冲突
         self._assert_code(CODE_CONFLICT, self.common.with_user(self.manager).lab_admin_user_create,
-                          login='p3_new_a', name='重复', password='Passw0rd!2026')
+                          login='p3_new_a', name='重复', password='test-Pass2026a')
         # 空密码 / 空登录名 -> 校验失败
         self._assert_code(CODE_VALIDATION, self.common.with_user(self.manager).lab_admin_user_create,
-                          login='', name='无登录名', password='Passw0rd!2026')
+                          login='', name='无登录名', password='test-Pass2026a')
         self._assert_code(CODE_VALIDATION, self.common.with_user(self.manager).lab_admin_user_create,
                           login='p3_new_b', name='无密码', password='')
 
@@ -541,9 +541,9 @@ class LabP3BackendTest(TransactionCase):
         })
         self._assert_code(CODE_FORBIDDEN,
                           self.common.with_user(self.operator).lab_admin_user_set_password,
-                          user_id=target.id, password='NewPass!2026')
+                          user_id=target.id, password='test-NewPass26a')
         changed = self.common.with_user(self.manager).lab_admin_user_set_password(
-            user_id=target.id, password='NewPass!2026')
+            user_id=target.id, password='test-NewPass26a')
         self.assertTrue(changed['changed'])
         # 新密码确实生效（Odoo 19 的 authenticate 签名是
         # (credential, user_agent_env)，返回 {'uid': ...} 而不是 int）
