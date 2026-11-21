@@ -939,6 +939,8 @@ function bomEquivalentCandidateLine(row, candidate) {
 
 /** The extra table row rendered under one BOM line; null when it has no candidates. */
 function bomEquivalentsExtraRow(row, columnCount) {
+  // 无 C 编号的行没有 equivalents（候选直接显示在库位列里）。
+  if (!row || row.unmappedGroup) return null;
   const eq = row.equivalents;
   if (!eq || !Array.isArray(eq.candidates) || !eq.candidates.length) return null;
   const key = row.itemKey || 'lcsc:' + row.code;
@@ -1128,20 +1130,53 @@ function renderBom() {
   }
 
   const rows = bom.rows || [];
-  if (rows.length) {
-    const tableRows = rows.map((row) => [
-      bomStatusCell(row),
-      el('span', { class: 'mono' }, row.code),
-      row.name || '—',
-      (row.designators || []).join(','),
-      fmtQty(row.need),
-      row.available === null ? '未知' : fmtQty(row.available),
-      row.gap === null ? '未知' : fmtQty(row.gap),
-      (row.locations || [])
-        .map((location) => locationSummary(location))
-        .join(' ') || '—',
-      bagTraceSummary(row.bags),
-    ]);
+  // 无 C 编号的器件**并进主表**，不再单独一栏。用户说「没必要把没有立创
+  // C 编号的器件单拿出来」——它们在 BOM 里同样是器件，只是身份靠值+封装。
+  const unmappedRows = (bom.unmappedGroups || []).map((group) => ({
+    unmappedGroup: group,
+    status: BOM_STATUS.NO_CODE,
+    code: '',
+    name: group.value || '—',
+    designators: group.designators || [],
+    need: group.quantity,
+  }));
+  const allRows = rows.concat(unmappedRows);
+  if (allRows.length) {
+    const tableRows = allRows.map((row) => {
+      if (row.unmappedGroup) {
+        // 无编号行：C 编号列显示「无」，可用/缺口留空，库位列显示候选。
+        return [
+          bomStatusCell(row),
+          el('span', { class: 'muted' }, '无'),
+          el('span', {}, (row.unmappedGroup.value || '—') +
+            (row.unmappedGroup.footprint ? ' · ' + row.unmappedGroup.footprint : '')),
+          (row.designators || []).join(','),
+          fmtQty(row.need),
+          '—',
+          '—',
+          renderValueCandidates(row.unmappedGroup),
+          '—',
+        ];
+      }
+      // NOT_IN_CATALOG 是「资料库里没有这个 C 编号」，不是「库存为 0」。
+      // 用户看到「库存未知」会以为是数据延迟，其实要去抓取或建档。
+      const isNotInCatalog = row.status === BOM_STATUS.NOT_IN_CATALOG;
+      return [
+        bomStatusCell(row),
+        el('span', { class: 'mono' }, row.code),
+        row.name || '—',
+        (row.designators || []).join(','),
+        fmtQty(row.need),
+        row.available === null ? '未知' : fmtQty(row.available),
+        row.gap === null ? '未知' : fmtQty(row.gap),
+        isNotInCatalog
+          ? el('span', { class: 'muted' }, '资料库无此编号，需抓取或建档')
+          : ((row.locations || [])
+              .map((location) => locationSummary(location))
+              .join(' ') || '—'),
+        isNotInCatalog ? '—' : bagTraceSummary(row.bags),
+      ];
+    });
     dom.view.appendChild(
       section('对比结果', [
         table(
@@ -1157,7 +1192,7 @@ function renderBom() {
             { label: '袋' },
           ],
           tableRows,
-          { rowAfter: (cells, index) => bomEquivalentsExtraRow(rows[index], BOM_COLUMNS) },
+          { rowAfter: (cells, index) => bomEquivalentsExtraRow(allRows[index], BOM_COLUMNS) },
         ),
         el('div', { class: 'row', style: 'margin-top:10px' }, [
           el('button', { class: 'btn', type: 'button', onclick: () => copyText(bomTsv(rows), '已复制对比表') }, '复制对比表'),
@@ -1167,30 +1202,15 @@ function renderBom() {
     );
   }
 
-  if (bom.unmapped && bom.unmapped.length) {
+  // 无 C 编号的器件不再单独一栏——用户说「没必要把没有立创 C 编号的器件
+  // 单拿出来」。它们的候选已经并进主表（见 bomUnmappedRows），
+  // 这里只在检索失败时提示一句，避免静默。
+  if (bom.valueMatchError) {
     dom.view.appendChild(
-      section('没有立创 C 编号的器件（按值 + 封装匹配）', [
-        el('p', { class: 'muted', style: 'margin:0 0 8px' },
-          '这些器件原理图里只填了值和封装、没填立创编号。下面按「值 + 封装」' +
-          '去器件库搜出的候选仅供参考——插件不会自动合并或替换，' +
-          '确认要用哪个请到网页端建好编号后重新读取。'),
-        bom.valueMatchError
-          ? errorBox(bom.valueMatchError, { retry: () => loadValueMatches() })
-          : null,
-        bom.valueMatchLoading
-          ? el('p', { class: 'muted' }, '正在按值 + 封装检索…')
-          : null,
-        table(
-          [{ label: '位号' }, { label: '值' }, { label: '封装' }, { label: '数量' },
-           { label: '库中候选（有库存）' }],
-          (bom.unmappedGroups || groupUnmappedByValue(bom.unmapped)).map((group) => [
-            (group.designators || []).join(', ') || '—',
-            group.value || '—',
-            group.footprint || '—',
-            fmtQty(group.quantity),
-            renderValueCandidates(group),
-          ]),
-        ),
+      section('值 + 封装检索失败', [
+        errorBox(bom.valueMatchError, { retry: () => loadValueMatches() }),
+        el('p', { class: 'muted' },
+          '主表里「无 C 编号」的行暂时没有候选，但库存对比不受影响。'),
       ]),
     );
   }
