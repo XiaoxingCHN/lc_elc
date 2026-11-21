@@ -1,5 +1,5 @@
 {
   "client": "maintenance/registry/source-client-1.3.5-25b-20261120.json",
-  "server": "maintenance/registry/source-server-pkg-20261121.json",
-  "eda": "maintenance/registry/source-eda-pkg-20261121.json"
+  "server": "maintenance/registry/source-server-conn-20261121.json",
+  "eda": "maintenance/registry/source-eda-conn-20261121.json"
 }
