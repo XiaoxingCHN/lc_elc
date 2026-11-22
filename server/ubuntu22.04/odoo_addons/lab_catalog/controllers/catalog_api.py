@@ -291,8 +291,12 @@ class LabCatalogController(http.Controller):
             item_key = str(raw.get('item_key') or '').strip()
             if not item_key:
                 continue
-            clean.append({'item_key': item_key,
-                          'quantity': raw.get('quantity')})
+            clean.append({
+                'item_key': item_key,
+                'quantity': raw.get('quantity'),
+                'name': str(raw.get('name') or '').strip(),
+                'footprint': str(raw.get('footprint') or '').strip(),
+            })
         limit = params.get('limit_per_line')
         try:
             limit = int(limit) if limit is not None else 5

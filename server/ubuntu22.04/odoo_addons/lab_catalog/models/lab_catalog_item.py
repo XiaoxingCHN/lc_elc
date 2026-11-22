@@ -1061,17 +1061,121 @@ class LabCatalogItem(models.Model):
                             'source': None, 'candidates': []})
                 continue
             out.append(self._equivalents_for_code(
-                val, limit_per_line, avail_by_tmpl))
+                val, limit_per_line, avail_by_tmpl,
+                name=str(raw.get('name') or '').strip(),
+                footprint=str(raw.get('footprint') or '').strip()))
         return {'lines': out}
 
     @api.model
-    def _equivalents_for_code(self, code, limit_per_line, avail_by_tmpl):
-        """单个 C 编号的等效候选。"""
+    @api.model
+    def _equivalents_by_value(self, code, name, footprint, limit_per_line,
+                              avail_by_tmpl):
+        """C 编号没采集时，用「值 + 封装」去实验室库存找候选。
+
+        返回的形状与正常路径一致（``item_key`` 用 ``lab:<id>``，
+        因为候选来自实验室自己的档案而不是立创资料库）。
+        """
+        value = (name or '').strip()
+        pkg = (footprint or '').strip()
+        if not value:
+            return {'item_key': 'lcsc:%s' % code, 'basis': 'none',
+                    'source': None, 'candidates': []}
+
+        # 封装的 C0603/R0603 与实验室的 0603 是同一种；只认带前缀的写法。
+        chip = re.match(r'^([CRL])(\d{4})$', pkg.upper())
+        if chip:
+            pkg = chip.group(2)
+
+        domain = [('lab_sn', '!=', False), ('lab_search_specs', 'ilike', value)]
+        if pkg:
+            domain.append(('lab_package', '=ilike', pkg))
+        templates = self.env['product.template'].search(domain, limit=limit_per_line * 6)
+
+        # 值必须独立出现：`10k` 不能因为 `110kΩ` 含 `10k` 就算命中。
+        strict = re.compile(r'(?<![0-9a-z.])' + re.escape(value.lower()) + r'(?![0-9])')
+        templates = templates.filtered(
+            lambda tmpl: strict.search(str(tmpl.lab_search_specs or '').lower()))
+
+        # 一次取回所有候选的袋/库位，避免逐条 N+1。
+        all_tids = templates.ids
+        _all_locations, all_bags, _i, _h = (
+            self._workflow_overlay(all_tids) if all_tids else ([], [], [], []))
+
+        # 库位按模板重新归集：_workflow_overlay 把一批模板合在一起，
+        # 直接复用会把 A 候选的库位挂到 B 候选上。
+        loc_by_tid = {}
+        for quant in self.env['stock.quant'].search_read(
+                [('product_id.product_tmpl_id', 'in', all_tids),
+                 ('location_id.usage', '=', 'internal'), ('quantity', '!=', 0)],
+                ['product_id', 'location_id', 'quantity', 'available_quantity']):
+            tid = (self.env['product.product'].browse(quant['product_id'][0])
+                   .product_tmpl_id.id) if quant['product_id'] else None
+            if tid:
+                loc_by_tid.setdefault(tid, []).append(quant)
+
+        candidates = []
+        for tmpl in templates:
+            available = sum(avail_by_tmpl.get(t.id, 0.0) for t in tmpl)
+            if available <= 0:
+                continue
+            bags = [b for b in all_bags
+                    if (b.get('product_tmpl_id') or [None])[0] == tmpl.id]
+            slots = {}
+            for quant in loc_by_tid.get(tmpl.id, []):
+                loc_id = quant['location_id'][0] if quant['location_id'] else False
+                if not loc_id:
+                    continue
+                slot = slots.get(loc_id)
+                if slot is None:
+                    location = self.env['stock.location'].browse(loc_id)
+                    slot = slots[loc_id] = {
+                        'id': loc_id, 'code': getattr(location, 'lab_code', '') or '',
+                        'name': location.name or '',
+                        'path': location.complete_name or location.display_name or '',
+                        'location': location.display_name or '',
+                        'quantity': 0.0, 'available_quantity': 0.0,
+                    }
+                slot['quantity'] += quant.get('quantity') or 0.0
+                slot['available_quantity'] += quant.get('available_quantity') or 0.0
+            locations = sorted(slots.values(), key=lambda x: x['path'] or x['location'])
+            candidates.append({
+                'item_key': 'lab:%d' % tmpl.id,
+                'catalog_code': tmpl.lab_lcsc_code_norm or '',
+                'sn': tmpl.lab_sn or '',
+                'name': tmpl.name or '',
+                'brand': tmpl.lab_brand or '',
+                'package': tmpl.lab_package or '',
+                'available': available,
+                'locations': locations,
+                'bags': [{'id': b.get('id'), 'trace_code': b.get('trace_code') or '',
+                          'available_quantity': b.get('outstanding_quantity') or 0}
+                         for b in bags],
+                'matched': [{'name': '值', 'value': value}],
+                'conflicts': [],
+                'confidence': 'weak',   # 只有值+封装，没比参数
+            })
+        candidates.sort(key=lambda c: -c['available'])
+        return {
+            'item_key': 'lcsc:%s' % code,
+            'basis': 'value_package',
+            'source': {'item_key': 'lcsc:%s' % code, 'catalog_code': code,
+                       'name': value, 'package': pkg, 'parameters': []},
+            'candidates': candidates[:limit_per_line],
+        }
+
+    def _equivalents_for_code(self, code, limit_per_line, avail_by_tmpl,
+                              name='', footprint=''):
+        """单个 C 编号的等效候选。
+
+        资料库里没有这个 C 编号时（``C51376376`` 这种未采集编号很常见），
+        退回用 EDA 给的**值 + 封装**去实验室库存找——用户看到的是
+        「明明有 100nF 却匹配不到」，实际是编号没采集，不是没有料。
+        """
         item = self.search([('catalog_code', '=', code),
                             ('market', '=', MARKET_CN)], limit=1)
         if not item:
-            return {'item_key': 'lcsc:%s' % code, 'basis': 'none',
-                    'source': None, 'candidates': []}
+            return self._equivalents_by_value(
+                code, name, footprint, limit_per_line, avail_by_tmpl)
 
         source_params = [{'name': p.name or '', 'value': p.value or ''}
                          for p in item.param_ids]

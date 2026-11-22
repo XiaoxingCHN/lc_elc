@@ -100,3 +100,15 @@ test('substitutionNote keeps the plain prefix without substitutes and lists them
     'BOM 一键出库；替代：C14663 → C1525 ×2, C25804 → C7711 ×1',
   );
 });
+
+test('equivalentsRequestLines carries name and footprint for catalog misses', () => {
+  // 资料库里没有这个 C 编号时，服务端要靠「值 + 封装」去实验室库存找候选。
+  const rows = [
+    row({ code: 'C51376376', itemKey: 'lcsc:C51376376', name: '100nF',
+          footprint: 'C0603', status: BOM_STATUS.NOT_IN_CATALOG, gap: 20 }),
+  ];
+  const lines = equivalentsRequestLines(rows);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].name, '100nF');
+  assert.equal(lines[0].footprint, '0603');
+});
