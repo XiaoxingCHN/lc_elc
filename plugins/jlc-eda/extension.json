@@ -3,7 +3,7 @@
   "uuid": "1329a87d576b4b8cbb8592b1c1012b8b",
   "displayName": "实验室库存联动（Odoo 19）",
   "description": "画图助手：在嘉立创 EDA 专业版中按立创 C 编号查询实验室实时库存、库位与袋追溯码，并对整张原理图/BOM 一键出库。入库、归还与扫码追溯请在网页端或 Flutter 客户端办理。",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "publisher": "lab",
   "engines": {
     "eda": "^4.0.0"

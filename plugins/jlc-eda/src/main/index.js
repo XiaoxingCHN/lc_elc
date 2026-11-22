@@ -24,7 +24,7 @@ import { handleOutbound } from '../shared/outbound.js';
 import { getEda, resolveEda, scanProjectBom, scanSchematic, toast } from './eda.js';
 import { installBridge, makeNonce, openOdooAction, openPanel } from './panel.js';
 
-export const VERSION = '4.0.0';
+export const VERSION = '4.1.0';
 
 /**
  * 宿主每次点菜单都会重新执行整个 bundle，模块级状态会丢。把运行时挂在

@@ -34,6 +34,17 @@ test('package exists at the expected deterministic name', async () => {
   assert.ok(buffer.length > 50000);
 });
 
+test('main bundle reports the same version as extension.json', async () => {
+  // 主模块的 VERSION 用于日志和诊断页；漏改会导致「扩展管理器 4.1.0、
+  // 诊断页 4.0.0」，排查时对不上。
+  const { zip, extension } = await loadPackage();
+  const js = await zip.file('dist/index.js').async('string');
+  const match = js.match(/(?:const|var|let)\s+VERSION\s*=\s*['"]([^'"]+)['"]/);
+  assert.ok(match, 'main bundle should declare a VERSION constant');
+  assert.equal(match[1], extension.version,
+    'main VERSION must match extension.json');
+});
+
 test('iframe bundle reports the same version as extension.json', async () => {
   // 面板左上角显示的版本来自 iframe/app.js 里的 VERSION 常量，与
   // extension.json 是两个独立的地方。漏改一个，扩展管理器里显示 4.0.0
