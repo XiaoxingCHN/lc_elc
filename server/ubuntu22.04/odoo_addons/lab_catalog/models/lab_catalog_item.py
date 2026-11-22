@@ -1086,15 +1086,25 @@ class LabCatalogItem(models.Model):
         if chip:
             pkg = chip.group(2)
 
-        domain = [('lab_sn', '!=', False), ('lab_search_specs', 'ilike', value)]
+        # 值和型号**都要搜**：电容电阻靠值（100nF），连接器只有型号
+        # （WAFER-GH1.25-2PLB）。只搜 lab_search_specs 会让连接器永远 0 候选。
+        domain = [('lab_sn', '!=', False),
+                  '|', ('lab_search_specs', 'ilike', value),
+                  ('lab_mpn', 'ilike', value)]
         if pkg:
             domain.append(('lab_package', '=ilike', pkg))
         templates = self.env['product.template'].search(domain, limit=limit_per_line * 6)
 
         # 值必须独立出现：`10k` 不能因为 `110kΩ` 含 `10k` 就算命中。
+        # 型号（连接器）没有这种边界问题，命中即可。
         strict = re.compile(r'(?<![0-9a-z.])' + re.escape(value.lower()) + r'(?![0-9])')
-        templates = templates.filtered(
-            lambda tmpl: strict.search(str(tmpl.lab_search_specs or '').lower()))
+
+        def _hit(tmpl):
+            if strict.search(str(tmpl.lab_search_specs or '').lower()):
+                return True
+            return value.lower() in str(tmpl.lab_mpn or '').lower()
+
+        templates = templates.filtered(_hit)
 
         # 一次取回所有候选的袋/库位，避免逐条 N+1。
         all_tids = templates.ids

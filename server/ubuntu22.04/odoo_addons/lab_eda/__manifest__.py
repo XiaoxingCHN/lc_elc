@@ -1,6 +1,6 @@
 {
     "name": "实验室库存 EDA 插件接口",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.2",
     "summary": "嘉立创 EDA 专业版插件专用接口：API Token 认证，不依赖 Cookie 会话",
     "description": """
 EDA 插件专用接口
