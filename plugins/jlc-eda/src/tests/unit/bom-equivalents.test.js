@@ -26,7 +26,9 @@ const C1525 = {
   conflicts: [],
 };
 
-test('equivalentsRequestLines asks only for missing lines and sends the gap', () => {
+test('equivalentsRequestLines asks for missing, uncatalogued and unknown lines', () => {
+  // 只有 OK 的行不需要候选；SHORT / NOT_IN_CATALOG / UNKNOWN 都要。
+  // UNKNOWN 表示详情接口没数据（编号未采集），不是「库存为 0」。
   const rows = [
     row({ code: 'C1', itemKey: 'lcsc:C1', status: BOM_STATUS.OK, gap: 0, need: 2 }),
     row({ code: 'C2', itemKey: 'lcsc:C2', status: BOM_STATUS.SHORT, gap: 3, need: 5 }),
@@ -36,6 +38,7 @@ test('equivalentsRequestLines asks only for missing lines and sends the gap', ()
   assert.deepEqual(equivalentsRequestLines(rows), [
     { item_key: 'lcsc:C2', quantity: 3 },
     { item_key: 'lcsc:C3', quantity: 7 },
+    { item_key: 'lcsc:C4', quantity: 1 },
   ]);
   assert.deepEqual(equivalentsRequestLines([]), []);
   assert.deepEqual(equivalentsRequestLines(null), []);
@@ -111,4 +114,22 @@ test('equivalentsRequestLines carries name and footprint for catalog misses', ()
   assert.equal(lines.length, 1);
   assert.equal(lines[0].name, '100nF');
   assert.equal(lines[0].footprint, '0603');
+});
+
+test('equivalentsRequestLines also asks for UNKNOWN rows', () => {
+  // 「库存未知」= 详情接口没返回数据（编号未采集）。这些行**同样**需要
+  // 按值+封装去实验室库存找候选——用户看到的就是「明明有 100nF 却不匹配」。
+  const rows = [
+    row({ code: 'C51376376', itemKey: 'lcsc:C51376376', name: '100nF',
+          footprint: 'C0603', status: BOM_STATUS.UNKNOWN, gap: null, need: 20 }),
+  ];
+  const lines = equivalentsRequestLines(rows);
+  assert.equal(lines.length, 1, 'UNKNOWN rows must be requested too');
+  assert.equal(lines[0].name, '100nF');
+  assert.equal(lines[0].quantity, 20);   // gap 为 null 时用 need
+});
+
+test('equivalentsRequestLines skips rows that are already OK', () => {
+  const rows = [row({ code: 'C1', itemKey: 'lcsc:C1', status: BOM_STATUS.OK, gap: 0 })];
+  assert.deepEqual(equivalentsRequestLines(rows), []);
 });

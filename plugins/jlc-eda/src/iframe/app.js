@@ -35,7 +35,7 @@ import {
   locationSummary,
 } from '../shared/detail.js';
 
-const VERSION = '4.1.0';
+const VERSION = '4.1.1';
 
 const TABS = [
   { id: 'inventory', label: '器件库' },

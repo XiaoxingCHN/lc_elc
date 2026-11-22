@@ -142,3 +142,16 @@ test('real grouped BOM retains demand through comparison, totals and TSV',()=>{
  const rows=grouped.lines.map(line=>compareLine(line,{item:{lab_available_quantity:2,lab_quantity:2}}));
  assert.equal(rows[0].need,3);assert.equal(summarize(rows).need,3);assert.equal(rows[0].gap,1);assert.match(bomTsv(rows),/\t3\t2\t1\t/);
 });
+
+test('groupBom keeps the footprint so equivalents can fall back by value', () => {
+  // 资料库里没有这个 C 编号时，服务端要靠 name + footprint 去实验室库存找。
+  // 以前 groupBom 只保留 name，footprint 被丢掉了。
+  const { lines } = groupBom([
+    { code: 'C51376376', name: '100nF', footprint: 'C0603', designator: 'C1' },
+    { code: 'C51376376', name: '100nF', footprint: 'C0603', designator: 'C2' },
+  ]);
+  assert.equal(lines.length, 1);
+  // 归一化后是 0603（EDA 的 C0603 与实验室的 0603 是同一种封装）。
+  assert.equal(lines[0].footprint, '0603');
+  assert.deepEqual(lines[0].designators, ['C1', 'C2']);
+});
