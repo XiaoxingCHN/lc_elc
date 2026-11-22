@@ -312,8 +312,15 @@ class LabEdaApi(http.Controller):
                     continue
                 item_key = str(raw.get('item_key') or '').strip()
                 if item_key:
-                    clean.append({'item_key': item_key,
-                                  'quantity': raw.get('quantity')})
+                    # name/footprint 必须透传：资料库里没有这个 C 编号时，
+                    # 模型层要靠它们去实验室库存找候选。漏了这两个字段，
+                    # 「库存未知」的行就永远拿不到候选（真实踩过）。
+                    clean.append({
+                        'item_key': item_key,
+                        'quantity': raw.get('quantity'),
+                        'name': str(raw.get('name') or '').strip(),
+                        'footprint': str(raw.get('footprint') or '').strip(),
+                    })
             try:
                 limit = int(params.get('limit_per_line') or 5)
             except (TypeError, ValueError):
