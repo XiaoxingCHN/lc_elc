@@ -17,7 +17,7 @@ from odoo.exceptions import AccessError
 from odoo.http import request
 
 from odoo.addons.lab_catalog.controllers.envelope import (
-    VALIDATION_ERROR, as_int, require)
+    VALIDATION_ERROR, LabApiError, as_int, require)
 
 _logger = logging.getLogger(__name__)
 

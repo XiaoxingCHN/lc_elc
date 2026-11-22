@@ -1,6 +1,6 @@
 {
   "name": "lab-inventory-odoo-v3",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "private": true,
   "type": "module",
   "description": "嘉立创EDA专业版库存插件（Odoo 19 会话版）",
