@@ -139,10 +139,20 @@ export function createLabApi(client) {
 
   async function equivalents(lines, limitPerLine = 5) {
     return client.call('/lab/api/eda/catalog/equivalents', {
-      lines: (Array.isArray(lines) ? lines : []).map((line) => ({
-        item_key: String((line && line.item_key) || ''),
-        quantity: Number(line && line.quantity) || 0,
-      })).filter((line) => line.item_key),
+      lines: (Array.isArray(lines) ? lines : []).map((line) => {
+        const out = {
+          item_key: String((line && line.item_key) || ''),
+          quantity: Number(line && line.quantity) || 0,
+        };
+        // name / footprint 必须一起发：资料库里没有这个 C 编号时，
+        // 服务端要靠「值 + 封装」去实验室库存找候选。漏了这两个字段，
+        // 所有未采集编号都只会返回空候选。
+        const name = String((line && line.name) || '').trim();
+        if (name) out.name = name;
+        const footprint = String((line && line.footprint) || '').trim();
+        if (footprint) out.footprint = footprint;
+        return out;
+      }).filter((line) => line.item_key),
       limit_per_line: limitPerLine,
     });
   }

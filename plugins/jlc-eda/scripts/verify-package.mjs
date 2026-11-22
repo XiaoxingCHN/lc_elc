@@ -56,6 +56,12 @@ async function main() {
   if (mainJs.length < 10000) fail('dist/index.js too small: ' + mainJs.length);
   if (!mainJs.includes('activate')) fail('dist/index.js missing activate export');
   if (!mainJs.includes('showInventoryPanel')) fail('dist/index.js missing menu export');
+  // 产物级断言：等效件请求必须转发 name/footprint。
+  // 源码改了但包没重打，或者改在了别的分支/工作区，这条会红。
+  const eqBlock = mainJs.slice(mainJs.indexOf('catalog/equivalents'));
+  const eqFn = eqBlock.slice(0, eqBlock.indexOf('limit_per_line'));
+  if (!eqFn.includes('name')) fail('dist/index.js: equivalents() does not forward name');
+  if (!eqFn.includes('footprint')) fail('dist/index.js: equivalents() does not forward footprint');
 
   const iframeHtml = await zip.file('iframe/app.html').async('string');
   if (!/<script>[\s\S]*lab\.odoo\.v3\.rpc[\s\S]*<\/script>/.test(iframeHtml)) fail('iframe/app.html is not self-contained');
@@ -74,7 +80,8 @@ async function main() {
   }
 
   const readme = await zip.file('README.md').async('string');
-  for (const phrase of ['Odoo 19', '3.0.3', 'CORS', 'session_id', 'group_lab_operator']) {
+  // 4.x 的 README 讲的是密钥认证，不再是 3.x 的 CORS/Cookie 桥接。
+  for (const phrase of ['Odoo 19', 'EDA 密钥', 'team.l-creation.club']) {
     if (!readme.includes(phrase)) fail('README missing required note: ' + phrase);
   }
 
@@ -87,19 +94,17 @@ async function main() {
   const bundleBuffer = await fs.readFile(bundlePath);
   const bundle = await JSZip.loadAsync(bundleBuffer);
   const bundleNames = Object.keys(bundle.files).filter((name) => !bundle.files[name].dir).sort();
+  // 4.0.0 起没有本机桥接：包里只有 eext + 说明 + 哈希。
   for (const required of [
     'lab-inventory-odoo_v' + extension.version + '.eext',
-    'bridge/server.mjs',
-    'bridge/start-windows.cmd',
-    'bridge/start-linux.sh',
-    'bridge/快速启动.txt',
-    'bridge/runtime/node.exe',
-    'bridge/runtime/NODE-LICENSE.txt',
     '安装说明.txt',
     'SHA256.txt',
     'README.md',
   ]) {
     if (!bundleNames.includes(required)) fail('missing bundle file: ' + required);
+  }
+  for (const forbidden of ['bridge/server.mjs', 'bridge/runtime/node.exe']) {
+    if (bundleNames.includes(forbidden)) fail('bundle must not contain ' + forbidden);
   }
   if (bundleNames.some((name) => name.startsWith('node_modules/'))) fail('bundle contains node_modules');
   const inside = await bundle.file('lab-inventory-odoo_v' + extension.version + '.eext').async('nodebuffer');
@@ -107,7 +112,7 @@ async function main() {
   const shaText = await bundle.file('SHA256.txt').async('string');
   if (!shaText.includes(manifestSha)) fail('bundle SHA256.txt missing eext hash');
   const installText = await bundle.file('安装说明.txt').async('string');
-  if (!installText.includes('start-windows.cmd') || !installText.includes('配对码')) fail('bundle install instructions incomplete');
+  if (!installText.includes('EDA 密钥') || !installText.includes('管理')) fail('bundle install instructions incomplete');
   const bundleManifest = JSON.parse(await fs.readFile(path.join(ROOT, 'build', 'bundle-manifest.json'), 'utf8'));
   if (bundleManifest.sha256 !== sha256(bundleBuffer)) fail('bundle manifest hash mismatch');
   console.log('Bundle Files ' + bundleNames.length + ', bytes ' + bundleBuffer.length);

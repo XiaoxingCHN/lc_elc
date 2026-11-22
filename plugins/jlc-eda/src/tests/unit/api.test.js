@@ -76,20 +76,23 @@ test('issue validates borrower, project and unique bag lines', async () => {
   );
 });
 
-test('equivalents sends the batch lines and limit_per_line, dropping empty keys', async () => {
+test('equivalents forwards name and footprint with each line', async () => {
+  // 服务端要靠 name/footprint 在资料库没有该 C 编号时去实验室库存找候选。
+  // 旧断言把「只有 item_key+quantity」当成正确结果，等于把 bug 固化进测试
+  // ——这正是 4.1.2 包测试全绿却功能不生效的原因。
   const client = makeClient();
   const api = createLabApi(client);
   await api.equivalents([
-    { item_key: 'lcsc:C14663', quantity: 4 },
+    { item_key: 'lcsc:C51376376', quantity: 20, name: '100nF', footprint: '0603' },
     { item_key: '', quantity: 2 },
     null,
-    { item_key: 'lcsc:C25804', quantity: '1' },
+    { item_key: 'lcsc:C25804', quantity: '1', name: '  ' },
   ]);
   assert.deepEqual(client.calls[0], {
     path: '/lab/api/eda/catalog/equivalents',
     params: {
       lines: [
-        { item_key: 'lcsc:C14663', quantity: 4 },
+        { item_key: 'lcsc:C51376376', quantity: 20, name: '100nF', footprint: '0603' },
         { item_key: 'lcsc:C25804', quantity: 1 },
       ],
       limit_per_line: 5,
