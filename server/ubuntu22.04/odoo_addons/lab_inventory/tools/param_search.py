@@ -10,6 +10,18 @@ import json
 import re
 import unicodedata
 
+try:                                   # Odoo 内：包内相对导入
+    from . import component_model
+except ImportError:                    # 按文件路径加载（导入器、离线测试）
+    import importlib.util as _ilu
+    import os as _os
+    _spec = _ilu.spec_from_file_location(
+        'lc_component_model',
+        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                      'component_model.py'))
+    component_model = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(component_model)
+
 _SI = {
     'p': 1e-12,
     'n': 1e-9,
@@ -62,21 +74,30 @@ def _pair(entry):
 
 
 def key_pairs(parameters):
-    """Select label-sized key parameters (same rules as label printing)."""
+    """Select label-sized key parameters (same rules as label printing).
+
+    以前用子串匹配 + 手写别名表，遇到 ``耗散功率(Pd)`` 这种带括号的写法会漏。
+    现在交给 :mod:`component_model`：先判定器件类型，再按类型取字段——
+    同一概念的不同写法（容值/容量/电容量）自动归到一起。
+    """
     pairs = []
     for entry in parameters or []:
         name, value = _pair(entry)
         if name or value:
             pairs.append((name, value))
-    if any('阻值' in name for name, _value in pairs):
-        keys = ('阻值', '精度', '功率')
-    elif any(any(k in name for k in ('容值', '容量', '电容量'))
-             for name, _value in pairs):
-        keys = ('容值', '容量', '电容量', '耐压', '额定电压', '介质', '材质')
-    else:
+
+    kind = component_model.classify(parameters)
+    fields = component_model.TYPE_FIELDS.get(kind) or ()
+    if not fields:
         return pairs[:3]
-    return [(name, value) for name, value in pairs
-            if any(key in name for key in keys)][:4]
+
+    mapping = component_model.field_map(parameters)
+    out = []
+    for field in fields:
+        entry = mapping.get(field)
+        if entry:
+            out.append(entry)
+    return out[:4]
 
 
 def key_parameter_dicts(parameters):
