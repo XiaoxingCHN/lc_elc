@@ -295,6 +295,42 @@ class LabP3BackendTest(TransactionCase):
         })
         self.assertEqual(error.fields.get('location_id'), 'inactive')
 
+    def test_13_location_tree_and_move_replay(self):
+        model = self.env['stock.location']
+        directory = model.create({
+            'name': 'P3 directory', 'usage': 'view', 'company_id': self.company.id,
+        })
+        child = model.create({
+            'name': 'P3 nested', 'usage': 'internal', 'company_id': self.company.id,
+            'location_id': self.location_b.id,
+        })
+        receipt = self._receipt(3, child)
+        bag = self.env['lab.bag'].browse(receipt['bag']['id'])
+        manager = self.common.with_user(self.manager)
+        key = _key('move')
+        args = {'location_id': self.location_b.id, 'parent_id': directory.id,
+                'update_parent': True, 'request_key': key}
+        moved = manager.lab_location_update(**args)['location']
+        self.assertEqual(moved['parent_id'], directory.id)
+        self.assertEqual(moved['code'], self.location_b.lab_code)
+        self.assertEqual(child.location_id, self.location_b)
+        self.assertIn('P3 directory', child.complete_name)
+        self.assertEqual(bag.location_id, child)
+        self.assertEqual(bag.quantity, 3)
+        self.assertEqual(self._stored_quantity(child, bag.lot_id), 3)
+        tree = manager.lab_locations(with_tree=True)
+        self.assertIn(directory.id, [row['id'] for row in tree['ancestors']])
+        self.assertNotIn(directory.id, [row['id'] for row in tree['locations']])
+        self.assertNotIn('ancestors', manager.lab_locations())
+        self._assert_code(CODE_FORBIDDEN, self.common.with_user(self.operator).lab_location_update,
+                          **args)
+        self._assert_code(CODE_CONFLICT, manager.lab_location_update,
+                          **dict(args, parent_id=False))
+        manager.lab_location_update(location_id=self.location_b.id, update_parent=True,
+                                    parent_id=self.location_a.id, request_key=_key('move'))
+        self.assertTrue(manager.lab_location_update(**args)['replayed'])
+        self.assertEqual(self.location_b.location_id, self.location_a)
+
     # ==================================================================
     # 4. 类别→库位映射
     # ==================================================================

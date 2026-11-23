@@ -1,10 +1,14 @@
 # 立创采集与Odoo资料同步服务
 
-## 唯一源码与生产事实
+## 现行方式与源码
+
+日常资料更新通过 Web 或 Flutter 按需触发。装配和 SMT 数据可用立创开放平台读取，已有中文详情抓取路径用于补充字段。按需结果更新立创资料，并与实验室库存区分。生产版本和验证范围见[当前状态](../../docs/operations/CURRENT_STATE.md)。
 
 采集Python源码唯一入口是server/ubuntu22.04/crawler，保留它在现有部署布局以兼容安装器和依赖准备器，不在这里再复制第二套可编辑源码。Odoo导入器为server/ubuntu22.04/odoo_addons/lab_catalog/tools/import_catalog.py。
 
-systemd-production是归档时从192.168.31.105只读导出的完整实际定义（含drop-in），服务器时区Asia/Shanghai；没有重启/改变服务，也没有读取/etc/odoo.conf或环境凭据。
+## 历史部署快照
+
+`systemd-production` 是归档时从192.168.31.105只读导出的完整实际定义（含drop-in），服务器时区Asia/Shanghai；没有重启/改变服务，也没有读取/etc/odoo.conf或环境凭据。
 
 - lcsc-crawler.timer：每日03:30启动，enabled。
 - lcsc-crawler-stop.timer：每日05:30停止，enabled；停止service仅在采集服务active时运行。

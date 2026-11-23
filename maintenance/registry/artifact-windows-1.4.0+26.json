@@ -1,0 +1,9 @@
+{
+  "file": "clients/windows/releases/1.4.0+26/LC_ELC-Windows-1.4.0+26-x64.zip",
+  "bytes": 37748130,
+  "sha256": "7817d572f9ae64a000cdb66b4b2328156a615e534c8f1e21565bd6ee6a553ab4",
+  "version": "1.4.0+26",
+  "source_manifest": "maintenance/registry/source-client-1.4.0-26-20261123.json",
+  "source_tree_sha256": "ca745ad8f526fac0ad321a1bd953409a197c1c685530abdd5e97f74dd2bebe18",
+  "validation": "Built on Windows 11 with Flutter 3.47.7/Dart 3.13.5 and VS 2022 Build Tools; pub get, flutter test (526 pass, 5 skipped) and flutter build windows all exit 0. Zip holds the bundle at top level (30 entries) including lab_inventory_client.exe, client_update_helper.exe and client-install.json. Not launched on a device; in-app update channel not published."
+}

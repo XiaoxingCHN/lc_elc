@@ -4,8 +4,8 @@
 
 ```text
 Windows / Android / Linux（共享Flutter源） ───HTTP会话───┐
-Odoo浏览器仓库 / 网站门户 ────────────────────────────┤
-嘉立创EDA专业版插件 ──本机127.0.0.1 Node桥接───────────┤
+自有 Web 仓库（lab_team_web） ───Odoo 会话────────────┤
+嘉立创 EDA 专业版插件 ───EDA 密钥 → lab_eda──────────┤
                                                       ▼
 Odoo19：lab_catalog + lab_inventory + lab_workflow
   │ 权限由服务器会话/用户组决定；业务写入走统一库存作业方法
@@ -27,8 +27,9 @@ Flutter只缓存公开资料和安全登录状态，没有第二套权威库存�
 | lab_catalog | server/ubuntu22.04/odoo_addons/lab_catalog | 资料导入、分类/参数筛选、统一列表与网页仓库、缓存资产 |
 | lab_inventory | 同级lab_inventory | product/stock扩展、SN和库位、库存字段与映射 |
 | lab_workflow | 同级lab_workflow | 入库/领用/原单归还、袋追溯、幂等、QR/A4标签、三档业务角色 |
-| EDA插件 | plugins/jlc-eda/src | EDA业务入口和iframe，调用本机桥接 |
-| Node桥接 | plugins/jlc-eda/bridge/server.mjs | 127.0.0.1配对，代持Odoo会话，Linux宿主Node/Windows随包Node |
+| EDA 插件 | plugins/jlc-eda/src | 主模块与 iframe，使用 EDA 密钥访问 Odoo，负责器件查询和 BOM 领用 |
+| lab_eda | server/ubuntu22.04/odoo_addons/lab_eda | 校验库存管理员发放的密钥，按绑定用户执行库存业务，管理员代领另记领用人 |
+| lab_team_web | server/ubuntu22.04/odoo_addons/lab_team_web | 自有网页入口、库位树和库存管理 |
 | 采集器 | server/ubuntu22.04/crawler | 中文采集、去重、断点、过滤与一致性快照 |
 | 导入器 | server/ubuntu22.04/odoo_addons/lab_catalog/tools/import_catalog.py | SQLite到供应商资料模型，保留实验室库存语义 |
 | 服务编排 | services/lcsc/systemd-production | 归档的每日03:30启动/05:30停止 unit；2026-11-08 起日常更新改为按需抓取，两个夜间 timer 已停用（disabled），采集器仅作手工全量重建 |
@@ -39,13 +40,13 @@ Flutter只缓存公开资料和安全登录状态，没有第二套权威库存�
 
 - 供应商器件用立创编号去重，绑定后的实验室物料与资料合并成一张卡片。
 - 多库位/批次数量在一张卡汇总，详情展开；有本地库存优先。
-- 器件SN是主档标识，袋/批次有追溯码，库位有库码。
+- 器件 SN 标识实验室档案，袋或批次使用追溯码，库位使用稳定库码。库位层级来自 Odoo 父级关系，调整路径后保留库位 ID 和库存关联。
 - 器件标签只有一个追溯二维码；SN、库位、参数可作文字。库位标签单独用库码。
 - 领用绑定系统账号、项目说明和原领料行；归还只回补允许归还的原领用数量，不能随意制造库存。
 - 库存事务要使用业务API、幂等键和服务端权限，不从客户端直接更新stock.quant。
 
 ## 环境分离
 
-已知生产192.168.31.105:8069、数据库LcHardwareHouse、内网域名 team.l-creation.club（旧域名 lc.rm.com 已停用）仅供定位，真实账号密码与odoo.conf不在仓库。维护者应为本地/测试环境使用独立配置，不把生产作为自动测试默认目标。
+已知生产192.168.31.105:8069、数据库LcHardwareHouse、正式 HTTPS 域名 team.l-creation.club（旧域名 lc.rm.com 已停用）仅供定位，真实账号密码与odoo.conf不在仓库。维护者应为本地/测试环境使用独立配置，不把生产作为自动测试默认目标。
 
 server/ubuntu22.04/systemd是旧离线安装模板；services/lcsc/systemd-production是归档时只读导出的实际服务定义。二者用途不同，不可混称同一环境。全新Ubuntu22.04包为cp310；生产已存在cp312，见CURRENT_STATE。

@@ -1,12 +1,12 @@
 # 数据保存与恢复
 
-数据不进Git。当前本机完整历史快照在catalog/checkpoint-20261015，来源原linux_serve/lcsc_deployment/checkpoint；SQLite3547037696字节，中文cn662768条、cn_excluded56条。预期SHA256 `ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823`，迁移会实际重算来源和目标hash确认。
+数据不进Git。当前本机完整历史快照在catalog/checkpoint-20261015，来源原linux_serve/lcsc_deployment/checkpoint；SQLite3547037696字节，中文cn662768条、cn_excluded56条。预期SHA256 `ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823`，来源与副本已于 2026-11-14 全量重算哈希，结果相同。
 
-这是旧一致性快照，不是当前服务器695217器件/4110477参数的最新数据库。生产完整备份仍只在服务器；路径/hash见SERVER.md。不要把本目录直接恢复到生产。
+这是 2026-10-15 供应商资料历史快照。695217 个器件和 4110477 条参数是归档阶段的生产观测。生产备份另按[运维手册](../docs/operations/SERVER.md)管理。
 
 同一快照在旧工作区曾有多份 components.sqlite3 原件。2026-11-14 复核 lcscmigration/components.sqlite3 与本目录副本全量 SHA256 一致（同为 3547037696 字节 / ac536621032c6028b708847b4ee0d74669008c9dfd2dee480991dfa11ad60823），该旧工作区原件已随退役删除；本机对该快照的权威引用仍是本目录一份，local/archive/data/lcsc_cn_archive 为既有归档原库，未删除。复核记录见 local/manifests/merge-recheck-20261114.json。
 
-旧Windows中文JSONL/CSV导出、状态和日志在local/archive/data/lcsc_cn_archive，国际发现历史在local/archive/data/international；相同大库经全量hash确认后只保存一个新副本并建立来源别名，原文件没有删除。
+旧Windows中文JSONL/CSV导出、状态和日志在local/archive/data/lcsc_cn_archive，国际发现历史在local/archive/data/international；相同大库的来源按 11 月 14 日退役清单核对；另存的归档原库仍保留。
 
 ## 怎样获得这些文件
 

@@ -45,6 +45,40 @@ export function readPanelPayload() {
   }
 }
 
+/**
+ * Reads one user config entry from the EDA storage.
+ *
+ * Used for the unresolved-outbound record: an issue whose answer never arrived
+ * must survive closing the panel, or the operator loses the request key that
+ * makes a safe retry possible.
+ */
+export function readUserConfig(key) {
+  const eda = edaObject();
+  if (!eda) return null;
+  try {
+    const raw = eda.sys_Storage.getExtensionUserConfig(key);
+    if (typeof raw !== 'string' || !raw) return null;
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Writes (or clears, with `null`) one user config entry. Never throws. */
+export function writeUserConfig(key, value) {
+  const eda = edaObject();
+  if (!eda || typeof eda.sys_Storage.setExtensionUserConfig !== 'function') return false;
+  try {
+    const payload = value === null || value === undefined ? '' : JSON.stringify(value);
+    const result = eda.sys_Storage.setExtensionUserConfig(key, payload);
+    // Older SDK builds return a promise; a rejection must not break the UI.
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export function toError(payload) {
   const error = new Error((payload && payload.message) || '请求失败');
   error.name = 'BridgeApiError';

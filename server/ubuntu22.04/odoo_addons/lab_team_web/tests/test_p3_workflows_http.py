@@ -386,6 +386,35 @@ class LabTeamWebP3WorkflowTest(HttpCase):
         self.assertFalse(ok, '匿名不应通过：code=%s' % code)
         self.assertEqual(self._quant(template['id']), 0)
 
+    def test_01_location_tree_and_move_api(self):
+        location_id, parent_id = self.location_ids
+        move = {'location_id': location_id, 'parent_id': parent_id,
+                'update_parent': True, 'request_key': _key('location-move')}
+        update_path = '/lab/api/inventory/location_update'
+        list_path = '/lab/api/inventory/locations'
+
+        self._login('operator')
+        status, result = self._rpc(update_path, move)
+        self.assertEqual(status, 200)
+        self.assertEqual(self._envelope(result)[:2], (False, 'FORBIDDEN'))
+
+        self._login('manager')
+        status, result = self._rpc(list_path, {'with_stats': True, 'with_tree': True})
+        self.assertEqual(status, 200)
+        ok, _, _, before = self._envelope(result)
+        self.assertTrue(ok)
+        self.assertTrue(before['ancestors'])
+        original = next(row for row in before['locations'] if row['id'] == location_id)
+        status, result = self._rpc(update_path, move)
+        self.assertEqual(status, 200)
+        ok, _, _, moved = self._envelope(result)
+        self.assertTrue(ok)
+        self.assertEqual(moved['location']['parent_id'], parent_id)
+        self.assertEqual(moved['location']['code'], original['code'])
+        status, result = self._rpc(update_path, move)
+        self.assertEqual(status, 200)
+        self.assertTrue(self._envelope(result)[3]['replayed'])
+
     # ------------------------------------------------------------------
     # 2. 两阶段：确认前无库存、确认后入库、幂等、同 key 异 payload
     # ------------------------------------------------------------------

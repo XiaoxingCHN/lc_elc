@@ -40,14 +40,14 @@
                     <label class="lc-field-label" for="lc-inv-loc-filter">筛选</label>
                     <input class="lc-input" id="lc-inv-loc-filter" type="search"
                            autocomplete="off" data-lc-inv-filter="locations"
-                           placeholder="按库码或路径筛选（本地过滤）"/>
+                           placeholder="按库码、名称或路径搜索"/>
                 </div>
                 <button class="lc-btn lc-btn-outline" type="button"
                         data-lc-action="locations-reload">刷新</button>
                 <span class="lc-toolbar-spacer"></span>
                 <span class="lc-toolbar-note"
                       t-if="lc_workflow_permissions['can_manage_locations']">
-                    可新建 / 改名 / 停用；数量以库存实时值为准
+                    可新建、改名、更改上级或停用
                 </span>
                 <span class="lc-toolbar-note"
                       t-if="not lc_workflow_permissions['can_manage_locations']">
@@ -80,7 +80,7 @@
                                     name="parent_id" data-lc-field="parent_id">
                                 <option value="">（根级，无上级）</option>
                             </select>
-                            <p class="lc-hint">上级只能是内部库位或视图库位；根级库位直接挂在仓库下。</p>
+                            <p class="lc-hint">可选内部库位或仓库目录作为上级。</p>
                         </div>
                         <div class="lc-field">
                             <span class="lc-field-label">说明</span>
@@ -98,6 +98,32 @@
                     <p class="lc-hint">
                         结果未知时请先用「刷新」核对列表，再决定是否重试；重试复用同一提交内容与同一请求键。
                     </p>
+                </div>
+            </section>
+
+            <section class="lc-panel" data-lc-inv-move-panel="locations" hidden="hidden"
+                     t-if="lc_workflow_permissions['can_manage_locations']">
+                <div class="lc-panel-head">
+                    <h2 class="lc-section-title">更改上级</h2>
+                </div>
+                <div class="lc-panel-body">
+                    <form class="lc-form-grid" data-lc-form="location-move" method="post" action="#">
+                        <div class="lc-field">
+                            <span class="lc-field-label">当前路径</span>
+                            <p class="lc-hint" data-lc-inv-move-path="">—</p>
+                        </div>
+                        <div class="lc-field">
+                            <label class="lc-field-label" for="lc-inv-move-parent">新上级库位</label>
+                            <select class="lc-input" id="lc-inv-move-parent" name="parent_id"
+                                    data-lc-field="parent_id" required="required"></select>
+                            <p class="lc-hint">移动后，子库位随同归入新上级，库码和在库袋保留。</p>
+                        </div>
+                        <div class="lc-actions">
+                            <button class="lc-btn lc-btn-primary" type="submit">确认移动</button>
+                            <button class="lc-btn lc-btn-ghost" type="button"
+                                    data-lc-action="locations-cancel-move">取消</button>
+                        </div>
+                    </form>
                 </div>
             </section>
 
@@ -140,7 +166,7 @@
 
             <section class="lc-panel">
                 <div class="lc-panel-head">
-                    <h2 class="lc-section-title">内部库位</h2>
+                    <h2 class="lc-section-title">库位树</h2>
                     <span class="lc-badge" data-lc-count="locations">0</span>
                 </div>
                 <div class="lc-panel-body">
@@ -153,7 +179,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col">库码</th>
-                                    <th scope="col">路径</th>
+                                    <th scope="col">库位</th>
                                     <th scope="col" class="lc-inv-num">袋数</th>
                                     <th scope="col" class="lc-inv-num">袋内数量</th>
                                     <th scope="col" class="lc-inv-num">在库数量</th>

@@ -121,6 +121,7 @@ export function readPrimitive(primitive, context = {}) {
   const code = firstCatalogCode(candidates);
   const rawName = safeCall(() => primitive.getState_Name(), '') || '';
   const name = resolveTemplateName(rawName, properties, manufacturerId);
+  const value = resolveTemplateName('={Value}', properties, '');
   const addIntoBom = safeCall(() => primitive.getState_AddIntoBom(), undefined);
   const footprint = safeCall(() => primitive.getState_Footprint(), undefined);
 
@@ -133,7 +134,9 @@ export function readPrimitive(primitive, context = {}) {
     supplierName: String(supplierName || ''),
     manufacturerId: String(manufacturerId || ''),
     name: String(name || ''),
-    footprint: String(footprint && typeof footprint === 'object' ? footprint.name || '' : footprint || ''),
+    value: value === '={Value}' ? '' : value,
+    footprint: String((footprint && typeof footprint === 'object' ? footprint.name : footprint)
+      || properties.Footprint || properties.Package || ''),
     addIntoBom: typeof addIntoBom === 'boolean' ? addIntoBom : null,
     page: context.page || '',
     rawProperties: properties,

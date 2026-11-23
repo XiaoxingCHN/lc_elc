@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-server/ubuntu22.04/odoo_addons内lab_inventory扩展product/stock；lab_catalog管理商品/参数/分类/统一搜索/网页仓库；lab_workflow提供带权限与幂等的扫码入库、领用、原单归还、袋和标签。不要从客户端或导入器直接写stock.quant来绕过业务方法。
+`lab_inventory` 扩展产品与库存，`lab_catalog` 管理资料和统一搜索，`lab_workflow` 负责库位树、库位调整和库存作业，`lab_team_web` 提供自有网页，`lab_eda` 处理扩展密钥与 EDA 请求。其余模块提供站点和主题。依赖和当前部署版本见[运维状态](../operations/CURRENT_STATE.md)。库存数量由 Odoo 业务方法维护。
 
 修改manifest、ACL、XML、assets必须同步版本和升级验证。Odoo19的res.groups.privilege与native roles widget是当前角色结构，不能套用旧版res.users生成字段。
 

@@ -1,5 +1,7 @@
 # 当前交接：team域名HTTP已接通，DNS停用完成，HTTPS待确认
 
+> 历史 HTTP 阶段记录。正式 HTTPS 入口与最新状态见[运维状态](../../docs/operations/CURRENT_STATE.md)。
+
 ## 用户目标与已确认边界
 
 内网/VPN使用team.l-creation.club，根欢迎页、/login、/lab使用自有前端，保留旧站/API。用户已保存阿里云team A192.168.31.105；明确允许服务器自身DNS改为路由器192.168.31.1，明确允许停用其旧DNS服务。新域名HTTP阶段由Codex按既定迁移范围决定先实施。

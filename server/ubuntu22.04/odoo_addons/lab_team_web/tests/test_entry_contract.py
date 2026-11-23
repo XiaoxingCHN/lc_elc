@@ -128,7 +128,7 @@ class ModuleVersionTest(unittest.TestCase):
     """候选版本独立递增到 19.0.1.1.0，且页面展示版本与 manifest 一致。"""
 
     def test_manifest_version(self):
-        self.assertEqual(_manifest()["version"], "19.0.1.2.7")
+        self.assertEqual(_manifest()["version"], "19.0.1.3.1")
 
     def test_lc_version_matches_manifest(self):
         match = re.search(r"'lc_version':\s*'([^']+)'", COMMON_PY)

@@ -118,6 +118,7 @@ class StockLocation(models.Model):
             'code': self.lab_code or '',
             'name': self.name,
             'path': self.complete_name or self.display_name,
+            'parent_id': self.location_id.id or False,
             'usage': self.usage,
             'payload': inventory_codec.build_location_payload(self.lab_code) if self.lab_code else None,
         }

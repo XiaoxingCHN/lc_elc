@@ -206,14 +206,12 @@ class LabWorkflowApi(models.AbstractModel):
         }
 
     @api.model
-    def lab_locations(self, with_stats=False):
-        """``/lab/api/inventory/locations``；``with_stats`` 时追加袋数/数量。
-
-        统计只算本库位（不含子库位），便于列表直接展示；停用校验用子树口径。
-        """
-        locations = self.env['stock.location'].search([
-            ('usage', '=', 'internal'),
-            '|', ('company_id', '=', False), ('company_id', '=', self.env.company.id),
+    def lab_locations(self, with_stats=False, with_tree=False):
+        """List internal locations and optionally their view ancestors."""
+        location_model = self.env['stock.location']
+        company_domain = ['|', ('company_id', '=', False), ('company_id', '=', self.env.company.id)]
+        locations = location_model.search([
+            ('usage', '=', 'internal'), *company_domain,
         ]).sorted(lambda loc: loc.complete_name or '')
         rows = [location._lab_location_dict() for location in locations]
         if p3_rules.parse_bool(with_stats, False):
@@ -221,7 +219,17 @@ class LabWorkflowApi(models.AbstractModel):
             for row in rows:
                 row.update(stats.get(row['id'], {'bag_count': 0, 'bag_quantity': 0.0,
                                                  'quantity': 0.0}))
-        return {'locations': rows}
+        result = {'locations': rows}
+        if p3_rules.parse_bool(with_tree, False):
+            ancestor_ids = {
+                int(part) for path in locations.mapped('parent_path') if path
+                for part in path.split('/') if part
+            }
+            views = location_model.search([
+                ('id', 'in', list(ancestor_ids)), ('usage', '=', 'view'), *company_domain,
+            ])
+            result['ancestors'] = [location._lab_location_dict() for location in views]
+        return result
 
     @api.model
     def lab_location_create(self, name, parent_id=None):
@@ -234,6 +242,11 @@ class LabWorkflowApi(models.AbstractModel):
             if not parent:
                 raise LabApiError.not_found('父库位不存在：%s' % parent_id,
                                             {'parent_id': 'not_found'})
+            if parent.company_id and parent.company_id != self.env.company:
+                raise LabApiError.forbidden('上级库位属于其他公司。', {'parent_id': 'wrong_company'})
+            if not parent.active:
+                raise LabApiError.precondition('上级库位已停用，请刷新后重新选择。',
+                                               {'parent_id': 'inactive'})
             if parent.usage not in ('view', 'internal'):
                 raise LabApiError.validation(
                     '父库位「%s」类型是 %s，不能作为内部库位的父级'

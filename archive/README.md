@@ -5,7 +5,7 @@
 - local/archive/packages：旧版客户端、Ubuntu离线包和最初SDK整包；不是当前发布入口。
 - local/archive/legacy-workspace：旧服务端/手机端/Flutter原型/早期Linux方案与原始根说明。
 - local/archive/eda：EDA2.x和3.0.0–3.0.2、引用资料与旧验收。
-- local/archive/data：旧中文导出/国际发现库/日志；相同SQLite经全量hash核对后可引用data/catalog唯一副本，未删除原库。
+- local/archive/data：旧中文导出/国际发现库/日志；相同 SQLite 经全量哈希核对后引用 `data/catalog` 的副本。旧工作区的重复文件已退役，`local/archive/data/lcsc_cn_archive` 的另存归档原库仍保留。
 - local/archive/docs-original：原文档，可能有过时计数、状态和路径；不得作为当前部署事实。
 - local/archive/evidence：历史实际测试记录和真实构建配方；一次性补丁和聊天记录不作为正式维护工具。
 - local/archive/workspace-candidates：旧工作区退役前补档的570个未发布构建候选（含560 MiB服务端离线重建包和两个Linux客户端tar.gz）；不是当前发布入口。

@@ -69,6 +69,7 @@ class LabP3Api(http.Controller):
             active=data.get('active'),
             parent_id=data.get('parent_id'),
             update_parent=data.get('update_parent', False),
+            request_key=data.get('request_key'),
         )
 
     # ------------------------------------------------------------------

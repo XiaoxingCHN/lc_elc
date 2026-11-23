@@ -15,6 +15,12 @@
   --line: rgba(15, 23, 42, 0.1);
   --accent: #0a84ff;
   --accent-2: #0060df;
+  /* Primary actions use their own paired tokens: filled background + its own
+     foreground. White on the blue gradient above measured 1.83:1 in dark mode,
+     below the 4.5:1 the label needs. */
+  --primary: #3d7a00;
+  --primary-hover: #2f6100;
+  --on-primary: #ffffff;
   --accent-soft: rgba(10, 132, 255, 0.14);
   --ok: #0f8a3c;
   --warn: #b25000;
@@ -44,6 +50,9 @@
     --line: rgba(255, 255, 255, 0.12);
     --accent: #5ea9ff;
     --accent-2: #8cc4ff;
+    --primary: #c9ff3f;
+    --primary-hover: #d9ff6b;
+    --on-primary: #0a0d06;
     --accent-soft: rgba(94, 169, 255, 0.2);
     --ok: #59d68f;
     --warn: #ffb454;
@@ -120,7 +129,7 @@ body {
 
 .version {
   margin-left: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 500;
 }
@@ -280,7 +289,7 @@ p {
 
 .stat .label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .stat .value {
@@ -359,14 +368,15 @@ input[type="radio"] {
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
 }
 
 .btn.primary:hover {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn.danger {
@@ -398,7 +408,7 @@ input[type="radio"] {
   border-radius: 999px;
   background: var(--chip);
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 12px;
   border: 1px solid var(--line);
 }
 
@@ -451,7 +461,7 @@ input[type="radio"] {
 
 .card .card-sub {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
   margin-bottom: 8px;
   min-height: 30px;
 }
@@ -515,6 +525,32 @@ th.num {
   border-radius: 8px;
 }
 
+.bom-table table {
+  table-layout: fixed;
+  /* Wide enough that 需求/可用/缺口/未知 stay on one line; the wrapper below
+     scrolls horizontally instead of squeezing the labels. */
+  min-width: 900px;
+}
+
+.bom-table th {
+  white-space: nowrap;
+}
+
+.bom-table th:nth-child(1) { width: 7rem; }
+.bom-table th:nth-child(2) { width: 6rem; }
+.bom-table th:nth-child(4) { width: 25%; }
+.bom-table th.num { width: 4.5rem; }
+.bom-table th:nth-child(8),
+.bom-table th:nth-child(9) { width: 14%; }
+
+.bom-table td {
+  overflow-wrap: anywhere;
+}
+
+.bom-table .chip {
+  white-space: nowrap;
+}
+
 /* BOM equivalents (S5): one expandable sub-row under each short line. */
 .bom-equivalents-row td {
   padding: 4px 8px 8px;
@@ -534,7 +570,7 @@ th.num {
   border-radius: 999px;
   background: var(--panel);
   color: var(--accent);
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 3px 10px;
   cursor: pointer;
 }
@@ -569,7 +605,7 @@ th.num {
 
 .bom-equivalent-note {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
   margin: 2px 0 0 24px;
 }
 
@@ -597,7 +633,7 @@ th.num {
   align-items: center;
   justify-content: center;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
   padding: 8px;
   overflow: hidden;
@@ -758,7 +794,7 @@ th.num {
 
 .error-box .code {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger);
   margin-bottom: 4px;
 }
@@ -779,7 +815,7 @@ pre {
   white-space: pre-wrap;
   word-break: break-word;
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 11.5px;
+  font-size: 12px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -812,7 +848,7 @@ details summary {
 .footer-note {
   margin-top: 18px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ========================================================================= *
@@ -966,13 +1002,15 @@ h3 {
 
 .btn.primary {
   border-color: transparent;
-  background: linear-gradient(180deg, #3d9bff, var(--accent) 55%, var(--accent-2));
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(10, 132, 255, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .btn.primary:hover {
-  box-shadow: 0 12px 26px rgba(10, 132, 255, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: var(--primary-hover);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--primary) 38%, transparent);
 }
 
 .btn.ghost {

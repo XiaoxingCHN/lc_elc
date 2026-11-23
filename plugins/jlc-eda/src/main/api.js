@@ -154,7 +154,7 @@ export function createLabApi(client) {
         return out;
       }).filter((line) => line.item_key),
       limit_per_line: limitPerLine,
-    });
+    }, { timeoutMs: 50000 });
   }
 
   /** 无 C 编号器件的「值 + 封装」批量检索。只返回候选，不自动合并。 */

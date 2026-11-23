@@ -1067,7 +1067,6 @@ class LabCatalogItem(models.Model):
         return {'lines': out}
 
     @api.model
-    @api.model
     def _equivalents_by_value(self, code, name, footprint, limit_per_line,
                               avail_by_tmpl):
         """C 编号没采集时，用「值 + 封装」去实验室库存找候选。
@@ -1081,30 +1080,34 @@ class LabCatalogItem(models.Model):
             return {'item_key': 'lcsc:%s' % code, 'basis': 'none',
                     'source': None, 'candidates': []}
 
-        # 封装的 C0603/R0603 与实验室的 0603 是同一种；只认带前缀的写法。
-        chip = re.match(r'^([CRL])(\d{4})$', pkg.upper())
-        if chip:
-            pkg = chip.group(2)
+        def normalize_package(package):
+            text = (package or '').strip().upper()
+            chip = re.fullmatch(r'[CRL](\d{4})(?:_L\d+(?:\.\d+)?-W\d+(?:\.\d+)?)?', text)
+            return chip.group(1) if chip else text
 
-        # 值和型号**都要搜**：电容电阻靠值（100nF），连接器只有型号
-        # （WAFER-GH1.25-2PLB）。只搜 lab_search_specs 会让连接器永远 0 候选。
-        domain = [('lab_sn', '!=', False),
-                  '|', ('lab_search_specs', 'ilike', value),
-                  ('lab_mpn', 'ilike', value)]
-        if pkg:
-            domain.append(('lab_package', '=ilike', pkg))
-        templates = self.env['product.template'].search(domain, limit=limit_per_line * 6)
+        pkg = normalize_package(pkg)
+        # EDA 的值属性可能在数字和单位之间留空格（例如 100 nF）。
+        term = re.sub(r'^(\d+(?:\.\d+)?)\s+([pnuµμmkKMG]?(?:[FfHhVvΩRr]|ohms?))$', r'\1\2', value)
+        stocked_ids = [tid for tid, qty in avail_by_tmpl.items() if qty > 0]
+        exact_ids = self._template_ids_by_codes([code]).get(code, [])
+        templates = self.env['product.template'].search([
+            ('id', 'in', stocked_ids), ('id', 'not in', exact_ids), ('lab_sn', '!=', False),
+            '|', ('lab_search_specs', 'ilike', term), ('lab_mpn', 'ilike', value),
+        ])
 
-        # 值必须独立出现：`10k` 不能因为 `110kΩ` 含 `10k` 就算命中。
-        # 型号（连接器）没有这种边界问题，命中即可。
-        strict = re.compile(r'(?<![0-9a-z.])' + re.escape(value.lower()) + r'(?![0-9])')
+        # 规格按完整词命中，型号按完整字段命中。mΩ 与 MΩ 保持区分。
+        term_pattern = re.escape(term)
+        flags = 0 if re.search(r'\d[mM]', term) else re.IGNORECASE
+        strict = re.compile(r'(?<![0-9a-zA-Z.])' + term_pattern + r'(?![0-9a-zA-Z.])', flags)
 
-        def _hit(tmpl):
-            if strict.search(str(tmpl.lab_search_specs or '').lower()):
-                return True
-            return value.lower() in str(tmpl.lab_mpn or '').lower()
+        def matches(tmpl):
+            if pkg and normalize_package(tmpl.lab_package) != pkg:
+                return False
+            return (strict.search(tmpl.lab_search_specs or '')
+                    or (tmpl.lab_mpn or '').strip().casefold() == value.casefold())
 
-        templates = templates.filtered(_hit)
+        templates = templates.filtered(matches).sorted(
+            key=lambda tmpl: (-avail_by_tmpl[tmpl.id], tmpl.id))[:limit_per_line]
 
         # 一次取回所有候选的袋/库位，避免逐条 N+1。
         all_tids = templates.ids
@@ -1198,7 +1201,7 @@ class LabCatalogItem(models.Model):
             'parameters': source_params,
         }
 
-        package = (item.package or '').strip()
+        package = (item.package or footprint or '').strip()
         if not package:
             # 没有封装就无从缩小范围，宁可返回空也不猜。
             return {'item_key': 'lcsc:%s' % code, 'basis': 'none',

@@ -168,11 +168,34 @@ test('iframe bundle no longer renders receipt/issue/return/trace tabs', async ()
   ]) {
     assert.equal(html.includes(name), false, 'iframe bundle still contains ' + name);
   }
-  for (const label of ['器件库', '原理图库存', '连接/账户', '诊断']) {
+  // One name for the connection destination: the header shortcut, the tab and
+  // every gate now say 「连接设置」 (three different labels confused operators).
+  for (const label of ['器件库', '原理图库存', '连接设置', '诊断']) {
     assert.ok(html.includes(label), 'iframe missing retained tab ' + label);
   }
   assert.equal(html.includes('BOM 对比'), false);
   assert.ok(html.includes('一键出库'));
+});
+
+test('iframe carries the unresolved-outbound lock and paired primary tokens', async () => {
+  // Two failures this guards, both shipped before: an issue whose answer never
+  // arrived could be silently replaced by a NEW issue, and the primary button's
+  // white label sat on a blue gradient at 1.83:1 in dark mode.
+  const { zip } = await loadPackage();
+  const html = await zip.file('iframe/app.html').async('string');
+  for (const marker of [
+    'lab_eda_pending_outbound',
+    'pendingOutboundBanner',
+    '原样重试（同一请求号）',
+    '先处理未决出库',
+  ]) {
+    assert.ok(html.includes(marker), 'iframe missing unresolved-outbound marker ' + marker);
+  }
+  for (const token of ['--primary: #c9ff3f', '--on-primary: #0a0d06', '--primary: #3d7a00', '--on-primary: #ffffff']) {
+    assert.ok(html.includes(token), 'iframe missing primary contrast token ' + token);
+  }
+  assert.equal(html.includes('#3d9bff, var(--accent)'), false,
+    'primary button still paints white text on the old blue gradient');
 });
 
 test('iframe is self-contained, Chinese and uses the trusted bridge', async () => {

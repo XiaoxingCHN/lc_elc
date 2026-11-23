@@ -1,6 +1,8 @@
 # Windows客户端
 
-当前现成版：releases/1.0.1/LC_ELC-Windows-1.0.1.zip，以及同目录展开bundle。必须完整分发，不能只拿lab_inventory_client.exe。
+本机成品为 `releases/1.4.0+26/LC_ELC-Windows-1.4.0+26-x64.zip`。解压整个 ZIP，在完整目录内运行 `lab_inventory_client.exe`。更新通道候选包已通过解包和首帧启动。 正式应用内 stable 为 `1.4.0+26`。走查和更新状态见[交接](../../maintenance/handoffs/2026-11-23-client-stable-release.md)。
+
+## 开发环境与既有构建说明
 
 共享源在../app。工具为Flutter3.47.7/Dart3.13.5、Windows C++桌面编译工具；MSVC不在本仓库离线包，原机D:/VS2026是未注册的便携布局，不可当通用VS安装。按官方[安装说明](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170)安装“使用C++的桌面开发”、Windows SDK、对应v143工具集；本机原工具集14.44.35207。
 
@@ -8,4 +10,4 @@
 
 插件符号链接错误时，使用dependencies/ensure_plugin_junctions.ps1并显式传-Project（当前新构建worktree）和-PubCache，不能无视pubget失败。PDF打印需要同包插件DLL/Pdfium/CRT，不能按‘附件’删除。
 
-本次仅重新核对既有成品hash和归档源，没有重新编译或实体打印。完整步骤见docs/development/CLIENT.md。
+`1.4.0+26` 的完整构建与首帧证据见[正式发布交接](../../maintenance/handoffs/2026-11-23-client-stable-release.md)。精臣实物打印和完整升级待复测。完整构建说明见[客户端开发](../../docs/development/CLIENT.md)。

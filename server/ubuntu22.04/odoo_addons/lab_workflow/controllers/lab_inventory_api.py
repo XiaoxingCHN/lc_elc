@@ -74,7 +74,8 @@ class LabInventoryApi(http.Controller):
             require_lab_access()
             data = params()
             return request.env['lab.workflow.common'].lab_locations(
-                with_stats=data.get('with_stats', False))
+                with_stats=data.get('with_stats', False),
+                with_tree=data.get('with_tree', False))
         return handler()
 
     @http.route(API + '/inventory/location_create', type='jsonrpc', auth='user',

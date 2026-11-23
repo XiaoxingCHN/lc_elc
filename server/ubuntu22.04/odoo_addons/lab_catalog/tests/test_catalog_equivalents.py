@@ -146,6 +146,33 @@ class CatalogEquivalentsTest(TransactionCase):
         self.assertEqual(result['lines'][1]['basis'], 'none')
         self.assertEqual(result['lines'][1]['candidates'], [])
 
+    def test_unindexed_eda_part_matches_only_compatible_stocked_templates(self):
+        def stocked(code, package, value):
+            template = self._stock(code, 100)
+            template.write({
+                'lab_package': package,
+                'lab_specifications': '{"容值": "%s"}' % value,
+            })
+            return template
+
+        compatible = stocked('C9200081', '0603', '0.1uF')
+        stocked('C9200082', '0805', '100nF')
+        stocked('C9200083', '0603', '110nF')
+        self.env['product.template'].create({
+            'name': '无库存测试物料', 'type': 'consu',
+            'lab_package': '0603', 'lab_specifications': '{"容值": "100nF"}',
+        })
+
+        result = self.Item.equivalents([{
+            'item_key': 'lcsc:C5137636', 'quantity': 61,
+            'name': '100 nF', 'footprint': 'C0603_L1.6-W0.8',
+        }])
+        line = result['lines'][0]
+        self.assertEqual(line['basis'], 'value_package')
+        self.assertEqual([c['item_key'] for c in line['candidates']],
+                         ['lab:%d' % compatible.id])
+        self.assertEqual(line['candidates'][0]['sn'], compatible.lab_sn)
+
     def test_candidate_carries_location_and_bags(self):
         self._capacitor('C9200070')
         self._capacitor('C9200071')

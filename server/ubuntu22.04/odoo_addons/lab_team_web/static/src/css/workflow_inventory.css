@@ -29,6 +29,39 @@ body.lc-body .lc-workflow .lc-inv-btn-sm {
   font-size: 13px;
 }
 
+body.lc-body .lc-workflow .lc-inv-tree-node {
+  padding-inline-start: calc(var(--lc-inv-depth, 0) * clamp(0.5rem, 1.5vw, 1.2rem));
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.lc-body .lc-workflow .lc-inv-tree-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0 0.35rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  color: inherit;
+  cursor: pointer;
+}
+
+body.lc-body .lc-workflow .lc-inv-tree-toggle:hover,
+body.lc-body .lc-workflow .lc-inv-tree-toggle:focus-visible {
+  color: var(--lime);
+}
+
+body.lc-body .lc-workflow .lc-inv-tree-leaf {
+  display: inline-block;
+  padding-inline-start: 1.35rem;
+}
+
 /* 触控设备（触屏 / 二合一）：行内小按钮抬到 44px 触控下限（方案 §三 组件清单） */
 @media (any-pointer: coarse) {
   body.lc-body .lc-workflow .lc-inv-btn-sm {
@@ -428,6 +461,24 @@ body.lc-body .lc-workflow .lc-inv-plain {
 
   body.lc-body .lc-workflow .lc-inv-num {
     text-align: left;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody tr {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody .lc-inv-tree-cell {
+    order: -1;
+    justify-content: flex-start;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] tbody .lc-inv-tree-cell::before {
+    content: none;
+  }
+
+  body.lc-body .lc-workflow .lc-table[data-lc-table="locations"] .lc-inv-view-location td:not(.lc-inv-tree-cell) {
+    display: none;
   }
 
   /* 角色勾选：标签在左，勾选在右，整行 ≥44px 可点 */

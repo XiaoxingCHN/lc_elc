@@ -1,4 +1,15 @@
-# 当前维护交接：2026-11-14 旧工作区审核与退役（已删除；补档 2,870 文件）
+# 当前维护交接
+
+- [三端构建与 EDA 对齐](handoffs/2026-11-23-client-eda-alignment.md)记录功能、成品和验收范围。
+- [应用内更新通道](handoffs/2026-11-23-client-stable-release.md)记录正式 stable、签名来源及备份。
+- [网页库位树](handoffs/2026-11-22-warehouse-location-tree.md)记录已上线模块、权限和生产备份。
+- [历史文档索引](HISTORY.md)按主题整理历史证据和现行入口。
+- [全仓文档同步](handoffs/2026-11-23-project-documentation-refresh.md)记录审查范围、校对依据和文档快照。
+- [客户端 GitHub 公开发行](handoffs/2026-11-23-client-github-release.md)记录 Linux 附件、标签及 Windows 和 Android 的分发范围。
+
+## 历史维护交接
+
+### 2026-11-14 旧工作区审核与退役（已删除；补档 2,870 文件）
 
 最新（本条目）：[旧工作区退役交接](handoffs/2026-11-14-workspace-retirement.md)｜[任务](tasks/2026-11-14-workspace-retirement.md)。`F:\lc_elc_workspace` 已于 2026-11-14 审核补档后删除（原 178,156 文件 / 49,676,894,303 B）：138,294 个已迁移目标中 138,107 个仍在，缺失 187 个全为 Flutter SDK 可重建缓存，820 个抽查哈希中 51 个因源码演进不同并已补档旧修订；补档 2,870 文件 / 1,402,575,621 B 到 `local/archive`（workspace-candidates 570、eda/workspace-intermediates 30、evidence/analysis-workspace-20261014 2,219、source-import-before-format 新增 51）；`lcscmigration/components.sqlite3` 与 `data/catalog/checkpoint-20261015` 全量 SHA256 一致，仅保留后者为本机权威副本；`robocopy /MIR /XJ` 删除 176,743 文件 / 46.243 GB、0 失败，F: 可用 64.1 GB → 109 GB；`repo_check.py` exit 0；仅改文档，未 commit/push。记录见 `local/manifests/workspace-retirement-20261114.{json,md}`、`merge-recheck-20261114.{json,log}`、`workspace-purge-20261114.log`。
 

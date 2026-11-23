@@ -41,9 +41,9 @@ sha256sum -c SHA256SUMS
 
 ## 3. Linux客户端和EDA
 
-Linux运行DEB在linux-runtime/out/debs和当前Linux1.0.1成品内（199个），包清单与verify_deb_closure.py保留。编译用clang/cmake/ninja/pkg-config、GTK/libsecret/CUPS开发包与运行时不同；在Ubuntu22.04联网开发机用apt安装平台README列出的明确包。原WSL私有环境路径不等于已迁出的完整工具链，具体导出状态见CURRENT_STATE。
+Linux 运行依赖的历史 199 个 DEB 在 `linux-runtime/out/debs` 与 1.0.1 归档内。`1.4.0+26` 释出的是完整应用 bundle，运行环境见 [Linux 指南](../clients/linux/README.md)。编译用clang/cmake/ninja/pkg-config、GTK/libsecret/CUPS开发包与运行时不同；在Ubuntu22.04联网开发机用apt安装平台README列出的明确包。原WSL私有环境路径不等于已迁出的完整工具链，具体导出状态见CURRENT_STATE。
 
-EDA Windows Node24.19.0在plugins/jlc-eda/bridge/runtime。可从已核对3.0.3 bundle提取bridge/runtime恢复同字节，并带NODE-LICENSE.txt；官方版本目录https://nodejs.org/dist/v24.19.0/，获取前核对发布checksum。Linux需独立Linux Node，参见[官方Node下载](https://nodejs.org/en/download)，Windows exe不能用。
+EDA 4.x 的安装仅需 `.eext`。源码构建用 [Node.js](https://nodejs.org/en/download) 和 npm，按锁文件安装。旧 3.x 的 Node 桥接只在历史包恢复中使用。
 
 EDA构建用npm package-lock完整URL/integrity。联网在plugins/jlc-eda运行npm ci --cache ../../dependencies/npm-cache；离线必须先验证缓存重放。归档时若网络超时，仍保留现成node_modules但不会虚称npm ci --offline已通过。
 

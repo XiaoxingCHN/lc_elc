@@ -1,15 +1,9 @@
-最新Android stable **1.1.3+6** 修复安装入口缓存校验并显示具体原因；275 Flutter/9 JVM检查通过，实机仍待验证，旧安装入口失败时需手动覆盖一次。Windows/Linux仍为1.1.2+5候选。见[最新交接](../maintenance/handoffs/2026-10-19-android-install-fix.md)。以下为此前候选时点。
-
-最新开发候选 **1.1.2+5** 修复器件选择白屏及更新状态；三端构建和来源核验通过，包/hash见[修复审计](../maintenance/audit/receipt-picker-fix-20261019.json)。生产更新接口已上线，尚未发布stable包。
-
 # 三端客户端维护入口
 
-唯一共享源码是[app](app/)（开发候选 1.1.1+4，已发布包仍为 1.0.1+2），Windows、Android、Linux不各复制一套lib。本轮新增更新器，三端完整包、来源/hash与真实升级未验收项见[更新器交接](../maintenance/handoffs/2026-10-19-client-updater.md)。每个平台的README负责环境和成品说明：
+唯一共享源码在 [clients/app](app/)。Windows、Android、Linux 的本机包和正式应用内 stable 均为 `1.4.0+26`。正式域名三份签名清单已验证。 三个本机构建均已登记哈希和冻结源。
 
-- [Windows](windows/README.md)：完整bundle/ZIP。
-- [Android](android/README.md)：最终重签APK，必须保留匹配密钥。
-- [Linux](linux/README.md)：完整bundle/tar.gz及199个运行DEB。
+- [Windows](windows/README.md) 使用完整 x64 ZIP。
+- [Android](android/README.md) 使用匹配既有证书的 ARM APK。
+- [Linux](linux/README.md) 使用含主程序、更新助手和运行资源的 x64 tar.gz。
 
-[开发与构建](../docs/development/CLIENT.md)说明工具链恢复和命令。发布先冻结完整源，不用旧根lab_inventory_client原型或10月14日handoff起步。
-
-归档时核对66个原Dart/pubspec业务文件与既有构建快照一致；后续两阶段入库候选已修改源码，新manifest覆盖当前测试、平台runner、锁文件和配置。现成成品仍以registry/releases.json的hash为准，不能按mtime挑最新。
+「仓位速览」在 `1.4.0+26` 支持多级库位树、搜索和管理员更改上级。当前入口、设备验收和生产发布边界分别见[开发与构建](../docs/development/CLIENT.md)、[构建交接](../maintenance/handoffs/2026-11-23-client-eda-alignment.md)和[更新通道交接](../maintenance/handoffs/2026-11-23-client-stable-release.md)。

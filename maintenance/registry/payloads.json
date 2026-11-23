@@ -493,6 +493,40 @@
         "metadata": "clients/app/windows/niimbot/README.md"
       },
       "notes": "x64 Windows only; Resources_x86 is never used. Vendor binaries and fonts stay out of Git (repository boundary rejects *.dll and large payloads). Missing payload degrades to the PDF/system-print path; the direct-print button is hidden."
+    },
+    {
+      "id": "niimbot-android-sdk-aar",
+      "path": "clients/app/android/app/libs/4.1.1-release.aar",
+      "type": "file",
+      "version": "4.1.1",
+      "sha256": "a23ac708acbc2a66f13367edaf53245476fa185209ee2e51b73a988a388c88e4",
+      "size_bytes": 791385,
+      "frozen_source_input": true,
+      "acquisition": {
+        "method": "vendor-supplied-archive",
+        "commands": [
+          "Obtain the authorized NIIMBOT Android SDK distribution and place 4.1.1-release.aar under clients/app/android/app/libs/. Verify SHA-256 against this record."
+        ],
+        "metadata": "clients/app/android/app/libs/README.md"
+      },
+      "notes": "Vendor-supplied build input, excluded from Git. Public source-only checks report a missing payload; local full verification requires it."
+    },
+    {
+      "id": "niimbot-android-image-aar",
+      "path": "clients/app/android/app/libs/image-1.9.5.aar",
+      "type": "file",
+      "version": "1.9.5",
+      "sha256": "7e7b055bb6a72a26a77de9af46ac86d099bcec105860d1b5c9852dd307fa61cc",
+      "size_bytes": 28663052,
+      "frozen_source_input": true,
+      "acquisition": {
+        "method": "vendor-supplied-archive",
+        "commands": [
+          "Obtain the authorized NIIMBOT Android SDK distribution and place image-1.9.5.aar under clients/app/android/app/libs/. Verify SHA-256 against this record."
+        ],
+        "metadata": "clients/app/android/app/libs/README.md"
+      },
+      "notes": "Vendor-supplied build input, excluded from Git. Public source-only checks report a missing payload; local full verification requires it."
     }
   ]
 }

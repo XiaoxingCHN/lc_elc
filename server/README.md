@@ -1,4 +1,10 @@
-# 最新上线状态
+# Odoo 服务端维护入口
+
+## 当前服务与发布
+
+正式入口 `https://team.l-creation.club`。网页库位树运行在 `lab_team_web 19.0.1.3.1` 与 `lab_workflow 19.0.2.0.5`，最近生产核验的 `lab_catalog` 为 `19.0.2.0.23`。Windows、Android、Linux 的本机包和正式应用内 stable 均为 `1.4.0+26`。正式域名三份签名清单已验证。 [运维状态](../docs/operations/CURRENT_STATE.md)。以下按日期记录历史。
+
+## 历史上线记录
 
 2026-10-25 HTTPS更新：**https://team.l-creation.club/**已可用，HTTP308跳转、正常证书验证及页面/旧更新接口12项独立检查通过。自动续期未配置，HTTPS真实登录待复验；离开内网后的DSH最终审计待恢复核验。见[最新交接](../maintenance/handoffs/2026-10-25-team-https-current.md)。
 
@@ -14,14 +20,16 @@
 
 lab_workflow19.0.1.2.0更新接口已按本轮明确授权上线，服务active，Android manifest200（1.1.3+6 stable）、Windows/Linux204；备份、权限和库存不变证据见[交接](../maintenance/handoffs/2026-10-19-update-endpoint-deploy.md)。以下此前候选/部署说明为各自时点。
 
-# Odoo服务端唯一维护入口
+## 源码与运维入口
 
-当前源码和部署工具在[ubuntu22.04](ubuntu22.04/)；三个自定义模块在odoo_addons。保持内部布局，升级脚本会按自身目录导入lc_odoo_conf.py，安装器会寻找tools/crawler/odoo_addons。不要只移动一个脚本。
+当前源码和部署工具在 [ubuntu22.04](ubuntu22.04/)，项目模块位于 `odoo_addons/`。保持内部布局，升级脚本会按自身目录导入lc_odoo_conf.py，安装器会寻找tools/crawler/odoo_addons。不要只移动一个脚本。
+
+下列版本是 2026-10-19 前后维护基线。现行版本见[当前状态](../docs/operations/CURRENT_STATE.md)。
 
 - lab_inventory 19.0.1.0.0：依赖stock/product/mrp，属于必要业务底层。
 - lab_catalog 19.0.2.0.3：资料与统一网页仓库。
 - lab_workflow 19.0.1.1.0：库存工作流、两阶段入库、追溯标签和角色显示；2026-10-19已上线，实际版本、备份和验收见[本轮交接](../maintenance/handoffs/2026-10-19-server-deploy.md)。
-- 当前维护源为19.0.1.2.0候选，新增客户端更新只读分发接口，尚未部署，见[更新器实现](../docs/development/CLIENT_UPDATE_IMPLEMENTATION.md)。分发根取Odoo真实data_dir，不与库存附件混放。
+- `19.0.1.2.0` 是客户端更新器最初候选时的工作流版本。现行生产通道见[正式发布记录](../maintenance/handoffs/2026-11-23-client-stable-release.md)。分发根取Odoo真实data_dir，不与库存附件混放。
 
 归档成品修复包在releases/2026-10-18，导入时与源102文件hash逐项一致；后续候选源码已变更，不能再把该旧包当作新源码构建物。旧Ubuntu整包在local/archive/packages，仅是20261015历史，不能拿旧包覆盖当前模块。
 

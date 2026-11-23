@@ -1,5 +1,7 @@
 # 客户端开发与环境恢复
 
+当前共享源码与本机成品为 `1.4.0+26`，stable 状态见[发布交接](../../maintenance/handoffs/2026-11-23-client-stable-release.md)。仓位树只在仓位速览请求 `with_tree`，普通作业的库位选择器仍读取内部库位。
+
 ## 改哪里
 
 lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/器件库/库存管理）与外壳；lib/features/unified是统一器件展示、详情和收/领/还/标签；lib/services/lab_api_client.dart是业务API；odoo_client.dart是登录和HTTP会话；login_memory_store.dart/secret_backend.dart是安全登录；providers/auth_provider.dart负责状态；routes负责返回/离线访问边界。修改共享源码同时考虑三端行为。
@@ -11,7 +13,7 @@ lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/�
 | 分区 | 根路径 | 页面 |
 |---|---|---|
 | 库存速览 | `/stock` | 器件数 / 有库存数 / 仓位数 / 实物袋 / 在库数量 + 仓位分布 + 有库存器件 |
-| 仓位速览 | `/stock/locations` | 每个仓位的袋数与数量；`/stock/locations/:id` 是该仓位的实物袋列表 |
+| 仓位速览 | `/stock/locations` | 库位树、库码或路径搜索，以及管理员创建和调整上级。`/stock/locations/:id` 打开实物袋列表 |
 | 器件库 | `/catalog` | 原 `UnifiedCatalogScreen`，未改动 |
 | 库存管理 | `/stock/manage` | 入库 / 领料 / 归还 / 标签打印 / 历史追溯 五个入口 |
 
@@ -19,7 +21,7 @@ lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/�
 - 作业页（`/receipt`、`/receipt/prepare`、`/issue`、`/return`、`/labels`、`/history`）**仍在根级、全屏 push**，不属于任何分区，深链、扫码 intent 与返回栈不变。库存管理页只是入口。
 - `/home`、`/products`、`/products/:id` 仍重定向到 `/catalog`：这些旧链接的意思是「给我看器件」，不是「给我看汇总」。
 - 数字来源：器件数/有库存数取 `/catalog/search` 的 `total`（一次不带 `stock_only`、一次带）；仓位数与在库数量取 `locations(with_stats:1)` 的 `stock.quant` 合计。客户端不自己累加一页数据来冒充总数。
-- 仓位内容页走 `/inventory/bags`（`location_id` 含子仓位、`next_cursor` 键集分页、`limit` 服务端上限 100），客户端此前没有接这个接口。
+- 仓位速览读取 `locations(with_stats: true, with_tree: true)`，单节点统计只算本库位，视图祖先用于分组。内容页使用 `/lab/api/inventory/bags`，按 `location_id` 查该分支及子仓位，通过 `next_cursor` 分页，服务端 `limit` 上限为 100。详情和标签仍使用原库位 ID、库码。
 
 ## 热敏标签版式（40 × 20 mm）
 
@@ -51,12 +53,12 @@ lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/�
 
 ## 器件库按需抓取
 
-搜索零结果且服务端在 `fetch_suggestion` 中给出可抓取项时，**三个入口**都能当场抓取：整库搜索的空结果页、入库/待入库表单的搜索建议面板（“立即从立创商城抓取”）、以及器件详情页的「刷新资料」（只对带 C 码的卡片显示）。可抓取项有两种：精确 C 码/完整 MPN（直接抓取），以及**规范化后大于 5 个字符且含字母的关键词**（只换候选，选定后才抓取）。
+搜索零结果且服务端在 `fetch_suggestion` 中给出可抓取项时，**三个入口**都能当场抓取：整库搜索的空结果页、入库/待入库表单的搜索建议面板（“立即从立创商城抓取”）、以及器件详情页的「刷新资料」（只对带 C 码的卡片显示）。可抓取项有两种：精确 C 码/完整 MPN（直接抓取），以及**规范化后至少 5 个字符且含字母的关键词**（只换候选，选定后才抓取）。
 
 - `CatalogFetchController`（`providers/catalog_fetch_controller.dart`）负责一次请求：`POST /lab/api/catalog/fetch`（`sync` 默认 true，服务端在 15 秒预算内当场抓），非终态才每秒轮询 `fetch_status`（最多 60 次）。`done` 后由页面自己重查：整库搜索走 `CatalogNotifier.refresh()`；入库/待入库重跑建议检索（`CatalogSuggestFieldState.research()`），新行由操作员自己点选，不自动填入；详情页 `ref.invalidate(catalogDetailProvider/catalogRowProvider)`。
 - 页面各自持有控制器：整库搜索用 `CatalogNotifier.startFetch(query:, catalogCode:, refresh:)`，入库/待入库/详情各自创建；换查询或销毁时取消轮询，互不影响。
 - 「刷新资料」只刷新当前打开的这一个 C 码（`refresh: true` + `catalog_code`）；没有列表级/全库刷新按钮，服务端也没有批量刷新接口。内容未变化时服务端不写库、不 bump revision，面板显示“资料未变化，无需更新。”。
-- 关键词候选只来自立创**搜索接口**：`CatalogFetchCandidate` 显示 `name`（立创显示名，如 `TI TLV9001IDBVR`）、品牌、封装和 C 码；服务端在候选阶段不打开中文详情页、不写库。`candidates` 是终态，必须由用户点「选这个」后带 `catalog_code` 重新提交，不能自动取第一条。短关键词（≤5 字符）、纯数字、名称片段不发请求，也不由客户端自行判断。失败、非电子、待复核、未找到都显示服务端中文原因，状态卡同时带图标与文字，不只靠颜色。
+- 关键词候选只来自立创**搜索接口**：`CatalogFetchCandidate` 显示 `name`（立创显示名，如 `TI TLV9001IDBVR`）、品牌、封装和 C 码；服务端在候选阶段不打开中文详情页、不写库。`candidates` 是终态，必须由用户点「选这个」后带 `catalog_code` 重新提交，不能自动取第一条。短关键词（少于 5 字符）、纯数字、名称片段不发请求，也不由客户端自行判断。失败、非电子、待复核、未找到都显示服务端中文原因，状态卡同时带图标与文字，不只靠颜色。
 - 抓取只影响器件资料与供应商库存，不创建本地档案、不改实验室库存；离线模式下不出现该按钮。
 - 客户端测试 `catalog_fetch_test.dart`（显式 query/refresh、关键词候选、候选名称）、`catalog_suggest_search_test.dart`（零结果按钮只在服务端建议时出现）、`pending_receipt_test.dart`（表单内进度与完成）用 `FakeLabApi` 覆盖，不访问网络。
 
@@ -66,7 +68,7 @@ lib/features/warehouse是登录后的四个分区（库存速览/仓位速览/�
 
 恢复脚本产生的Flutter可用 `--flutter <工具目录>/flutter`，JDK/Android分别用--jdk和--android-sdk传给build_client.py。脚本只改子进程环境，不全局改PATH。`--online`允许pubget联网；默认offline和enforce-lockfile，失败应查日志而不是抹掉锁重新解析。
 
-Linux在开发机按平台README安装原生构建依赖，恢复sdk/flutter_linux_3.47.7-stable.tar.xz及pubcache。独立LinuxNode不是Android/Flutter的依赖，但EDA桥接需要，别混为客户端必须项。
+Linux 在开发机按平台 README 恢复原生构建依赖、`flutter_linux_3.47.7-stable.tar.xz` 与 pub 缓存。当前 EDA 4.x 在构建阶段使用 Node，安装扩展时没有 Node 或本机网桥依赖。
 
 ## 隔离构建与验收
 

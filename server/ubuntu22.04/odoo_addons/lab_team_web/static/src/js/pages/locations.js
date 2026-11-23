@@ -35,13 +35,22 @@
       editPanel: LC.qs('[data-lc-inv-edit-panel="locations"]', root),
       editBadge: LC.qs('[data-lc-inv-edit-target]', root),
       editStats: LC.qs('[data-lc-inv-edit-stats]', root),
+      movePanel: LC.qs('[data-lc-inv-move-panel="locations"]', root),
+      movePath: LC.qs('[data-lc-inv-move-path]', root),
       parentSelect: LC.qs('#lc-inv-loc-parent', root),
       locks: LC.qs('[data-lc-inv-locks="locations"]', root),
       lockRows: LC.qs('[data-lc-rows="locks"]', root)
     };
     var createForm = LC.qs('[data-lc-form="location-create"]', root);
     var editForm = LC.qs('[data-lc-form="location-edit"]', root);
+    var moveForm = LC.qs('[data-lc-form="location-move"]', root);
+    var moveParent = LC.qs('#lc-inv-move-parent', root);
 
+    var treeRows = [];
+    var expanded = new Map();
+    var revealId = null;
+    var moveTarget = null;
+    var hierarchyAvailable = false;
     var all = [];          // 服务端最近一次返回的库位
     var byId = {};         // id -> 库位（行按钮用）
     var editTarget = null; // 当前编辑中的库位
@@ -68,11 +77,17 @@
                endpoint: 'locationUpdate', label: '停用库位 #' + id };
     }
 
+    function specMove(id) {
+      return { key: 'move:' + id, scope: 'locations/move/' + id,
+               endpoint: 'locationUpdate', label: '更改上级 #' + id };
+    }
+
     function lockSpecs() {
       var specs = [SPEC_CREATE];
       all.forEach(function (loc) {
         specs.push(specRename(loc.id));
         specs.push(specDeactivate(loc.id));
+        specs.push(specMove(loc.id));
       });
       return specs;
     }
@@ -95,6 +110,9 @@
       var data = payload || {};
       if (!data || !Object.keys(data).length) return '浏览器未保存明细';
       if (data.active === false) return '停用库位 #' + data.location_id;
+      if (data.update_parent) {
+        return '库位 #' + data.location_id + ' → ' + (data.parent_id ? '上级 #' + data.parent_id : '根级');
+      }
       if (data.name) {
         return '名称「' + data.name + '」' + (data.parent_id ? '，上级 #' + data.parent_id : '，根级');
       }
@@ -170,6 +188,8 @@
       }).then(function (res) {
         refreshLocks();
         var loc = (res && res.data && res.data.location) || null;
+        if (loc) revealId = loc.id;
+        if (moveTarget && spec.key === 'move:' + moveTarget.id) closeMove();
         LC.status.show({
           kind: 'success',
           message: '未决提交已确认生效' + (loc ? '：' + (loc.path || loc.name || '') : '') +
@@ -257,9 +277,16 @@
         disabled: deactivateLocked,
         text: '停用'
       });
-      return LC.el('td', {}, [
-        LC.el('div', { class: 'lc-inv-actions' }, [rename, deactivate])
-      ]);
+      var buttons = [rename];
+      if (hierarchyAvailable && moveForm) {
+        buttons.push(LC.el('button', {
+          class: 'lc-btn lc-btn-outline lc-inv-btn-sm', type: 'button',
+          'data-lc-action': 'locations-move', 'data-lc-inv-loc-id': String(loc.id),
+          disabled: !!pendingLocks['move:' + loc.id], text: '更改上级'
+        }));
+      }
+      buttons.push(deactivate);
+      return LC.el('td', {}, [LC.el('div', { class: 'lc-inv-actions' }, buttons)]);
     }
 
     /* 窄屏卡片化：把表头文案复制到每个单元格的 data-label，
@@ -283,16 +310,75 @@
       }
     }
 
-    function row(loc) {
+    function ancestorsOf(loc) {
+      var parents = [];
+      var seen = new Set([loc.id]);
+      for (var parent = byId[loc.parent_id]; parent && !seen.has(parent.id); parent = byId[parent.parent_id]) {
+        seen.add(parent.id);
+        parents.push(parent);
+      }
+      return parents;
+    }
+
+    function rebuildTree(data) {
+      all = data.locations || [];
+      hierarchyAvailable = Array.isArray(data.ancestors);
+      var entries = (data.ancestors || []).concat(all);
+      byId = Object.create(null);
+      entries.forEach(function (loc) { byId[loc.id] = loc; });
+      var children = new Map();
+      entries.forEach(function (loc) {
+        var parent = byId[loc.parent_id];
+        var key = parent ? parent.id : null;
+        if (!children.has(key)) children.set(key, []);
+        children.get(key).push(loc);
+      });
+      treeRows = [];
+      function appendChildren(parentId, depth) {
+        (children.get(parentId) || []).sort(function (a, b) {
+          return String(a.name).localeCompare(String(b.name), 'zh-CN', { numeric: true });
+        }).forEach(function (loc) {
+          var hasChildren = children.has(loc.id);
+          treeRows.push({ loc: loc, depth: depth, hasChildren: hasChildren });
+          if (hasChildren) {
+            if (!expanded.has(loc.id)) expanded.set(loc.id, depth < 2);
+            appendChildren(loc.id, depth + 1);
+          }
+        });
+      }
+      appendChildren(null, 0);
+      var reveal = byId[revealId];
+      if (reveal) {
+        ancestorsOf(reveal).forEach(function (parent) { expanded.set(parent.id, true); });
+        if (nodes.filter && !matches(reveal, nodes.filter.value.trim().toLowerCase())) nodes.filter.value = '';
+      }
+      revealId = null;
+    }
+
+    function row(entry, searching) {
+      var loc = entry.loc;
+      var isView = loc.usage === 'view';
+      var open = expanded.get(loc.id);
+      var caption = LC.el('span', { text: hierarchyAvailable ? loc.name : (loc.path || loc.name), title: loc.path });
+      var label = entry.hasChildren && !searching
+        ? LC.el('button', {
+            class: 'lc-inv-tree-toggle', type: 'button',
+            'data-lc-action': 'locations-toggle-branch', 'data-lc-inv-loc-id': String(loc.id),
+            'aria-expanded': open ? 'true' : 'false', title: loc.path
+          }, [LC.el('span', { 'aria-hidden': 'true', text: open ? '▾' : '▸' }), caption])
+        : LC.el('span', { class: 'lc-inv-tree-leaf' }, caption);
+      var node = LC.el('div', { class: 'lc-inv-tree-node' }, label);
+      node.style.setProperty('--lc-inv-depth', String(Math.min(entry.depth, 8)));
       var cells = [
-        LC.el('td', {}, [LC.el('span', { class: 'lc-mono', text: loc.code || '—' })]),
-        LC.el('td', { text: loc.path || loc.name || '' }),
-        numCell(loc.bag_count),
-        numCell(loc.bag_quantity),
-        numCell(loc.quantity)
+        LC.el('td', {}, [LC.el('span', { class: 'lc-mono', text: isView ? '—' : loc.code || '—' })]),
+        LC.el('td', { class: 'lc-inv-tree-cell' }, node),
+        isView ? LC.el('td', { class: 'lc-inv-num', text: '—' }) : numCell(loc.bag_count),
+        isView ? LC.el('td', { class: 'lc-inv-num', text: '—' }) : numCell(loc.bag_quantity),
+        isView ? LC.el('td', { class: 'lc-inv-num', text: '—' }) : numCell(loc.quantity)
       ];
-      if (manager) cells.push(actionsCell(loc));
-      return LC.el('tr', { 'data-lc-inv-loc': String(loc.id) }, cells);
+      if (manager) cells.push(isView ? LC.el('td') : actionsCell(loc));
+      return LC.el('tr', { 'data-lc-inv-loc': String(loc.id), 'data-lc-inv-depth': String(entry.depth),
+        class: isView ? 'lc-inv-view-location' : '' }, cells);
     }
 
     function matches(loc, needle) {
@@ -302,30 +388,48 @@
     }
 
     function render() {
-      var needle = nodes.filter ? String(nodes.filter.value || '').trim().toLowerCase() : '';
-      var rows = all.filter(function (loc) { return matches(loc, needle); });
-      LC.renderRows(nodes.rows, rows, row);
+      var needle = nodes.filter ? nodes.filter.value.trim().toLowerCase() : '';
+      var visible = new Set();
+      var matched = 0;
+      if (needle) {
+        treeRows.forEach(function (entry) {
+          if (!matches(entry.loc, needle)) return;
+          if (entry.loc.usage !== 'view') matched += 1;
+          visible.add(entry.loc.id);
+          ancestorsOf(entry.loc).forEach(function (parent) { visible.add(parent.id); });
+        });
+      }
+      var rows = treeRows.filter(function (entry) {
+        return needle ? visible.has(entry.loc.id) : ancestorsOf(entry.loc).every(function (parent) {
+          return expanded.get(parent.id);
+        });
+      });
+      LC.renderRows(nodes.rows, rows, function (entry) { return row(entry, !!needle); });
       labelCells();
-      LC.setText(nodes.count, String(rows.length));
-      // 空状态要区分"本来就没有"与"筛选没命中"，否则用户以为库位丢了
+      LC.setText(nodes.count, String(needle ? matched : all.length));
       LC.setText(nodes.empty, needle
-        ? '没有匹配的库位（筛选：' + needle + '）。清空筛选可以看全部内部库位。'
-        : '当前公司还没有内部库位。管理员可以先「新建库位」，再到扫码上架里把袋放进该库位。');
+        ? '没有匹配的库位。清空搜索可查看全部库位。'
+        : '当前公司还没有内部库位。');
       LC.show(nodes.empty, rows.length === 0);
     }
 
-    function fillParentSelect() {
-      if (!nodes.parentSelect) return;
-      var current = nodes.parentSelect.value;
-      LC.clear(nodes.parentSelect);
-      nodes.parentSelect.appendChild(LC.el('option', { value: '', text: '（根级，无上级）' }));
-      all.forEach(function (loc) {
-        nodes.parentSelect.appendChild(LC.el('option', {
-          value: String(loc.id),
-          text: (loc.code ? '[' + loc.code + '] ' : '') + (loc.path || loc.name || loc.id)
+    function fillParentSelect(select, target) {
+      var previous = select.value;
+      LC.clear(select);
+      if (target) select.appendChild(LC.el('option', { value: '', text: '选择新上级' }));
+      if (!target || target.parent_id) {
+        select.appendChild(LC.el('option', { value: target ? '0' : '', text: '（根级，无上级）' }));
+      }
+      treeRows.forEach(function (entry) {
+        var loc = entry.loc;
+        if (target && (loc.id === target.id || loc.id === target.parent_id ||
+            ancestorsOf(loc).some(function (parent) { return parent.id === target.id; }))) return;
+        select.appendChild(LC.el('option', {
+          value: String(loc.id), text: (loc.code ? '[' + loc.code + '] ' : '') + (loc.path || loc.name)
         }));
       });
-      nodes.parentSelect.value = current;
+      select.value = Array.from(select.options).some(function (option) { return option.value === previous; })
+        ? previous : '';
     }
 
     /* -------------------------------------------------------------- 读取 */
@@ -335,14 +439,17 @@
       LC.show(nodes.loading, true);
       LC.show(nodes.empty, false);
       LC.setBusy(button, true, '刷新中…');
-      return LC.rpc('locations', { with_stats: true }).then(function (data) {
+      return LC.rpc('locations', { with_stats: true, with_tree: true }).then(function (data) {
         if (seq !== loadSeq) return;
-        all = (data && data.locations) || [];
-        byId = {};
-        all.forEach(function (loc) { byId[String(loc.id)] = loc; });
-        refreshLocks();      // 先恢复未决提交（决定行按钮是否禁用），再渲染
+        rebuildTree(data || {});
+        refreshLocks();
         render();
-        fillParentSelect();
+        if (nodes.parentSelect) fillParentSelect(nodes.parentSelect);
+        if (moveTarget) {
+          var updated = byId[moveTarget.id];
+          if (updated) showMove(updated, true);
+          else closeMove();
+        }
         LC.show(nodes.loading, false);
         LC.setBusy(button, false);
         if (editTarget && byId[String(editTarget.id)]) {
@@ -404,6 +511,7 @@
           ? '已创建库位 ' + (loc.code ? '[' + loc.code + '] ' : '') + (loc.path || loc.name || '')
           : '库位已创建。'
       });
+      if (loc) revealId = loc.id;
       if (createForm) {
         LC.setFieldValue(createForm, 'name', '');
         LC.setFieldValue(createForm, 'parent_id', '');
@@ -423,6 +531,23 @@
       });
     }
 
+    function showMove(loc, keepSelection) {
+      if (!manager || !moveForm || !hierarchyAvailable || loc.usage === 'view') return;
+      moveTarget = loc;
+      if (!keepSelection) moveParent.value = '';
+      fillParentSelect(moveParent, loc);
+      LC.setText(nodes.movePath, loc.path || loc.name);
+      moveForm.querySelector('button[type="submit"]').disabled = !!pendingLocks['move:' + loc.id];
+      LC.show(nodes.movePanel, true);
+      if (!keepSelection) moveParent.focus();
+    }
+
+    function closeMove() {
+      moveTarget = null;
+      LC.show(nodes.movePanel, false);
+      LC.clearFormErrors(moveForm);
+    }
+
     /* -------------------------------------------------------- 改名 / 停用 */
     function showEdit(loc, keepPanel) {
       editTarget = loc;
@@ -431,7 +556,7 @@
       if (!keepPanel) LC.setFieldValue(editForm, 'name', loc.name || '');
       LC.setText(nodes.editBadge, (loc.code ? '[' + loc.code + '] ' : '') + (loc.path || loc.name || ''));
       LC.setText(nodes.editStats,
-        '当前库位（含子库位）有 ' + LC.fmt.quantity(loc.bag_count) + ' 袋 / 数量 ' +
+        '当前库位有 ' + LC.fmt.quantity(loc.bag_count) + ' 袋 / 数量 ' +
         LC.fmt.quantity(loc.quantity) + '（袋内数量 ' + LC.fmt.quantity(loc.bag_quantity) + '）');
       LC.show(nodes.editPanel, true);
       // 该对象有未决提交时，禁用对应动作（解除入口在上方未决区）
@@ -596,6 +721,25 @@
       if (createForm) LC.clearFormErrors(createForm);
     });
 
+    LC.on(root, '[data-lc-action="locations-toggle-branch"]', 'click', function (ev, button) {
+      var loc = byId[button.getAttribute('data-lc-inv-loc-id')];
+      if (!loc) return;
+      expanded.set(loc.id, !expanded.get(loc.id));
+      render();
+      var toggle = LC.qs('[data-lc-action="locations-toggle-branch"][data-lc-inv-loc-id="' + loc.id + '"]', root);
+      if (toggle) toggle.focus();
+    });
+
+    LC.on(root, '[data-lc-action="locations-move"]', 'click', function (ev, button) {
+      var loc = byId[button.getAttribute('data-lc-inv-loc-id')];
+      if (!loc) return;
+      LC.status.clear();
+      showMove(loc, false);
+      nodes.movePanel.scrollIntoView({ block: 'nearest' });
+    });
+
+    LC.on(root, '[data-lc-action="locations-cancel-move"]', 'click', closeMove);
+
     LC.on(root, '[data-lc-action="locations-edit"]', 'click', function (ev, btn) {
       var loc = byId[String(btn.getAttribute('data-lc-inv-loc-id'))];
       if (!loc) return;
@@ -637,6 +781,46 @@
         }).catch(function (err) {
           done(err);
           handleCreateError(err, values, button);
+        });
+      });
+    }
+
+    if (moveForm) {
+      LC.guard(moveForm, function (values, done) {
+        var loc = moveTarget;
+        var parentId = LC.parse.int(values.parent_id, null);
+        var parent = byId[parentId];
+        if (!loc || !values.parent_id || (parentId !== 0 && !parent)) {
+          LC.formError(moveForm, 'parent_id', '请选择一个新上级。');
+          done();
+          return;
+        }
+        var destination = parent ? parent.path || parent.name : '根级';
+        if (!LC.confirmAction('将「' + (loc.path || loc.name) + '」移到「' + destination + '」下？')) {
+          done();
+          return;
+        }
+        var spec = specMove(loc.id);
+        LC.submit({
+          scope: spec.scope, endpoint: spec.endpoint,
+          params: { location_id: loc.id, parent_id: parentId || false, update_parent: true },
+          button: moveForm.querySelector('button[type="submit"]'), busyLabel: '移动中…'
+        }).then(function (res) {
+          var moved = res && res.data && res.data.location;
+          done();
+          closeMove();
+          revealId = loc.id;
+          LC.status.show({ kind: 'success', message: '已移动至 ' + (moved ? moved.path : destination) });
+          load();
+        }).catch(function (err) {
+          done(err);
+          if (err.unknown || isPendingConflict(err)) {
+            handleUnknownSubmit(err, spec);
+            showMove(loc, true);
+            return;
+          }
+          LC.status.show({ kind: 'error', code: err.code, message: LC.errorText(err) });
+          showFieldErrors(moveForm, err);
         });
       });
     }

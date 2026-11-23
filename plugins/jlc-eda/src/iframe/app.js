@@ -1,4 +1,4 @@
-import { createBridge, readPanelPayload } from './bridge-client.js';
+import { createBridge, readPanelPayload, readUserConfig, writeUserConfig } from './bridge-client.js';
 import { beginSubmit, markSuccess, markFailure } from '../shared/idempotency.js';
 import {
   groupBom,
@@ -35,30 +35,31 @@ import {
   locationSummary,
 } from '../shared/detail.js';
 
-const VERSION = '4.1.3';
+const VERSION = '4.2.0';
 
 const TABS = [
   { id: 'inventory', label: '器件库' },
   { id: 'bom', label: '原理图库存' },
-  { id: 'settings', label: '连接/账户' },
+  { id: 'settings', label: '连接设置' },
   { id: 'diagnostics', label: '诊断' },
 ];
 
 const ERROR_HINTS = {
-  SESSION_REQUIRED: '请先到「连接/账户」登录 Odoo。',
-  SESSION_EXPIRED: '会话已失效，请重新登录；插件不会保存密码。',
+  SESSION_REQUIRED: '请先到「连接设置」填入 EDA 密钥并保存。',
+  SESSION_EXPIRED: 'EDA 密钥无效、已过期或已被吊销。请向库存管理员索取新密钥后在「连接设置」重新保存。',
   SESSION_COOKIE_UNAVAILABLE:
-    '直接连接没有保持登录会话。请改用默认的「本机桥接」，或联系管理员确认客户端设置。',
-  INVALID_CREDENTIALS: '请检查数据库名、登录名和密码；若账号启用两步验证，请先在 Odoo 网页端处理。',
+    '没有读到有效的 EDA 密钥。请在「连接设置」重新粘贴密钥并保存；密钥由库存管理员发放。',
+  INVALID_CREDENTIALS:
+    '密钥被服务器拒绝。请确认复制完整（形如 eda_…），或请管理员重新发放。',
   NETWORK_OR_CORS:
-    '无法连接。使用本机桥接时请确认桥接窗口仍打开；直接连接时请检查 Odoo 地址和网络。',
+    '无法连接服务器。请检查「连接设置」里的服务器地址和本机网络；本插件不需要安装额外程序。',
   FORBIDDEN: '当前账号缺少 lab 权限组（user/operator/manager），请联系库存管理员。',
   AMBIGUOUS_MATERIAL: '同一 C 编号有多个实验室档案，请明确选择 SN；插件不会自动取第一个。',
   CONFLICT: '请求号已用于不同内容。请确认当前表单后重新提交（插件会生成新请求号）。',
   TIMEOUT_AMBIGUOUS: '请求超时，服务器可能已处理。写操作请使用同一请求号重试，服务端会按幂等键返回原结果。',
   EXTERNAL_INTERACTION_DISABLED: '请在 EDA 扩展管理器中启用本扩展的「外部交互」权限。',
-  RELAY_AUTH: '配对码不正确或已变化，请重新复制本机桥接窗口中的配对码。',
-  RELAY_UNAVAILABLE: '本机桥接未启动或已关闭。请双击压缩包里的「start-windows.cmd」并保持窗口打开。',
+  RELAY_AUTH: '这是旧版本遗留的提示，当前插件不使用配对码。请检查「连接设置」中的 EDA 密钥。',
+  RELAY_UNAVAILABLE: '这是旧版本遗留的提示，当前插件不需要本机程序。请检查「连接设置」中的服务器地址。',
   NOT_FOUND: '服务器没有找到该对象，请刷新后重试。',
   VALIDATION_ERROR: '请按提示修正输入。',
   HTTP: '服务器返回了异常状态，请查看诊断日志。',
@@ -75,6 +76,52 @@ const ERROR_HINTS = {
  * (confirmed bags + borrower + project); it survives an UNKNOWN result so the
  * operator can retry with the SAME request key.
  */
+const PENDING_OUTBOUND_KEY = 'lab_eda_pending_outbound';
+
+/** The identity a pending record belongs to: one server, one signed-in user. */
+function outboundScope() {
+  return {
+    serverUrl: String((state.settings && state.settings.serverUrl) || ''),
+    uid: state.session && state.session.uid ? Number(state.session.uid) : null,
+  };
+}
+
+/**
+ * Reads the unresolved attempt saved by a previous panel session.
+ *
+ * A record from ANOTHER account or server is ignored: replaying somebody
+ * else's request key would either fail or, worse, act under the wrong identity.
+ */
+function loadPendingOutbound() {
+  const saved = readUserConfig(PENDING_OUTBOUND_KEY);
+  if (!saved || typeof saved !== 'object' || !saved.attempt || !saved.requestKey) return null;
+  if (!saved.attempt.draft || saved.attempt.draft.key !== saved.requestKey) return null;
+  const scope = outboundScope();
+  if (saved.serverUrl !== scope.serverUrl || Number(saved.uid) !== Number(scope.uid)) return null;
+  return saved;
+}
+
+/** Saves (or clears) the unresolved attempt for the current identity. */
+function savePendingOutbound(value) {
+  if (!value) {
+    state.bom.pending = null;
+    writeUserConfig(PENDING_OUTBOUND_KEY, null);
+    return;
+  }
+  const scope = outboundScope();
+  const record = {
+    serverUrl: scope.serverUrl,
+    uid: scope.uid,
+    requestKey: value.requestKey,
+    savedAt: new Date().toISOString(),
+    borrowerId: value.attempt && value.attempt.borrower_id,
+    project: value.attempt && value.attempt.project,
+    attempt: value.attempt,
+  };
+  state.bom.pending = record;
+  writeUserConfig(PENDING_OUTBOUND_KEY, record);
+}
+
 function emptyBomOutbound() {
   return {
     computing: false,
@@ -137,6 +184,10 @@ const state = {
     equivalentsExpanded: new Set(),
     equivalentsToken: 0,
     outbound: emptyBomOutbound(),
+    // A frozen outbound attempt whose answer never arrived. It is NOT cleared
+    // by a re-scan, a scope change or a closed panel: it carries the request
+    // key that makes the retry safe.
+    pending: null,
   },
   settings: {
     serverUrl: '',
@@ -157,7 +208,6 @@ const dom = {
   view: document.getElementById('view'),
   toasts: document.getElementById('toasts'),
   modalRoot: document.getElementById('modal-root'),
-  btnSettings: document.getElementById('btn-settings'),
   btnDiagnostics: document.getElementById('btn-diagnostics'),
 };
 
@@ -276,30 +326,68 @@ function errorBox(error, options = {}) {
   return box;
 }
 
-function confirmModal(title, content, confirmText = '确认提交') {
+function confirmModal(titleText, content, confirmText = '确认提交') {
   return new Promise((resolve) => {
     const mask = el('div', { class: 'modal-mask' });
+    const previouslyFocused = document.activeElement;
+    const titleId = 'lab-modal-title';
     const close = (value) => {
       if (mask.parentNode) mask.parentNode.removeChild(mask);
       document.removeEventListener('keydown', onKey);
+      // Give focus back to whatever opened the dialog, not to <body>.
+      try {
+        if (previouslyFocused && previouslyFocused.isConnected && previouslyFocused.focus) {
+          previouslyFocused.focus();
+        }
+      } catch (_) {
+        /* focus restore must never break closing */
+      }
       resolve(value);
     };
+    const focusables = () =>
+      Array.from(modal.querySelectorAll('button, input, select, textarea, a[href]'))
+        .filter((node) => !node.disabled && node.offsetParent !== null);
     const onKey = (event) => {
-      if (event.key === 'Escape') close(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close(false);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      // Keep Tab inside the dialog: a modal that lets focus escape hides the
+      // only controls the operator can use while it is open.
+      const list = focusables();
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     const confirm = el('button', { class: 'btn primary', type: 'button' }, confirmText);
     confirm.addEventListener('click', () => close(true));
     const cancel = el('button', { class: 'btn', type: 'button' }, '取消');
     cancel.addEventListener('click', () => close(false));
-    const modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' }, [
-      el('h3', {}, title),
+    const modal = el('div', {
+      class: 'modal',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': titleId,
+    }, [
+      el('h3', { id: titleId }, titleText),
       el('div', { class: 'modal-body' }, content),
       el('div', { class: 'modal-actions' }, [cancel, confirm]),
     ]);
     mask.appendChild(modal);
     dom.modalRoot.appendChild(mask);
     document.addEventListener('keydown', onKey);
-    confirm.focus();
+    // First field if the dialog has one, otherwise Cancel: the safe choice.
+    const firstField = modal.querySelector('input, select, textarea');
+    (firstField || cancel).focus();
   });
 }
 
@@ -336,10 +424,10 @@ function isActive() {
 
 function loginGate(what) {
   return el('div', { class: 'panel' }, [
-    el('h2', {}, '需要登录 Odoo'),
+    el('h2', {}, '需要连接实验室库存'),
     state.sessionError ? errorBox(state.sessionError) : null,
-    el('p', {}, '要使用' + what + '，请先在「连接/账户」中登录。插件只在当前 EDA 会话内保持登录，不保存密码。'),
-    el('button', { class: 'btn primary', type: 'button', onclick: () => nav('settings') }, '去登录'),
+    el('p', {}, '要使用' + what + '，请先在「连接设置」填入 EDA 密钥并保存。插件不需要安装其他程序。'),
+    el('button', { class: 'btn primary', type: 'button', onclick: () => nav('settings') }, '打开连接设置'),
   ]);
 }
 
@@ -485,6 +573,10 @@ async function init() {
   render();
   if (isActive()) {
     await refreshSession();
+    // An outbound whose answer never arrived stays blocked across a panel
+    // restart: the saved request key is what makes the retry safe.
+    state.bom.pending = loadPendingOutbound();
+    if (state.bom.pending) render();
     void loadBootstrap();
   }
   window.addEventListener('beforeunload', () => {
@@ -492,7 +584,6 @@ async function init() {
   });
 }
 
-dom.btnSettings.addEventListener('click', () => nav('settings'));
 dom.btnDiagnostics.addEventListener('click', () => nav('diagnostics'));
 
 init().catch((error) => fatal((error && error.message) || String(error)));
@@ -846,7 +937,7 @@ const BOM_STATUS_LABEL = {
   ok: '充足',
   short: '缺料',
   unknown: '库存未知',
-  not_in_catalog: '资料库无此器件',
+  not_in_catalog: '资料未收录',
   no_code: '无 C 编号',
 };
 
@@ -863,7 +954,8 @@ function bomStatusCell(row) {
   if (row.substitute) {
     return el('div', {}, [
       el('span', { class: 'chip ok' }, '已选替代'),
-      el('div', { class: 'mono muted', style: 'margin-top:4px' }, row.code + ' → ' + codeOf(row.substitute)),
+      el('div', { class: 'mono muted', style: 'margin-top:4px' },
+        row.substitute.sn || codeOf(row.substitute) || row.substitute.item_key),
     ]);
   }
   return bomStatusChip(row.status);
@@ -911,9 +1003,10 @@ function bomEquivalentCandidateLine(row, candidate) {
     .join(',');
   const line = el('div', { class: 'bom-equivalent-row' }, [
     el('label', { class: 'check bom-equivalent-check' }, [box, el('span', {}, chosen ? '已选' : '选用')]),
-    el('span', { class: 'mono' }, codeOf(candidate) || candidate.item_key || '—'),
+    el('span', { class: 'mono' }, candidate.sn || codeOf(candidate) || candidate.item_key || '—'),
     el('span', {}, candidate.brand || '—'),
-    el('span', { class: 'bom-equivalent-name' }, candidate.name || '—'),
+    el('span', { class: 'bom-equivalent-name' },
+      [candidate.name, candidate.package].filter(Boolean).join(' · ') || '—'),
     el('span', {}, '可用 ' + fmtQty(candidate.available)),
     el('span', { class: 'muted' }, locations || '—'),
     el('span', { class: 'muted' }, '袋 ' + (bags || '—')),
@@ -942,7 +1035,12 @@ function bomEquivalentsExtraRow(row, columnCount) {
   // 无 C 编号的行没有 equivalents（候选直接显示在库位列里）。
   if (!row || row.unmappedGroup) return null;
   const eq = row.equivalents;
-  if (!eq || !Array.isArray(eq.candidates) || !eq.candidates.length) return null;
+  if (!eq) return null;
+  if (!eq.candidates.length) {
+    const message = eq.basis === 'none' ? '规格不足，无法查询替代料' : '未找到有可用库存的替代料';
+    return el('tr', { class: 'bom-equivalents-row' },
+      el('td', { colspan: String(columnCount), class: 'muted' }, message));
+  }
   const key = row.itemKey || 'lcsc:' + row.code;
   const expanded = state.bom.equivalentsExpanded.has(key);
   const toggle = el(
@@ -953,7 +1051,7 @@ function bomEquivalentsExtraRow(row, columnCount) {
       'aria-expanded': expanded ? 'true' : 'false',
       onclick: () => toggleBomEquivalents(row),
     },
-    (expanded ? '▾ ' : '▸ ') + '等效 ' + eq.candidates.length,
+    (expanded ? '▾ ' : '▸ ') + '可选替代 ' + eq.candidates.length,
   );
   const content = el('div', { class: 'bom-equivalents' }, [toggle]);
   if (expanded) {
@@ -961,10 +1059,49 @@ function bomEquivalentsExtraRow(row, columnCount) {
       content.appendChild(
         el('div', { class: 'bom-equivalent-note warn' }, '源器件缺少参数，以下候选仅按封装与分类匹配，请人工确认'),
       );
+    } else if (eq.basis === 'value_package') {
+      const message = eq.source?.package
+        ? '按原理图规格与封装匹配，请核对耐压、精度等参数。'
+        : '原理图未提供封装，请核对候选封装与其他参数。';
+      content.appendChild(el('div', { class: 'bom-equivalent-note warn' }, message));
     }
     for (const candidate of eq.candidates) content.appendChild(bomEquivalentCandidateLine(row, candidate));
   }
   return el('tr', { class: 'bom-equivalents-row' }, el('td', { colspan: String(columnCount) }, content));
+}
+
+/**
+ * Persistent banner for an outbound whose answer never arrived.
+ *
+ * It stays on screen through re-scans, scope changes and panel restarts, and
+ * it is the only place the operator can retry - always with the saved key.
+ */
+function pendingOutboundBanner(pending) {
+  const keys = (pending.attempt && pending.attempt.lines ? pending.attempt.lines : [])
+    .map((line) => '袋#' + line.bag_id + '×' + fmtQty(line.quantity))
+    .join(' ');
+  return el('section', { class: 'panel pending-outbound', role: 'alert' }, [
+    el('h2', {}, '有一笔出库结果未知'),
+    el('p', {}, '服务器没有返回明确结果：这笔出库可能已生效，也可能没有。本页不会显示已扣减，也不会开始新的出库。'),
+    el('p', { class: 'muted' }, '领用人 #' + String(pending.borrowerId || '—') + ' · 项目 ' + (pending.project || '—') +
+      ' · 请求号 ' + shortKey(pending.requestKey) + (keys ? ' · ' + keys : '')),
+    el('div', { class: 'row' }, [
+      el('button', { class: 'btn primary', type: 'button', onclick: () => retryBomOutbound() }, '原样重试（同一请求号）'),
+      el('button', { class: 'btn', type: 'button', onclick: () => copyText(pending.requestKey, '已复制请求号') }, '复制请求号'),
+      el('button', {
+        class: 'btn',
+        type: 'button',
+        onclick: async () => {
+          const ok = await confirmModal(
+            '放弃未决出库？',
+            el('p', {}, '请先在 Odoo「领用」或请求记账里核对这笔请求号。只有确认它没有生效，才能放弃；放弃后再次出库会使用新的请求号。'),
+            '核对后放弃',
+          );
+          if (ok) discardPendingOutbound();
+        },
+      }, '核对后放弃'),
+    ]),
+  ]);
 }
 
 function renderBom() {
@@ -996,10 +1133,10 @@ function renderBom() {
             {
               class: 'btn primary',
               type: 'button',
-              disabled: bom.loading || bom.outbound.computing || bom.outbound.submitting || !(bom.rows || []).length,
+              disabled: bom.loading || bom.outbound.computing || bom.outbound.submitting || Boolean(bom.pending) || !(bom.rows || []).length,
               onclick: () => openBomOutbound(),
             },
-            bom.outbound.computing ? '分配中…' : '一键出库',
+            bom.pending ? '先处理未决出库' : bom.outbound.computing ? '分配中…' : '一键出库',
           ),
         ]),
       ]),
@@ -1011,6 +1148,7 @@ function renderBom() {
     ]),
   );
 
+  if (bom.pending) dom.view.appendChild(pendingOutboundBanner(bom.pending));
   if (bom.error) dom.view.appendChild(errorBox(bom.error, { retry: () => runBom() }));
 
   if (bom.loading) {
@@ -1150,7 +1288,7 @@ function renderBom() {
           el('span', { class: 'muted' }, '无'),
           el('span', {}, (row.unmappedGroup.value || '—') +
             (row.unmappedGroup.footprint ? ' · ' + row.unmappedGroup.footprint : '')),
-          (row.designators || []).join(','),
+          (row.designators || []).join(', '),
           fmtQty(row.need),
           '—',
           '—',
@@ -1165,12 +1303,12 @@ function renderBom() {
         bomStatusCell(row),
         el('span', { class: 'mono' }, row.code),
         row.name || '—',
-        (row.designators || []).join(','),
+        (row.designators || []).join(', '),
         fmtQty(row.need),
         row.available === null ? '未知' : fmtQty(row.available),
         row.gap === null ? '未知' : fmtQty(row.gap),
         isNotInCatalog
-          ? el('span', { class: 'muted' }, '资料库无此编号，需抓取或建档')
+          ? '—'
           : ((row.locations || [])
               .map((location) => locationSummary(location))
               .join(' ') || '—'),
@@ -1192,7 +1330,7 @@ function renderBom() {
             { label: '袋' },
           ],
           tableRows,
-          { rowAfter: (cells, index) => bomEquivalentsExtraRow(allRows[index], BOM_COLUMNS) },
+          { class: 'bom-table', rowAfter: (cells, index) => bomEquivalentsExtraRow(allRows[index], BOM_COLUMNS) },
         ),
         el('div', { class: 'row', style: 'margin-top:10px' }, [
           el('button', { class: 'btn', type: 'button', onclick: () => copyText(bomTsv(rows), '已复制对比表') }, '复制对比表'),
@@ -1267,6 +1405,10 @@ function bomOutboundSourceLines(rows) {
 }
 
 async function openBomOutbound() {
+  if (state.bom.pending) {
+    toast('有一笔出库结果未知。请先用「原样重试」以同一请求号重发，或核对领用记录后放弃。', 'warn', 8000);
+    return;
+  }
   const out = state.bom.outbound;
   out.computing = true;
   out.error = null;
@@ -1401,6 +1543,7 @@ async function submitBomOutbound(attempt) {
     const outcome = classifyOutboundResponse(response);
     out.submitting = false;
     if (outcome === OUTBOUND_OUTCOME.SUCCESS) {
+      savePendingOutbound(null);
       attempt.draft = markSuccess(submitted, response);
       out.result = response.result || null;
       applyOutboundOutcome(out, OUTBOUND_OUTCOME.SUCCESS, {
@@ -1423,6 +1566,7 @@ async function submitBomOutbound(attempt) {
     if (outcome === OUTBOUND_OUTCOME.RECONFIRM) {
       // Nothing written; the frozen allocation is stale. Drop it and let the
       // operator re-preview against live stock.
+      savePendingOutbound(null);
       attempt.draft = markFailure(submitted, { code: 'PRECONDITION_FAILED' });
       out.attempt = null;
       applyOutboundOutcome(out, OUTBOUND_OUTCOME.RECONFIRM);
@@ -1439,6 +1583,11 @@ async function submitBomOutbound(attempt) {
       outcome === OUTBOUND_OUTCOME.UNKNOWN
         ? markFailure(submitted, { code: 'TIMEOUT_AMBIGUOUS', mayHaveBeenSent: true })
         : markFailure(submitted, { code: (response && response.code) || 'FAILED' });
+    if (outcome === OUTBOUND_OUTCOME.UNKNOWN) {
+      savePendingOutbound({ requestKey: attempt.draft.key, attempt });
+    } else {
+      savePendingOutbound(null);
+    }
     applyOutboundOutcome(out, outcome);
     out.error = null;
     const failed = outboundToast(outcome);
@@ -1449,6 +1598,11 @@ async function submitBomOutbound(attempt) {
     attempt.draft = markFailure(submitted, error);
     out.submitting = false;
     out.error = error;
+    if (outcome === OUTBOUND_OUTCOME.UNKNOWN) {
+      savePendingOutbound({ requestKey: attempt.draft.key, attempt });
+    } else {
+      savePendingOutbound(null);
+    }
     applyOutboundOutcome(out, outcome);
     if (outcome === OUTBOUND_OUTCOME.RECONFIRM) out.attempt = null;
     const failed = outboundToast(outcome);
@@ -1460,8 +1614,24 @@ async function submitBomOutbound(attempt) {
 
 async function retryBomOutbound() {
   const out = state.bom.outbound;
-  if (!out.attempt || out.submitting) return;
-  await submitBomOutbound(out.attempt);
+  if (out.submitting) return;
+  const pending = state.bom.pending;
+  const attempt = out.attempt || (pending && pending.attempt) || null;
+  if (!attempt) {
+    toast('没有可重试的出库记录。请先读取并对比，再重新发起。', 'error');
+    return;
+  }
+  out.attempt = attempt;
+  await submitBomOutbound(attempt);
+}
+
+/** Drops an unresolved record after the operator verified the real issue list. */
+function discardPendingOutbound() {
+  if (!state.bom.pending) return;
+  savePendingOutbound(null);
+  state.bom.outbound = emptyBomOutbound();
+  toast('已放弃未决出库。请先核对 Odoo 领用记录，确认没有生效再重新发起。', 'warn', 8000);
+  render();
 }
 
 function scopeRadio(value, label, current) {

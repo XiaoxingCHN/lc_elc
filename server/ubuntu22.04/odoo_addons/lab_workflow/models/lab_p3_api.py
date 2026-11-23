@@ -276,7 +276,7 @@ class LabWorkflowP3Api(models.AbstractModel):
     @api.model
     @internal_only
     def lab_location_update(self, location_id, name=None, note=None, active=None,
-                            parent_id=None, update_parent=False):
+                            parent_id=None, update_parent=False, request_key=None):
         """``/lab/api/inventory/location_update``（manager）。
 
         只改展示/结构（名称、备注、启用、父级），不碰 usage、不改库存；
@@ -305,6 +305,24 @@ class LabWorkflowP3Api(models.AbstractModel):
         except p3_rules.RuleError as error:
             raise self._lab_rule_error(error)
 
+        if wants_parent and request_key:
+            payload = {'location_id': location_id, 'parent_id': parent.id if parent else False,
+                       'name': name_text, 'note': note_text, 'active': set_active}
+            key = self.lab_request_key({'request_key': request_key})
+
+            def move_once():
+                with self.lab_savepoint():
+                    log, replay = self.lab_begin_request(key, 'inventory.location_move', payload)
+                    if replay is not None:
+                        return dict(replay, replayed=True)
+                    result = self.lab_location_update(
+                        location_id, name=name_text, note=note_text, active=set_active,
+                        parent_id=payload['parent_id'], update_parent=True)
+                    self.lab_finish_request(log, result)
+                    return result
+
+            return self.lab_run_with_concurrency_retry(move_once)
+
         location = self.env['stock.location'].browse(int(location_id)).exists()
         if not location:
             raise LabApiError.not_found('库位不存在或无权访问：%s' % location_id,
@@ -314,6 +332,9 @@ class LabWorkflowP3Api(models.AbstractModel):
             raise LabApiError.forbidden('库位属于其他公司，当前账号无权修改',
                                         {'location_id': 'wrong_company'})
         if parent is not None:
+            if not parent.active:
+                raise LabApiError.precondition('上级库位已停用，请刷新后重新选择。',
+                                               {'parent_id': 'inactive'})
             if parent.company_id and parent.company_id != company:
                 raise LabApiError.forbidden('父库位属于其他公司，不能挂接',
                                             {'parent_id': 'wrong_company'})

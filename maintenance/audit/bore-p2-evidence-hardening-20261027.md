@@ -10,15 +10,15 @@
 
 | 检查 | 实际结果 | 证据 |
 |---|---|---|
-| 完整 P2 | 127/0/0/0，exit 0 | [summary](../../local/build/bore-p2-20261026/runs/run.cf3QjW/summary.json) |
-| 真实浏览器 UI | 28/0，exit 0，console/network errors 均 0 | [browser](../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/browser.json) |
-| P1 真实代理回归 | 116/0，exit 0 | [P1 汇总](../../local/build/p2-lead-20261027/p1-regression-summary.json) |
-| bore 逻辑测试 | 167 项：WSL 165 通过、2 跳过；缺 Node 的 2 项已用 Windows 现有 Node 补测通过 | [逻辑汇总](../../local/build/p2-lead-20261027/logic-summary.json) |
+| 完整 P2 | 127/0/0/0，exit 0 | summary（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/summary.json`） |
+| 真实浏览器 UI | 28/0，exit 0，console/network errors 均 0 | browser（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/browser.json`） |
+| P1 真实代理回归 | 116/0，exit 0 | P1 汇总（本机证据 `../../local/build/p2-lead-20261027/p1-regression-summary.json`） |
+| bore 逻辑测试 | 167 项：WSL 165 通过、2 跳过；缺 Node 的 2 项已用 Windows 现有 Node 补测通过 | 逻辑汇总（本机证据 `../../local/build/p2-lead-20261027/logic-summary.json`） |
 | lab_team_web | 87 项：86 通过、1 HttpCase 跳过 | 同上；真实 Odoo 场景另由本轮 P2 覆盖 |
 | lab_catalog | 23/0，覆盖地址回退、私网混入、TLS/SNI、总预算和慢流 | 同上 |
-| manifest 命名 hook | 7/0，真实 Odoo 环境调用，数据库回滚 | [生命周期](../../local/build/p2-lead-20261027/lifecycle-proof.json) |
-| 下载清单签名 | 下载文件独立 Ed25519 公钥验签通过 | [验签](../../local/build/bore-p2-20261026/runs/run.cf3QjW/signature-verification.json) |
-| 源码稳定性 | 整轮 16 项运行输入哈希未变 | [输入哈希](../../local/build/bore-p2-20261026/runs/run.cf3QjW/acceptance-input-hashes.json) |
+| manifest 命名 hook | 7/0，真实 Odoo 环境调用，数据库回滚 | 生命周期（本机证据 `../../local/build/p2-lead-20261027/lifecycle-proof.json`） |
+| 下载清单签名 | 下载文件独立 Ed25519 公钥验签通过 | 验签（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/signature-verification.json`） |
+| 源码稳定性 | 整轮 16 项运行输入哈希未变 | 输入哈希（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/acceptance-input-hashes.json`） |
 
 results.jsonl 共 127 行，SHA256：
 
@@ -27,7 +27,7 @@ results.jsonl 共 127 行，SHA256：
 
 独立 --check-evidence 重算一致：evidence_integrity=pass、run_status=pass、run_exit_code=0、run_passed=true。该工具会分别报告证据完整性和业务结论，不将证据完整的失败轮次称为业务通过。
 
-中文截图已目视复核：[搜索](../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/shot-03-search.png)、[动态详情](../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/shot-04-detail.png)。搜索框实际输入 TEST-R-10K，结果仅电阻，详情来自结果卡片并显示实验室库存 25；搜索前后截图哈希不同。夹具未导入参数/袋数据，因此不据此声称参数/袋业务完成。
+中文截图已目视复核：搜索（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/shot-03-search.png`）、动态详情（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/shot-04-detail.png`）。搜索框实际输入 TEST-R-10K，结果仅电阻，详情来自结果卡片并显示实验室库存 25；搜索前后截图哈希不同。夹具未导入参数/袋数据，因此不据此声称参数/袋业务完成。
 
 ## 修复内容
 
@@ -42,7 +42,7 @@ results.jsonl 共 127 行，SHA256：
 
 旧 2026-10-26 的 77/0 不满足原验收要求（自 fetch 替代 UI、额外 CSP origin、零签名、summary 缺状态），不再作为完整通过依据。旧快照及独立 Codex 审计保持原样。
 
-本轮首个 [run.UbUJ19](../../local/build/bore-p2-20261026/runs/run.UbUJ19/summary.json) 为 122/3，真实根因是 asset 504，另两项是类型连带与 runner 退出派生；这些历史结果仍保留 fail。随后 [run.HaMOXj](../../local/build/bore-p2-20261026/runs/run.HaMOXj/summary.json) 暴露 bore 启动失败却被误报 ready，已增加自有监听就绪检查并在最终轮通过。
+本轮首个 run.UbUJ19（本机证据 `../../local/build/bore-p2-20261026/runs/run.UbUJ19/summary.json`） 为 122/3，真实根因是 asset 504，另两项是类型连带与 runner 退出派生；这些历史结果仍保留 fail。随后 run.HaMOXj（本机证据 `../../local/build/bore-p2-20261026/runs/run.HaMOXj/summary.json`） 暴露 bore 启动失败却被误报 ready，已增加自有监听就绪检查并在最终轮通过。
 
 ## 快照与检查
 

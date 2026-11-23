@@ -1,5 +1,7 @@
-# EDA插件与本机桥接
+# 嘉立创 EDA 专业版插件
 
-当前嘉立创EDA专业版插件在[jlc-eda](jlc-eda/)，版本3.0.3，源码src和scripts，Node桥接bridge/server.mjs；使用同一Odoo后端，没有另一套库存权威库。
+当前本机候选是 `4.2.0`，成品在 `jlc-eda/releases/4.2.0/`。在扩展管理器导入 `lab-inventory-odoo_v4.2.0.eext`，从「连接设置」填写服务器和库存管理员发放的 EDA 密钥。
 
-当前已构建成品在jlc-eda/releases/3.0.3：eext导入EDA，完整bundle包含Windows本机桥接运行时。源码README负责插件安装，MAINTENANCE负责开发/依赖/验收边界。旧2.0.1和3.0.0–3.0.2在local/archive/eda，不能按根旧FINAL_ACCEPTANCE冒充最新。
+4.x 使用 Odoo 的 `lab_eda` 模块直接鉴权。插件没有本机安装服务或 Node 运行时要求。旧 3.x 的桥接资料用于历史维护。EDA 负责器件查询、原理图或 PCB 的 BOM 库存对比、手动选替代料和按袋领用。Web 与 Flutter 继续负责日常库存管理。
+
+[插件安装说明](jlc-eda/README.md) · [成品索引](../releases/README.md) · [构建与验收交接](../maintenance/handoffs/2026-11-23-client-eda-alignment.md)。

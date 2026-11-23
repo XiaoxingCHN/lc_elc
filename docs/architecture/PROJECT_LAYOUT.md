@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|
 | `clients/` | 三端共享 Flutter 源码 + 各端说明与编译成品 | `clients/app/` | 源码入 Git；`clients/*/releases/` 不入 | 714M | [clients/README.md](../../clients/README.md) |
 | `server/` | Odoo 19 模块、Ubuntu 部署/备份/恢复、采集器、bore 网关 | `server/ubuntu22.04/odoo_addons/` | 是 | 71M | [server/README.md](../../server/README.md) |
-| `plugins/` | 嘉立创 EDA 专业版插件与 Node 本机桥接 | `plugins/jlc-eda/src/`、`plugins/jlc-eda/bridge/server.mjs` | 源码/说明入 Git；`node_modules/`、`dist/`、`bridge/runtime/`、`releases/` 不入 | 369M | [plugins/README.md](../../plugins/README.md)、[MAINTENANCE.md](../../plugins/jlc-eda/MAINTENANCE.md) |
+| `plugins/` | 嘉立创 EDA 专业版插件 | `plugins/jlc-eda/src/` | 源码与说明入 Git，`node_modules/`、`dist/`、`releases/` 排除 | 369M | [plugins/README.md](../../plugins/README.md)、[MAINTENANCE.md](../../plugins/jlc-eda/MAINTENANCE.md) |
 | `services/` | 采集/同步服务编排与生产 systemd unit 快照 | `services/lcsc/` | 是 | 21K | [services/lcsc/README.md](../../services/lcsc/README.md) |
 | `dependencies/` | 离线工具链与依赖载荷；恢复/获取脚本 | `dependencies/README.md` + `restore_client_tools.ps1` / `tools/fetch_payload.py` | 脚本与说明入 Git；`sdk/`、各类缓存、载荷不入 | 22.1G（23,676,281,799 B） | [dependencies/README.md](../../dependencies/README.md) |
 | `data/` | 本机历史数据快照（SQLite 等） | `data/README.md`（数据本体不入 Git） | 仅 `README.md` 入 Git | 3.4G | [data/README.md](../../data/README.md) |
@@ -35,7 +35,7 @@
 
 ### `server/ubuntu22.04/`
 
-- `odoo_addons/`：6 个 Odoo 模块 `lab_catalog`、`lab_inventory`、`lab_workflow`、`lab_site`、`lab_team_web`、`lab_theme`（当前版本见 `components.json` 的 `odoo`）。
+- `odoo_addons/`：7 个 Odoo 模块 `lab_catalog`、`lab_inventory`、`lab_workflow`、`lab_site`、`lab_team_web`、`lab_theme`、`lab_eda`（当前版本见 `components.json` 的 `odoo`）。
 - `crawler/`：立创采集与快照（`snapshot_catalog.py`、`lcsc_catalog_archive.py` 等）。
 - `bore/`：公网入口网关（`nginx/`、`netlify/`、`systemd/`、`tests/`、`scripts/`）。
 - `systemd/`：`odoo.service.example`、`lcsc-crawler.service`。
@@ -45,9 +45,9 @@
 ### `plugins/jlc-eda/`
 
 - `src/`：插件源码（`iframe/`、`main/`、`shared/`、`tests/`）。
-- `bridge/`：本机 Node 桥接，入口 `server.mjs`，另有 `start-windows.cmd`、`start-linux.sh`；`bridge/runtime/` 为运行载荷，Git 排除。
+- 4.x 插件使用 EDA 密钥直连 Odoo `lab_eda`，原 3.x 本机 Node 桥接属于历史架构。
 - `assets/`、`locales/`、`scripts/`：资源、语言包、构建脚本。
-- `releases/3.0.3/`：已发布成品，Git 排除；`dist/`、`node_modules/` 同样排除。
+- `releases/4.2.0/`：当前本机候选成品，保留旧发行目录。
 
 ### `maintenance/`
 
@@ -87,7 +87,7 @@
 | 迁移/退役记录 | `local/manifests/` | 逐文件来源、哈希、审核与删除日志；与 CHANGELOG/交接互相引用 |
 | SQLite 唯一副本 | `data/catalog/checkpoint-20261015/components.sqlite3` | 3,547,037,696 B / `ac536621…60823`；`local/archive/data/lcsc_cn_archive` 为既有归档原库 |
 | 离线工具链 | `dependencies/` | Flutter/Android/Gradle/pub 缓存、SDK 与恢复脚本；逐项登记见 `maintenance/registry/payloads.json` |
-| 各端成品 | `clients/*/releases/`、`plugins/jlc-eda/releases/`、`server/releases/` | Git 排除；版本与 hash 见 `maintenance/registry/releases.json` |
+| 各端成品 | `clients/*/releases/`、`plugins/jlc-eda/releases/`、`server/releases/` | Git 排除；现行登记见[成品索引](../../releases/README.md)，历史归档哈希见 `maintenance/registry/releases.json` |
 
 ## 4. 不要动清单
 
@@ -100,7 +100,7 @@
 
 - 根目录存在字面名为 `%SystemDrive%` 的目录骨架：`%SystemDrive%/ProgramData/Microsoft/Windows/Caches/*.db`，本机实测 7 个文件约 1 MB。疑似脚本未展开环境变量的误建物；Git 不跟踪，本轮不删除。
 - `clients/app/t.obj` 与 `clients/app/build/`：本机构建产物，已被忽略。
-- 根 `README.md` 顶部仍是 11 月初的状态长文，尚未改成目录入口（本文件与 `README.md` 的“目录规范”一节承担入口作用）。
+- 根 `README.md` 已在顶部链接现行状态和成品，旧段落保留原日期。
 - `Python/`：本机捆绑运行时，Git 排除，不应作为项目源码维护。
 - `.idea/`：本机 IDE 配置，Git 排除。
 - `docs/lc_elc.prg`：既有未跟踪文件，不在本文件描述范围。

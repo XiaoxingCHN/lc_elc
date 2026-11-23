@@ -2,7 +2,7 @@
 
 ## 首次接手
 
-读README → AGENTS → CURRENT_STATE → 对应组件README → registry。运行仓库检查，确认源码、载荷和当前包。生成文件不改，历史副本不作为起点。
+读 README、AGENTS 和 [CURRENT_STATE](../operations/CURRENT_STATE.md)，再看[当前交接](../../maintenance/HANDOFF_CURRENT.md)、对应组件说明和 registry。历史证据按日期阅读。运行仓库检查，确认源码、载荷和当前包。生成文件不改，历史副本不作为起点。
 
 ## 做一项修改
 

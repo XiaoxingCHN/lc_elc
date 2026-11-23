@@ -55,10 +55,25 @@ def main():
   try:
    m=ast.literal_eval((base/'__manifest__.py').read_text(encoding='utf-8-sig'));check('odoo-manifest:'+module,all((base/x).is_file() for x in m.get('data',[])),m['version'])
   except Exception as e:errors.append({'check':'odoo-manifest','path':module,'error':str(e)})
+ payloads=json.loads((ROOT/'maintenance/registry/payloads.json').read_text(encoding='utf-8'))['payloads']
+ offline_sources={item['path']:item['sha256'] for item in payloads
+                  if item.get('type')=='file' and item.get('frozen_source_input') is True}
  active=json.loads((ROOT/'maintenance/registry/active-sources.json').read_text(encoding='utf-8'))
  for manifest_path in active.values():
   mpath=(ROOT/manifest_path).resolve();assert mpath.is_relative_to(ROOT.resolve()),'Source manifest escapes repository'
-  m=json.loads(mpath.read_text(encoding='utf-8'));diff=[n for n,h in m['files'].items() if not (ROOT/n).resolve().is_relative_to(ROOT.resolve()) or not (ROOT/n).is_file() or portable_sha(ROOT/n)!=h];check('frozen-source:'+m['component'],not diff,diff[:20] if diff else m['file_count'])
+  m=json.loads(mpath.read_text(encoding='utf-8'));diff=[]
+  for name, expected in m['files'].items():
+   path=ROOT/name
+   if not path.resolve().is_relative_to(ROOT.resolve()):
+    diff.append(name)
+   elif not path.is_file():
+    # A source-only clone excludes vendor-supplied build inputs. Exempt only
+    # the exact hash and path listed in both registries, and only if untracked.
+    if a.verify_payloads or name in files or offline_sources.get(name)!=expected:
+     diff.append(name)
+   elif portable_sha(path)!=expected:
+    diff.append(name)
+  check('frozen-source:'+m['component'],not diff,diff[:20] if diff else m['file_count'])
  docs=[ROOT/'README.md',ROOT/'CONTRIBUTING.md']+list((ROOT/'docs').rglob('*.md'))
  for d in ['clients/README.md','clients/app/README.md','clients/windows/README.md','clients/android/README.md','clients/linux/README.md','server/README.md','plugins/README.md','dependencies/README.md','services/lcsc/README.md','data/README.md','archive/README.md','releases/README.md']:docs.append(ROOT/d)
  for doc in docs:
@@ -68,7 +83,6 @@ def main():
    target=urllib.parse.unquote(target.split('#')[0].strip('<>'))
    if '<' in target or '>' in target:continue
    if not (doc.parent/target).exists():errors.append({'check':'doc-link','path':str(doc.relative_to(ROOT)),'target':target})
- payloads=json.loads((ROOT/'maintenance/registry/payloads.json').read_text(encoding='utf-8'))['payloads']
  for item in payloads:
   check('payload-method:'+item['id'],bool(item.get('path') and item.get('acquisition',{}).get('commands')))
   if item.get('type')=='not-yet-built':warnings.append({'check':'known-payload-not-built','id':item['id'],'recovery':'See registered preparation commands; this is not a complete offline closure.'})

@@ -1,5 +1,7 @@
 # Netlify HTTPS回源部署（2026-10-27）
 
+> 历史 Netlify 回源验收。现行正式域名和服务状态见[运维状态](../../docs/operations/CURRENT_STATE.md)。
+
 ## 当前结果与待办
 
 专用HTTPS回源网关与IPv4 bore隧道已部署，正常SNI、证书信任和路由/缓存检查通过。已生成Netlify更新包，**等待用户更新现有rad-taffy-56e1ce项目**；Netlify端HTTPS业务回源与真实账号尚未验收，不能据此宣布最终上线。

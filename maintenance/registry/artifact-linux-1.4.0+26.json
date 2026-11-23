@@ -1,0 +1,9 @@
+{
+  "file": "clients/linux/releases/1.4.0+26/LC_ELC-Linux-1.4.0+26.tar.gz",
+  "bytes": 16618723,
+  "sha256": "e4842e57fab27b890dcb221842cbbe8f5a1d9d42eaa49220e4b404cfd4ac2d26",
+  "version": "1.4.0+26",
+  "source_manifest": "maintenance/registry/source-client-1.4.0-26-20261123.json",
+  "source_tree_sha256": "ca745ad8f526fac0ad321a1bd953409a197c1c685530abdd5e97f74dd2bebe18",
+  "validation": "Built inside WSL Ubuntu 22.04 with the restored Linux Flutter 3.47.7 SDK; pub get, flutter test (526 pass, 5 skipped) and flutter build linux all exit 0. libsecret-1/libgcrypt dev metadata was extracted into a private prefix (no system install). Archive keeps the bundle at top level with the executable bit on lab_inventory_client and client_update_helper. Not launched on a Linux desktop or WSLg; SecretService-backed remembered login unverified."
+}

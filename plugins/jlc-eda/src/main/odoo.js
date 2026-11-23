@@ -56,7 +56,7 @@ export function createOdooClient(options) {
   }
 
   /** 调一个 ``/lab/api/eda/*`` 端点。 */
-  async function call(path, params) {
+  async function call(path, params, { timeoutMs } = {}) {
     requireTransport();
     const body = JSON.stringify({
       jsonrpc: '2.0',
@@ -66,7 +66,7 @@ export function createOdooClient(options) {
     });
     const url = joinUrl(state.baseUrl, path);
     const response = await transport.request({
-      url, method: 'POST', body, headers: authHeaders(),
+      url, method: 'POST', body, headers: authHeaders(), timeoutMs,
     });
     let data;
     try {

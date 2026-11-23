@@ -1,5 +1,7 @@
 # bore 公网入口（P1 本地隔离链路 / P2 隔离真实 Odoo 验收）
 
+> **历史生产方案与隔离工具**。bore 中继不作为现行入口，目录中的 Nginx 模板与独立验收工具仍用于维护。现行正式域名与部署证据见[运维状态](../../../docs/operations/CURRENT_STATE.md)。
+
 ## Netlify HTTPS回源（2026-10-27）
 
 `scripts/render-netlify-gateway.py`复用原白名单并区分专用回源Host、固定Odoo管理Host和精确前台Origin白名单；使用独立map/限速zone，不信任Netlify或客户端自带转发头。所有响应显式private/no-store，清除上游缓存验证器；固定诊断路径/__lc_origin_probe不访问业务数据。独立回源证书的链和域名须实测通过，不能使用-k交付。

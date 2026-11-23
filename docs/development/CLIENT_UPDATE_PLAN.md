@@ -1,5 +1,7 @@
 # 客户端启动检查与自动下载更新方案
 
+> 此页为最初更新器方案。正式 stable 状态见[发布交接](../../maintenance/handoffs/2026-11-23-client-stable-release.md)。
+
 日期：2026-10-19。状态：方案，尚未实现或发布更新器。适用 Windows、Android、Linux 共享 Flutter 客户端。
 
 ## 目标与默认行为

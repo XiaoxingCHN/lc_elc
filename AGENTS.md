@@ -5,9 +5,9 @@
 ## 权威源码
 
 - clients/app：三端共享Flutter源码，一处修改后验证受影响平台。clients/<platform>/releases 是不可变成品，不能当源码改。
-- server/ubuntu22.04/odoo_addons：三个Odoo模块唯一源。保持运维脚本和辅助Python同目录；crawler也保留在现有部署布局，services/lcsc负责服务编排说明和生产unit快照。
-- plugins/jlc-eda：EDA3插件与Node本机桥接；禁止误用历史2.0.1或_reference运行时。
-- dependencies：恢复工具和离线载荷；local、data、archive、全部releases为本机材料，Git排除，来源登记不能省略。
+- server/ubuntu22.04/odoo_addons：本项目 Odoo 模块的唯一源码。保持运维脚本和辅助Python同目录；crawler也保留在现有部署布局，services/lcsc负责服务编排说明和生产unit快照。
+- plugins/jlc-eda：EDA 4.x 扩展源码，通过 Odoo `lab_eda` 与绑定用户的 EDA 密钥连接。Node 和 npm 仅用于构建，旧本机桥接随历史版本保管。
+- dependencies：恢复工具和离线载荷；本机数据、归档实物和成品由 Git 排除；各目录的索引、恢复说明和来源登记随仓库维护。
 
 ## 每次接手
 
@@ -18,7 +18,7 @@
 
 ## 业务不变量
 
-实验室数量以Odoo stock.quant/stock.move为权威；供应商库存不能混入。绑定同立创料号应统一展示、有本地库存前置、库位/袋在详情展开。领用人必须系统账号；归还关联原领料。实物标签仅一个追溯QR，库位另用库码。离线仅公开缓存只读；十天无成功登录要求重新输密码；凭据使用OS安全存储。
+实验室数量以Odoo stock.quant/stock.move为权威；供应商库存不能混入。绑定同立创料号应统一展示、有本地库存前置、库位/袋在详情展开。领用人必须系统账号；归还关联原领料。实物标签仅一个追溯QR，库位另用库码。Flutter 离线仅访问已缓存的公开资料，连续十天无成功登录时重新验证，登录凭据使用 OS 安全存储。EDA 密钥保存在扩展的本机配置，由库存管理员发放和吊销。
 
 ## 安全与权限边界
 

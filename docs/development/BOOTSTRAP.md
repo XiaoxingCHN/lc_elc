@@ -14,9 +14,7 @@
 
 ## EDA维护
 
-桥接本身只需要Node；Windows随bundle带node.exe，运行不需要npm。但从干净源码重建插件还需要npm。完整Node官方发行包（[下载](https://nodejs.org/en/download)、[版本目录](https://nodejs.org/dist/v24.19.0/)）与单独node.exe不同；按上游提供的SHA256校验后安装/解包完整发行版，确认node --version与npm --version，再按插件MAINTENANCE执行npm ci。
-
-仓库保留当前node_modules，能在本机离线构建，但不将它误写成npm缓存重放已验收。当前同字节Windowsruntime可从已核验bundle提取，来源比猜最新版本可靠。
+安装 EDA 4.x 时导入 `.eext` 并在「连接设置」填入 EDA 密钥，按[现行插件入口](../../plugins/README.md)操作。Node 和 npm 用于源码构建，安装扩展无需再装本机网桥。旧 3.x 包的 Node 运行时只用于恢复对应历史环境。
 
 ## Odoo维护
 
@@ -24,4 +22,4 @@
 
 ## 私有材料与版本
 
-Android匹配key单独受控恢复到local/private/signing，公证书对照registry；无key时不要生成一个新的冒充可更新包。真实登录密码由OS安全存储或管理员交付，不放Git/说明/聊天。首次Git提交作者由维护者本人配置，远端需本人提供私有仓库URL后再添加。
+Android匹配key单独受控恢复到local/private/signing，公证书对照registry；无key时不要生成一个新的冒充可更新包。真实登录密码由OS安全存储或管理员交付，不放Git/说明/聊天。首次Git提交作者由维护者本人配置，已有项目从登记的 `origin` 克隆即可。仓库和 Release 的实际可见性见 [GitHub 维护指南](../operations/GITHUB.md)。

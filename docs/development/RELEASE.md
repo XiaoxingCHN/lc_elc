@@ -1,10 +1,12 @@
 # 构建、发布与追溯
 
+当前本机成品见[发布索引](../../releases/README.md)。三端 `1.4.0+26` 的实际包及源分开登记。桌面手动安装与应用内通道包可使用不同的外层结构，应用内通道归档必须含 `bundle/`。签名清单的 `source_commit` 应对应构建源码。
+
 ## 现成包与新构建
 
-现成当前客户端在clients/<platform>/releases/1.0.1，EDA在plugins/jlc-eda/releases/3.0.3，服务器模块修复包在server/releases/2026-10-18。它们是不可变导入的既有发布物，具体SHA256见registry/releases.json。
+历史归档基线是客户端 `1.0.1`、EDA `3.0.3` 和服务端 `2026-10-18` 修复包。它们的历史 SHA-256 见 `maintenance/registry/releases.json`。
 
-新构建从权威源开始，写到local/build时间戳目录，不修改成品目录。当前build_client.py是仓库归档后新维护入口，本次验证其dry-run和基础测试，未宣称由该新入口重建三端并完成全部实机验收；历史实测配方保留在local/archive/evidence/ui-repair-20261018。
+新构建从权威源开始，写到local/build时间戳目录，不修改成品目录。三端 `1.4.0+26` 已由 `tools/build_client.py` 实际构建。手动包使用 `tools/package_client_release.py` 登记，服务器通道的桌面归档单独按 `bundle/` 布局打包并签名。实机升级仍按[发布证据](../../maintenance/handoffs/2026-11-23-client-stable-release.md)记录。
 
 ```sh
 python tools/build_client.py --platform android --dry-run

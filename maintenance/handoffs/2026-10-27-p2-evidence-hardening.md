@@ -16,7 +16,7 @@
 - asset IPv6 首地址黑洞已修为全候选安全校验后的有界回退，未放宽 SSRF/TLS/重定向/大小边界。bore 启动失败不能继续报 ready。
 - 官方 Noto CJK 私有字体恢复，中文搜索/详情截图已目视确认。测试私钥在隔离 WSL 原生文件系统，实测 0600，不入 Git。
 
-详见[完整审计](../audit/bore-p2-evidence-hardening-20261027.md)、[最终汇总](../../local/build/bore-p2-20261026/runs/run.cf3QjW/summary.json)、[浏览器证据](../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/browser.json)。results SHA256 为 a478fecf043f8f9647c78ba56b3ee3d394bdde9ec51f9da45241d03e83560f9e。local 链接仅供本机复核。
+详见[完整审计](../audit/bore-p2-evidence-hardening-20261027.md)、最终汇总（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/summary.json`）、浏览器证据（本机证据 `../../local/build/bore-p2-20261026/runs/run.cf3QjW/browser/browser.json`）。results SHA256 为 a478fecf043f8f9647c78ba56b3ee3d394bdde9ec51f9da45241d03e83560f9e。local 链接仅供本机复核。
 
 旧 77/0 不再作为完整通过依据；本轮失败轮次保留真实 fail，没有追改为 pass。最终仓库检查：python tools/repo_check.py：PASS，52项检查、0错误、exit 0；git diff --check exit 0。既有 production-py312-rebuild 尚未构建，完整离线闭合未建立；全量payload校验未执行，新字体载荷已独立核对官方SHA256。
 
