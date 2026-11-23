@@ -29,7 +29,8 @@ class Borrower {
   final Map<String, dynamic> raw;
 
   String get display {
-    if (name.isNotEmpty && login.isNotEmpty && name != login) return '$name ($login)';
+    if (name.isNotEmpty && login.isNotEmpty && name != login)
+      return '$name ($login)';
     if (name.isNotEmpty) return name;
     if (login.isNotEmpty) return login;
     return '#$id';
@@ -38,9 +39,17 @@ class Borrower {
   factory Borrower.fromJson(Map<String, dynamic> json) {
     return Borrower(
       id: firstInt(json, const ['id', 'user_id', 'res_id', 'borrower_id']) ?? 0,
-      name: firstString(json, const ['name', 'display_name', 'borrower_name']) ?? '',
+      name:
+          firstString(json, const ['name', 'display_name', 'borrower_name']) ??
+          '',
       login: firstString(json, const ['login', 'email', 'user_login']) ?? '',
-      isSelf: firstBool(json, const ['is_self', 'self', 'is_me', 'is_current_user']) ??
+      isSelf:
+          firstBool(json, const [
+            'is_self',
+            'self',
+            'is_me',
+            'is_current_user',
+          ]) ??
           false,
       active: firstBool(json, const ['active', 'is_active']) ?? true,
       raw: json,
@@ -112,7 +121,8 @@ class InventoryPermissions {
     for (final key in const ['permissions', 'rights', 'acl', 'flags']) {
       final nested = json[key];
       if (nested is Map) {
-        asMap(nested).forEach((name, item) => merged.putIfAbsent(name, () => item));
+        asMap(nested)
+            .forEach((name, item) => merged.putIfAbsent(name, () => item));
       }
     }
 
@@ -141,11 +151,21 @@ class InventoryPermissions {
 
     return InventoryPermissions(
       canIssueForOthers: manage,
-      canReceipt: flag(const ['can_receipt', 'receipt', 'can_receive']) || manage,
+      canReceipt:
+          flag(const ['can_receipt', 'receipt', 'can_receive']) || manage,
       canIssue: flag(const ['can_issue', 'issue']) || manage,
       canReturn: flag(const ['can_return', 'return']) || manage,
-      canCreateLocation: flag(const ['can_create_location', 'location_create']) || manage,
-      canPrintLabels: flag(const ['can_print_labels', 'labels', 'can_print']) || manage,
+      // The Odoo addon reports `can_manage_locations` (create + rename + move +
+      // deactivate). Older hosts only sent `can_create_location`.
+      canCreateLocation:
+          flag(const [
+            'can_manage_locations',
+            'can_create_location',
+            'location_create',
+          ]) ||
+          manage,
+      canPrintLabels:
+          flag(const ['can_print_labels', 'labels', 'can_print']) || manage,
       selfBorrowerId: firstInt(merged, const [
         'self_borrower_id',
         'own_borrower_id',
@@ -236,7 +256,9 @@ class InventoryBootstrap {
 
   factory InventoryBootstrap.fromJson(Map<String, dynamic> json) {
     return InventoryBootstrap(
-      locations: asMapList(json['locations']).map(LabStockLocation.fromJson).toList(),
+      locations: asMapList(json['locations'])
+          .map(LabStockLocation.fromJson)
+          .toList(),
       borrowers: asMapList(json['borrowers'])
           .map(Borrower.fromJson)
           .where((borrower) => borrower.id > 0)
@@ -304,7 +326,8 @@ class ResolvedCode {
   bool get isSupplier => kind == kindSupplier;
   bool get isCatalog => kind == kindCatalog;
   bool get isUnknown =>
-      kind == kindUnknown || (bag == null && location == null && itemKey.isEmpty);
+      kind == kindUnknown ||
+      (bag == null && location == null && itemKey.isEmpty);
 
   /// True when a receipt can be built from this scan.
   bool get canReceipt => isBag || isSupplier || isCatalog || itemKey.isNotEmpty;
@@ -340,8 +363,9 @@ class ResolvedCode {
     final supplier = asMap(json['supplier_metadata']);
 
     final bag = bagJson.isEmpty ? null : LabBag.fromJson(bagJson);
-    final location =
-        locationJson.isEmpty ? null : LabStockLocation.fromJson(locationJson);
+    final location = locationJson.isEmpty
+        ? null
+        : LabStockLocation.fromJson(locationJson);
 
     var kind = (firstString(json, const ['kind', 'type', 'code_kind']) ?? '')
         .toLowerCase()
@@ -369,10 +393,12 @@ class ResolvedCode {
       location: location,
       supplierMetadata: supplier,
       // The exact archive is taken from the scan - never derived by "first".
-      productTemplateId: firstInt(
-            json,
-            const ['product_template_id', 'template_id', 'lab_template_id'],
-          ) ??
+      productTemplateId:
+          firstInt(json, const [
+            'product_template_id',
+            'template_id',
+            'lab_template_id',
+          ]) ??
           bag?.productTemplateId,
       sn: firstString(json, const ['sn', 'sn_code', 'lab_sn']) ?? bag?.sn,
       materials: LabMaterial.listFrom(
@@ -383,13 +409,13 @@ class ResolvedCode {
   }
 
   static ResolvedCode unresolved(String raw) => ResolvedCode(
-        raw: raw,
-        kind: kindUnknown,
-        itemKey: '',
-        bag: null,
-        location: null,
-        supplierMetadata: const <String, dynamic>{},
-      );
+    raw: raw,
+    kind: kindUnknown,
+    itemKey: '',
+    bag: null,
+    location: null,
+    supplierMetadata: const <String, dynamic>{},
+  );
 }
 
 /// `/lab/api/inventory/receipt` result.
@@ -415,11 +441,16 @@ class ReceiptResult {
     final operationJson = asMap(json['operation']);
     final bagJson = asMap(json['bag']);
     return ReceiptResult(
-      operation:
-          operationJson.isEmpty ? null : LabOperation.fromJson(operationJson),
+      operation: operationJson.isEmpty
+          ? null
+          : LabOperation.fromJson(operationJson),
       bag: bagJson.isEmpty ? null : LabBag.fromJson(bagJson),
       itemKey: deriveItemKey(json) ?? '',
-      labQuantity: firstDouble(json, const ['lab_quantity', 'quantity', 'on_hand']),
+      labQuantity: firstDouble(json, const [
+        'lab_quantity',
+        'quantity',
+        'on_hand',
+      ]),
       inventoryRevision: firstString(json, const ['inventory_revision']) ?? '',
     );
   }
@@ -435,8 +466,9 @@ class IssueResult {
   factory IssueResult.fromJson(Map<String, dynamic> json) {
     final operationJson = asMap(json['operation']);
     return IssueResult(
-      operation:
-          operationJson.isEmpty ? null : LabOperation.fromJson(operationJson),
+      operation: operationJson.isEmpty
+          ? null
+          : LabOperation.fromJson(operationJson),
       inventoryRevision: firstString(json, const ['inventory_revision']) ?? '',
     );
   }
@@ -460,12 +492,14 @@ class ReturnResult {
   factory ReturnResult.fromJson(Map<String, dynamic> json) {
     final operationJson = asMap(json['operation']);
     return ReturnResult(
-      operation:
-          operationJson.isEmpty ? null : LabOperation.fromJson(operationJson),
-      outstandingQuantity: firstDouble(
-        json,
-        const ['outstanding_quantity', 'outstanding', 'unreturned_quantity'],
-      ),
+      operation: operationJson.isEmpty
+          ? null
+          : LabOperation.fromJson(operationJson),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'outstanding',
+        'unreturned_quantity',
+      ]),
       inventoryRevision: firstString(json, const ['inventory_revision']) ?? '',
     );
   }
@@ -490,7 +524,10 @@ class CreateMaterialResult {
   factory CreateMaterialResult.fromJson(Map<String, dynamic> json) {
     return CreateMaterialResult(
       itemKey: deriveItemKey(json) ?? '',
-      productTemplateId: firstInt(json, const ['product_template_id', 'template_id']),
+      productTemplateId: firstInt(json, const [
+        'product_template_id',
+        'template_id',
+      ]),
       productId: firstInt(json, const ['product_id']),
       sn: firstString(json, const ['sn', 'sn_code', 'lab_sn']) ?? '',
     );
@@ -507,7 +544,10 @@ class BindResult {
   factory BindResult.fromJson(Map<String, dynamic> json) {
     return BindResult(
       itemKey: deriveItemKey(json) ?? '',
-      productTemplateId: firstInt(json, const ['product_template_id', 'template_id']),
+      productTemplateId: firstInt(json, const [
+        'product_template_id',
+        'template_id',
+      ]),
     );
   }
 }

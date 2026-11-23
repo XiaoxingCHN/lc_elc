@@ -48,18 +48,29 @@ class LabMaterial {
 
   factory LabMaterial.fromJson(Map<String, dynamic> json) {
     return LabMaterial(
-      templateId: firstInt(
-        json,
-        const ['product_template_id', 'template_id', 'lab_template_id', 'id'],
-      ),
+      templateId: firstInt(json, const [
+        'product_template_id',
+        'template_id',
+        'lab_template_id',
+        'id',
+      ]),
       productId: firstInt(json, const ['product_id', 'lab_product_id']),
-      sn: firstString(json, const ['sn', 'sn_code', 'lab_sn', 'lot_name']) ?? '',
-      name: firstString(json, const ['name', 'display_name', 'product_name']) ?? '',
-      quantity: firstDouble(json, const ['quantity', 'lab_quantity', 'qty_available']),
-      available: firstDouble(
-        json,
-        const ['available_quantity', 'lab_available_quantity', 'free_quantity'],
-      ),
+      sn:
+          firstString(json, const ['sn', 'sn_code', 'lab_sn', 'lot_name']) ??
+          '',
+      name:
+          firstString(json, const ['name', 'display_name', 'product_name']) ??
+          '',
+      quantity: firstDouble(json, const [
+        'quantity',
+        'lab_quantity',
+        'qty_available',
+      ]),
+      available: firstDouble(json, const [
+        'available_quantity',
+        'lab_available_quantity',
+        'free_quantity',
+      ]),
       raw: json,
     );
   }
@@ -87,6 +98,7 @@ class LabStockLocation {
     this.bagCount,
     this.bagQuantity,
     this.usage,
+    this.parentId,
     this.raw = const <String, dynamic>{},
   });
 
@@ -119,12 +131,27 @@ class LabStockLocation {
   /// Odoo `usage` (`internal`, `view`, ...), when reported.
   final String? usage;
 
+  /// Parent location id, when the server reports the hierarchy.
+  ///
+  /// `null` means "top level": Odoo sends `false` for a root location, and a
+  /// list response without `parent_id` at all also lands here. Callers that
+  /// need to distinguish "root" from "not reported" use [hierarchyKnown].
+  final int? parentId;
+
   final Map<String, dynamic> raw;
 
   bool get hasId => id != null && id! > 0;
 
+  /// True when this row carries a `parent_id` key (`false` = top level).
+  bool get hierarchyKnown => raw.containsKey('parent_id');
+
+  /// A `view` location only groups real locations; it holds no stock and has no
+  /// 库码 of its own on the printed labels.
+  bool get isView => usage == 'view';
+
   /// True when this row carries the `with_stats` columns.
-  bool get hasStats => bagCount != null || bagQuantity != null || quantity != null;
+  bool get hasStats =>
+      bagCount != null || bagQuantity != null || quantity != null;
 
   /// `K000001 · R01`, or whatever exists.
   String get display {
@@ -147,19 +174,62 @@ class LabStockLocation {
         firstString(json, const ['location', 'display', 'label']) ?? '';
     return LabStockLocation(
       id: firstInt(json, const ['id', 'location_id']),
-      code: firstString(json, const ['code', 'location_code', 'barcode', 'name']) ??
+      code:
+          firstString(json, const [
+            'code',
+            'location_code',
+            'barcode',
+            'name',
+          ]) ??
           '',
-      name: firstString(json, const ['name', 'display_name', 'location_name']) ??
+      name:
+          firstString(json, const ['name', 'display_name', 'location_name']) ??
           '',
-      path: firstString(json, const ['path', 'complete_name', 'location_path']) ??
+      path:
+          firstString(json, const ['path', 'complete_name', 'location_path']) ??
           fallbackLabel,
-      quantity: firstDouble(json, const ['quantity', 'qty', 'on_hand', 'available']),
+      quantity: firstDouble(json, const [
+        'quantity',
+        'qty',
+        'on_hand',
+        'available',
+      ]),
       bagCount: firstInt(json, const ['bag_count', 'bagCount']),
       bagQuantity: firstDouble(json, const ['bag_quantity', 'bagQuantity']),
       usage: firstString(json, const ['usage']),
+      parentId: firstInt(json, const ['parent_id']),
       raw: json,
     );
   }
+}
+
+/// One `locations(with_tree: true)` answer.
+///
+/// [locations] are the real internal locations (the only ones that hold stock
+/// and can be entered). [ancestors] are the `view` folders above them, included
+/// only so the tree can show `WH → 库存 → R区` even though a folder itself is
+/// not a stock location.
+class LabLocationTree {
+  const LabLocationTree({
+    required this.locations,
+    required this.ancestors,
+    this.hierarchy = true,
+  });
+
+  final List<LabStockLocation> locations;
+  final List<LabStockLocation> ancestors;
+
+  /// False when the server answered without `parent_id` (an older host): the
+  /// screen then falls back to the flat list it used to show instead of
+  /// pretending every location is a root.
+  final bool hierarchy;
+
+  bool get isEmpty => locations.isEmpty && ancestors.isEmpty;
+
+  static const LabLocationTree empty = LabLocationTree(
+    locations: <LabStockLocation>[],
+    ancestors: <LabStockLocation>[],
+  );
 }
 
 /// One physical bag / batch: the unit a 追溯码 identifies.
@@ -200,6 +270,7 @@ class LabBag {
   final int? locationId;
   final String locationCode;
   final String locationName;
+
   /// On-hand quantity, from the LIVE `stock.quant` sum when the server reports
   /// it (the `/inventory/bags` list does); the bag's cached figure otherwise.
   final double? quantity;
@@ -238,51 +309,75 @@ class LabBag {
   double get remaining => quantity ?? 0;
 
   factory LabBag.fromJson(Map<String, dynamic> json) {
-    final locationJson = asMap(firstValue(json, const ['location', 'location_id']));
+    final locationJson = asMap(
+      firstValue(json, const ['location', 'location_id']),
+    );
     return LabBag(
       id: firstInt(json, const ['id', 'bag_id']),
-      traceCode: firstString(
-            json,
-            const ['trace_code', 'tracecode', 'bag_code', 'barcode', 'code', 'name'],
-          ) ??
+      traceCode:
+          firstString(json, const [
+            'trace_code',
+            'tracecode',
+            'bag_code',
+            'barcode',
+            'code',
+            'name',
+          ]) ??
           '',
-      sn: firstString(json, const ['sn', 'sn_code', 'lab_sn', 'lot_name']) ?? '',
+      sn:
+          firstString(json, const ['sn', 'sn_code', 'lab_sn', 'lot_name']) ??
+          '',
       itemKey: deriveItemKey(json) ?? '',
-      itemName: firstString(json, const ['item_name', 'product_name', 'name']) ?? '',
-      productTemplateId: firstInt(
-        json,
-        const ['product_template_id', 'template_id', 'lab_template_id'],
-      ),
-      locationId: firstInt(json, const ['location_id']) ??
+      itemName:
+          firstString(json, const ['item_name', 'product_name', 'name']) ?? '',
+      productTemplateId: firstInt(json, const [
+        'product_template_id',
+        'template_id',
+        'lab_template_id',
+      ]),
+      locationId:
+          firstInt(json, const ['location_id']) ??
           firstInt(locationJson, const ['id']),
-      locationCode: firstString(json, const ['location_code']) ??
+      locationCode:
+          firstString(json, const ['location_code']) ??
           firstString(locationJson, const ['code', 'location_code', 'name']) ??
           '',
-      locationName: firstString(json, const ['location_name']) ??
+      locationName:
+          firstString(json, const ['location_name']) ??
           firstString(locationJson, const ['name', 'display_name']) ??
           '',
-      quantity: firstDouble(
-        json,
-        const ['quantity', 'qty', 'remaining_quantity', 'on_hand'],
-      ),
-      availableQuantity: firstDouble(
-        json,
-        const ['available_quantity', 'free_quantity'],
-      ),
-      outstandingQuantity: firstDouble(
-        json,
-        const ['outstanding_quantity', 'issued_quantity'],
-      ),
+      quantity: firstDouble(json, const [
+        'quantity',
+        'qty',
+        'remaining_quantity',
+        'on_hand',
+      ]),
+      availableQuantity: firstDouble(json, const [
+        'available_quantity',
+        'free_quantity',
+      ]),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'issued_quantity',
+      ]),
       locationPath: firstString(json, const ['location_path', 'path']) ?? '',
       uom: firstString(json, const ['uom', 'uom_name', 'unit']) ?? '',
-      supplier: firstString(
-            json,
-            const ['supplier', 'supplier_name', 'supplier_metadata', 'source'],
-          ) ??
+      supplier:
+          firstString(json, const [
+            'supplier',
+            'supplier_name',
+            'supplier_metadata',
+            'source',
+          ]) ??
           '',
       note: firstString(json, const ['note', 'remark', 'memo']) ?? '',
       createdAt: asDateTime(
-        firstValue(json, const ['created_at', 'create_date', 'receipt_date', 'at']),
+        firstValue(json, const [
+          'created_at',
+          'create_date',
+          'receipt_date',
+          'at',
+        ]),
       ),
       raw: json,
     );
@@ -328,7 +423,9 @@ class LabFile {
   final Map<String, dynamic> raw;
 
   bool get isManual =>
-      isPdf || type.toLowerCase().contains('pdf') || type.toLowerCase().contains('manual');
+      isPdf ||
+      type.toLowerCase().contains('pdf') ||
+      type.toLowerCase().contains('manual');
 
   bool get isPdf {
     final lower = url.toLowerCase();
@@ -342,7 +439,9 @@ class LabFile {
   String get displayName {
     if (name.isNotEmpty) return name;
     final uri = Uri.tryParse(url);
-    final last = uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : '';
+    final last = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
     if (last.isNotEmpty) return last;
     return '资料文件';
   }
@@ -353,13 +452,20 @@ class LabFile {
   static List<LabFile> listFrom(Object? value) {
     final result = <LabFile>[];
     for (final entry in asMapList(value)) {
-      final type = firstString(entry, const ['fileType', 'file_type', 'type']) ?? '';
-      final nested = asMapList(entry['detailVOList'] ?? entry['files'] ?? entry['items']);
-      final directUrl = asAssetReference(firstValue(entry, const ['fileUrl', 'file_url', 'url']));
+      final type =
+          firstString(entry, const ['fileType', 'file_type', 'type']) ?? '';
+      final nested = asMapList(
+        entry['detailVOList'] ?? entry['files'] ?? entry['items'],
+      );
+      final directUrl = asAssetReference(
+        firstValue(entry, const ['fileUrl', 'file_url', 'url']),
+      );
       if (directUrl != null) {
         result.add(
           LabFile(
-            name: firstString(entry, const ['fileName', 'file_name', 'name']) ?? '',
+            name:
+                firstString(entry, const ['fileName', 'file_name', 'name']) ??
+                '',
             url: directUrl,
             type: type,
             size: firstInt(entry, const ['fileSize', 'size']),
@@ -368,13 +474,19 @@ class LabFile {
         );
       }
       for (final file in nested) {
-        final url = asAssetReference(firstValue(file, const ['fileUrl', 'file_url', 'url']));
+        final url = asAssetReference(
+          firstValue(file, const ['fileUrl', 'file_url', 'url']),
+        );
         if (url == null) continue;
         result.add(
           LabFile(
-            name: firstString(file, const ['fileName', 'file_name', 'name']) ?? '',
+            name:
+                firstString(file, const ['fileName', 'file_name', 'name']) ??
+                '',
             url: url,
-            type: firstString(file, const ['fileType', 'file_type', 'type']) ?? type,
+            type:
+                firstString(file, const ['fileType', 'file_type', 'type']) ??
+                type,
             size: firstInt(file, const ['fileSize', 'size']),
             raw: file,
           ),
@@ -435,8 +547,10 @@ class LabOperation {
   final String note;
   final Map<String, dynamic> raw;
 
-  bool get isReceipt => _kindContains('receipt') || _kindContains('in') || _kindContains('入库');
-  bool get isIssue => _kindContains('issue') || _kindContains('out') || _kindContains('领');
+  bool get isReceipt =>
+      _kindContains('receipt') || _kindContains('in') || _kindContains('入库');
+  bool get isIssue =>
+      _kindContains('issue') || _kindContains('out') || _kindContains('领');
   bool get isReturn => _kindContains('return') || _kindContains('归还');
 
   bool _kindContains(String needle) => kind.toLowerCase().contains(needle);
@@ -474,61 +588,89 @@ class LabOperation {
 
     return LabOperation(
       id: firstInt(json, const ['id', 'operation_id', 'move_id']),
-      kind: firstString(
-            json,
-            const ['kind', 'type', 'operation_type', 'op_type', 'move_type', 'state'],
-          ) ??
+      kind:
+          firstString(json, const [
+            'kind',
+            'type',
+            'operation_type',
+            'op_type',
+            'move_type',
+            'state',
+          ]) ??
           '',
       itemKey: deriveItemKey(json) ?? '',
-      itemName: firstString(
-            json,
-            const ['item_name', 'product_name', 'material_name', 'name', 'item'],
-          ) ??
+      itemName:
+          firstString(json, const [
+            'item_name',
+            'product_name',
+            'material_name',
+            'name',
+            'item',
+          ]) ??
           '',
-      quantity: firstDouble(
-        json,
-        const ['quantity', 'qty', 'amount', 'done_quantity'],
-      ),
-      outstandingQuantity: firstDouble(
-        json,
-        const ['outstanding_quantity', 'outstanding', 'unreturned_quantity'],
-      ),
-      actor: person(const [
-        'actor',
-        'actor_name',
-        'operator',
-        'operator_name',
-        'done_by',
-        'create_uid',
-        'user_id',
-      ]) ??
+      quantity: firstDouble(json, const [
+        'quantity',
+        'qty',
+        'amount',
+        'done_quantity',
+      ]),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'outstanding',
+        'unreturned_quantity',
+      ]),
+      actor:
+          person(const [
+            'actor',
+            'actor_name',
+            'operator',
+            'operator_name',
+            'done_by',
+            'create_uid',
+            'user_id',
+          ]) ??
           '',
-      borrower: person(const [
-        'borrower',
-        'borrower_name',
-        'borrower_id',
-        'issued_to',
-        'partner_id',
-      ]) ??
+      borrower:
+          person(const [
+            'borrower',
+            'borrower_name',
+            'borrower_id',
+            'issued_to',
+            'partner_id',
+          ]) ??
           '',
-      project: firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
-      bagTrace: firstString(
-            json,
-            const ['bag_trace', 'trace_code', 'bag_code', 'bag', 'lot_name'],
-          ) ??
+      project:
+          firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
+      bagTrace:
+          firstString(json, const [
+            'bag_trace',
+            'trace_code',
+            'bag_code',
+            'bag',
+            'lot_name',
+          ]) ??
           '',
-      locationCode: firstString(
-            json,
-            const ['location_code', 'location', 'location_name', 'dest_location'],
-          ) ??
+      locationCode:
+          firstString(json, const [
+            'location_code',
+            'location',
+            'location_name',
+            'dest_location',
+          ]) ??
           '',
       at: asDateTime(
-        firstValue(
-          json,
-          const ['at', 'timestamp', 'date', 'create_date', 'done_at', 'operation_date'],
-        ),
+        firstValue(json, const [
+          'at',
+          'timestamp',
+          'date',
+          'create_date',
+          'done_at',
+          'operation_date',
+        ]),
       ),
-      note: firstString(json, const ['note', 'remark', 'memo', 'description']) ?? '',
+      note:
+          firstString(json, const ['note', 'remark', 'memo', 'description']) ??
+          '',
       raw: json,
     );
   }
@@ -552,8 +694,10 @@ class OperationPage {
     );
   }
 
-  static const OperationPage empty =
-      OperationPage(operations: <LabOperation>[], nextCursor: null);
+  static const OperationPage empty = OperationPage(
+    operations: <LabOperation>[],
+    nextCursor: null,
+  );
 }
 
 /// One line of an issue record: what left which bag, and how much came back.
@@ -599,26 +743,44 @@ class IssueLineRecord {
       // `issue_line_id` FIRST: the return endpoint needs that exact id, and a
       // flat issue payload may also carry a generic `id` for something else.
       id: firstInt(json, const ['issue_line_id', 'line_id', 'id']),
-      bagId: firstInt(json, const ['bag_id']) ??
+      bagId:
+          firstInt(json, const ['bag_id']) ??
           firstInt(asMap(firstValue(json, const ['bag'])), const ['id']),
-      bagTrace: firstString(
-            json,
-            const ['bag_trace', 'trace_code', 'bag_code', 'lot_name'],
-          ) ??
+      bagTrace:
+          firstString(json, const [
+            'bag_trace',
+            'trace_code',
+            'bag_code',
+            'lot_name',
+          ]) ??
           '',
       itemKey: deriveItemKey(json) ?? '',
-      itemName: firstString(json, const ['item_name', 'product_name', 'name', 'item']) ?? '',
+      itemName:
+          firstString(json, const [
+            'item_name',
+            'product_name',
+            'name',
+            'item',
+          ]) ??
+          '',
       quantity: firstDouble(json, const ['quantity', 'qty', 'issued_quantity']),
-      returnedQuantity: firstDouble(
-        json,
-        const ['returned_quantity', 'returned', 'return_qty'],
-      ),
-      outstandingQuantity: firstDouble(
-        json,
-        const ['outstanding_quantity', 'outstanding', 'unreturned_quantity'],
-      ),
+      returnedQuantity: firstDouble(json, const [
+        'returned_quantity',
+        'returned',
+        'return_qty',
+      ]),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'outstanding',
+        'unreturned_quantity',
+      ]),
       locationCode:
-          firstString(json, const ['location_code', 'location_name', 'location']) ?? '',
+          firstString(json, const [
+            'location_code',
+            'location_name',
+            'location',
+          ]) ??
+          '',
       raw: json,
     );
   }
@@ -697,24 +859,32 @@ class IssueRecord {
     Map<String, dynamic> json,
     IssueLineRecord line,
   ) {
-    final borrowerRef = asReference(firstValue(json, const ['borrower', 'borrower_id']));
+    final borrowerRef = asReference(
+      firstValue(json, const ['borrower', 'borrower_id']),
+    );
     return IssueRecord(
       // The grouping id when present; otherwise the line id (still a unique,
       // selectable record - the UI never invents an issue).
       id: firstInt(json, const ['issue_id', 'issue_record_id']) ?? line.id,
-      project: firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
+      project:
+          firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
       borrowerId: firstInt(json, const ['borrower_id']) ?? borrowerRef.id,
-      borrowerName: firstString(json, const ['borrower_name', 'borrower']) ??
+      borrowerName:
+          firstString(json, const ['borrower_name', 'borrower']) ??
           borrowerRef.name ??
           '',
-      actorName: firstString(json, const ['actor_name', 'operator_name', 'actor']) ?? '',
+      actorName:
+          firstString(json, const ['actor_name', 'operator_name', 'actor']) ??
+          '',
       itemKey: line.itemKey,
       itemName: line.itemName,
       issuedAt: asDateTime(
         firstValue(json, const ['issued_at', 'create_date', 'at', 'date']),
       ),
-      outstandingQuantity:
-          firstDouble(json, const ['outstanding_quantity', 'outstanding']),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'outstanding',
+      ]),
       note: firstString(json, const ['note', 'remark', 'memo']) ?? '',
       lines: <IssueLineRecord>[line],
       raw: json,
@@ -722,19 +892,28 @@ class IssueRecord {
   }
 
   factory IssueRecord.fromJson(Map<String, dynamic> json) {
-    final borrowerRef = asReference(firstValue(json, const ['borrower', 'borrower_id']));
+    final borrowerRef = asReference(
+      firstValue(json, const ['borrower', 'borrower_id']),
+    );
     final lines = asMapList(json['lines'] ?? json['line_ids']);
     return IssueRecord(
       id: firstInt(json, const ['issue_id', 'id']),
-      project: firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
+      project:
+          firstString(json, const ['project', 'project_name', 'purpose']) ?? '',
       borrowerId: firstInt(json, const ['borrower_id']) ?? borrowerRef.id,
-      borrowerName: firstString(json, const ['borrower_name']) ??
+      borrowerName:
+          firstString(json, const ['borrower_name']) ??
           borrowerRef.name ??
           asReference(firstValue(json, const ['borrower'])).name ??
           '',
       actorName: (() {
         final reference = asReference(
-          firstValue(json, const ['actor', 'operator', 'create_uid', 'user_id']),
+          firstValue(json, const [
+            'actor',
+            'operator',
+            'create_uid',
+            'user_id',
+          ]),
         );
         return reference.name ??
             firstString(json, const ['actor_name', 'operator_name']) ??
@@ -742,10 +921,18 @@ class IssueRecord {
       })(),
       itemKey: deriveItemKey(json) ?? '',
       itemName: (() {
-        final direct = firstString(json, const ['item_name', 'product_name', 'name']);
+        final direct = firstString(json, const [
+          'item_name',
+          'product_name',
+          'name',
+        ]);
         if (direct != null) return direct;
         for (final line in lines) {
-          final name = firstString(line, const ['item_name', 'product_name', 'name']);
+          final name = firstString(line, const [
+            'item_name',
+            'product_name',
+            'name',
+          ]);
           if (name != null) return name;
         }
         return '';
@@ -753,10 +940,11 @@ class IssueRecord {
       issuedAt: asDateTime(
         firstValue(json, const ['issued_at', 'create_date', 'at', 'date']),
       ),
-      outstandingQuantity: firstDouble(
-        json,
-        const ['outstanding_quantity', 'outstanding', 'unreturned_quantity'],
-      ),
+      outstandingQuantity: firstDouble(json, const [
+        'outstanding_quantity',
+        'outstanding',
+        'unreturned_quantity',
+      ]),
       note: firstString(json, const ['note', 'remark', 'memo']) ?? '',
       lines: lines.map(IssueLineRecord.fromJson).toList(),
       raw: json,
@@ -805,7 +993,10 @@ class IssuePage {
     );
   }
 
-  static const IssuePage empty = IssuePage(issues: <IssueRecord>[], nextCursor: null);
+  static const IssuePage empty = IssuePage(
+    issues: <IssueRecord>[],
+    nextCursor: null,
+  );
 }
 
 /// `/lab/api/catalog/detail` response.
@@ -897,7 +1088,9 @@ class CatalogDetail {
       locations: asMapList(json['locations'] ?? json['location_ids'])
           .map(LabStockLocation.fromJson)
           .toList(),
-      bags: asMapList(json['bags'] ?? json['bag_ids']).map(LabBag.fromJson).toList(),
+      bags: asMapList(json['bags'] ?? json['bag_ids'])
+          .map(LabBag.fromJson)
+          .toList(),
       files: LabFile.listFrom(json['files'] ?? json['attachments']),
       history: asMapList(json['history'] ?? json['operations'])
           .map(LabOperation.fromJson)

@@ -10,13 +10,16 @@ import '../services/scan_sources.dart';
 import 'lab_errors.dart';
 import 'unified_providers.dart';
 
-export 'lab_errors.dart' show describeLabError, isOfflineFailure, isSessionExpired;
+export 'lab_errors.dart'
+    show describeLabError, isOfflineFailure, isSessionExpired;
 
 /// `/lab/api/inventory/bootstrap`, refreshed whenever stock changes.
 ///
 /// Supplies the internal locations and - crucially - the system accounts the
 /// operator may select as 领用人.
-final inventoryBootstrapProvider = FutureProvider<InventoryBootstrap>((ref) async {
+final inventoryBootstrapProvider = FutureProvider<InventoryBootstrap>((
+  ref,
+) async {
   ref.watch(dataRevisionProvider);
   ref.watch(effectiveSessionScopeProvider);
   final api = ref.watch(labApiProvider);
@@ -27,8 +30,9 @@ final inventoryBootstrapProvider = FutureProvider<InventoryBootstrap>((ref) asyn
 ///
 /// Plain rows (`id`/`code`/`name`/`path`): the pickers only need those, and the
 /// aggregate query behind `with_stats` costs a second round trip server-side.
-final inventoryLocationsProvider =
-    FutureProvider<List<LabStockLocation>>((ref) async {
+final inventoryLocationsProvider = FutureProvider<List<LabStockLocation>>((
+  ref,
+) async {
   ref.watch(dataRevisionProvider);
   ref.watch(effectiveSessionScopeProvider);
   final api = ref.watch(labApiProvider);
@@ -42,10 +46,24 @@ final inventoryLocationsProvider =
 /// picker pay for an aggregate the operator never sees.
 final inventoryLocationsWithStatsProvider =
     FutureProvider<List<LabStockLocation>>((ref) async {
+      ref.watch(dataRevisionProvider);
+      ref.watch(effectiveSessionScopeProvider);
+      final api = ref.watch(labApiProvider);
+      return api.locations(withStats: true);
+    });
+
+/// The location hierarchy: internal rows plus the `view` folders above them.
+///
+/// Separate from [inventoryLocationsProvider] on purpose - the tree needs the
+/// ancestors and the aggregates, while every picker (receipt, labels) must keep
+/// asking for the flat internal-only list it has always used.
+final inventoryLocationTreeProvider = FutureProvider<LabLocationTree>((
+  ref,
+) async {
   ref.watch(dataRevisionProvider);
   ref.watch(effectiveSessionScopeProvider);
   final api = ref.watch(labApiProvider);
-  return api.locations(withStats: true);
+  return api.locationsTree(withStats: true);
 });
 
 // -----------------------------------------------------------------------------
@@ -169,15 +187,19 @@ class ReceiptFormState {
   }) {
     return ReceiptFormState(
       input: input ?? this.input,
-      resolved: identical(resolved, _unset) ? this.resolved : resolved as ResolvedCode?,
+      resolved: identical(resolved, _unset)
+          ? this.resolved
+          : resolved as ResolvedCode?,
       itemKey: itemKey ?? this.itemKey,
       itemName: itemName ?? this.itemName,
-      templateId:
-          identical(templateId, _unset) ? this.templateId : templateId as int?,
+      templateId: identical(templateId, _unset)
+          ? this.templateId
+          : templateId as int?,
       sn: sn ?? this.sn,
       materials: materials ?? this.materials,
-      locationId:
-          identical(locationId, _unset) ? this.locationId : locationId as int?,
+      locationId: identical(locationId, _unset)
+          ? this.locationId
+          : locationId as int?,
       locationLabel: locationLabel ?? this.locationLabel,
       quantityText: quantityText ?? this.quantityText,
       supplierQr: supplierQr ?? this.supplierQr,
@@ -185,9 +207,13 @@ class ReceiptFormState {
       resolving: resolving ?? this.resolving,
       submitting: submitting ?? this.submitting,
       error: identical(error, _unset) ? this.error : error as String?,
-      errorCode: identical(errorCode, _unset) ? this.errorCode : errorCode as String?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
       notice: identical(notice, _unset) ? this.notice : notice as String?,
-      result: identical(result, _unset) ? this.result : result as ReceiptResult?,
+      result: identical(result, _unset)
+          ? this.result
+          : result as ReceiptResult?,
       succeeded: succeeded ?? this.succeeded,
       requestKey: requestKey ?? this.requestKey,
     );
@@ -211,10 +237,10 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
     required LabApiClient api,
     required String Function() newRequestKey,
     void Function(String inventoryRevision)? onInventoryChanged,
-  })  : _api = api,
-        _newRequestKey = newRequestKey,
-        _onInventoryChanged = onInventoryChanged,
-        super(ReceiptFormState(requestKey: newRequestKey()));
+  }) : _api = api,
+       _newRequestKey = newRequestKey,
+       _onInventoryChanged = onInventoryChanged,
+       super(ReceiptFormState(requestKey: newRequestKey()));
 
   final LabApiClient _api;
   final String Function() _newRequestKey;
@@ -260,7 +286,11 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
   }
 
   void setLocation(int? locationId, {String label = ''}) {
-    state = state.copyWith(locationId: locationId, locationLabel: label, error: null);
+    state = state.copyWith(
+      locationId: locationId,
+      locationLabel: label,
+      error: null,
+    );
   }
 
   /// Records the local archives known for this card.
@@ -336,7 +366,9 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
 
     try {
       final resolved = await _api.resolveCode(raw);
-      final itemKey = resolved.itemKey.isNotEmpty ? resolved.itemKey : state.itemKey;
+      final itemKey = resolved.itemKey.isNotEmpty
+          ? resolved.itemKey
+          : state.itemKey;
       final locationId = resolved.impliedLocationId ?? state.locationId;
       final locationLabel = resolved.location != null
           ? resolved.location!.display
@@ -359,15 +391,20 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
       String? notice;
       String? error;
       if (resolved.isUnknown) {
-        error = '未能识别该编码：$raw。\n'
+        error =
+            '未能识别该编码：$raw。\n'
             '可扫描本系统追溯袋码（LABB:）、库位码（LABL:）、原立创物料袋二维码，'
             '或输入 C 编号后从器件库选择器件。';
       } else if (resolved.isLocation && itemKey.isEmpty) {
-        notice = '已识别库位「${resolved.location?.display ?? raw}」。'
+        notice =
+            '已识别库位「${resolved.location?.display ?? raw}」。'
             '请再扫描物料袋码，或从器件库选择要入库的器件。';
       } else {
-        final target = resolved.bag?.display ??
-            (itemKey.isNotEmpty ? itemKey : (resolved.location?.display ?? raw));
+        final target =
+            resolved.bag?.display ??
+            (itemKey.isNotEmpty
+                ? itemKey
+                : (resolved.location?.display ?? raw));
         notice = '已识别${resolved.displayKind}：$target';
       }
 
@@ -423,8 +460,9 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
     // nested catch block would otherwise lose the type promotion.
     final locationIdValue = locationId!;
     final quantityValue = quantity!;
-    final supplierQrValue =
-        state.supplierQr.trim().isEmpty ? null : state.supplierQr.trim();
+    final supplierQrValue = state.supplierQr.trim().isEmpty
+        ? null
+        : state.supplierQr.trim();
     final noteValue = state.note.trim();
     final templateIdValue = state.templateId;
 
@@ -458,7 +496,7 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
             error: candidates.isEmpty
                 ? error.message
                 : '${error.message}\n请选择本次入库的本地档案 / SN：'
-                    '${candidates.map((material) => material.display).join('、')}',
+                      '${candidates.map((material) => material.display).join('、')}',
             errorCode: error.code,
           );
           return false;
@@ -491,13 +529,14 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
       final createdNote = autoCreatedSn == null
           ? archiveNote
           : (autoCreatedSn.isEmpty
-              ? '（已自动创建本地物料档案）'
-              : '（已自动创建本地物料档案 SN $autoCreatedSn）');
+                ? '（已自动创建本地物料档案）'
+                : '（已自动创建本地物料档案 SN $autoCreatedSn）');
       state = state.copyWith(
         submitting: false,
         succeeded: true,
         result: result,
-        notice: '入库成功：$quantityLabel 件 → ${location.isEmpty ? '库位#$locationId' : location}'
+        notice:
+            '入库成功：$quantityLabel 件 → ${location.isEmpty ? '库位#$locationId' : location}'
             '$createdNote'
             '${onHand == null ? '' : '，该器件内部库存 ${_format(onHand)}'}。',
         // A NEW submission gets a NEW key; the old one already did its job.
@@ -533,8 +572,11 @@ class ReceiptController extends StateNotifier<ReceiptFormState> {
     if (codes.contains(error.code.toUpperCase())) return true;
     final message = error.message;
     final mentionsMaterial =
-        message.contains('物料') || message.contains('档案') || message.contains('建档');
-    final mentionsMissing = message.contains('不存在') ||
+        message.contains('物料') ||
+        message.contains('档案') ||
+        message.contains('建档');
+    final mentionsMissing =
+        message.contains('不存在') ||
         message.contains('未建') ||
         message.contains('没有') ||
         message.contains('缺少');
@@ -655,7 +697,10 @@ class IssueFormState {
   bool get isBusy => submitting;
 
   bool get canSubmit =>
-      !submitting && lines.isNotEmpty && borrowerId != null && project.trim().isNotEmpty;
+      !submitting &&
+      lines.isNotEmpty &&
+      borrowerId != null &&
+      project.trim().isNotEmpty;
 
   /// All blocking problems, in the order the operator should fix them.
   List<String> get problems {
@@ -693,13 +738,16 @@ class IssueFormState {
       itemKey: itemKey ?? this.itemKey,
       itemName: itemName ?? this.itemName,
       lines: lines ?? this.lines,
-      borrowerId:
-          identical(borrowerId, _unset) ? this.borrowerId : borrowerId as int?,
+      borrowerId: identical(borrowerId, _unset)
+          ? this.borrowerId
+          : borrowerId as int?,
       project: project ?? this.project,
       note: note ?? this.note,
       submitting: submitting ?? this.submitting,
       error: identical(error, _unset) ? this.error : error as String?,
-      errorCode: identical(errorCode, _unset) ? this.errorCode : errorCode as String?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
       notice: identical(notice, _unset) ? this.notice : notice as String?,
       result: identical(result, _unset) ? this.result : result as IssueResult?,
       succeeded: succeeded ?? this.succeeded,
@@ -723,10 +771,10 @@ class IssueController extends StateNotifier<IssueFormState> {
     required LabApiClient api,
     required String Function() newRequestKey,
     void Function(String inventoryRevision)? onInventoryChanged,
-  })  : _api = api,
-        _newRequestKey = newRequestKey,
-        _onInventoryChanged = onInventoryChanged,
-        super(IssueFormState(requestKey: newRequestKey()));
+  }) : _api = api,
+       _newRequestKey = newRequestKey,
+       _onInventoryChanged = onInventoryChanged,
+       super(IssueFormState(requestKey: newRequestKey()));
 
   final LabApiClient _api;
   final String Function() _newRequestKey;
@@ -736,7 +784,8 @@ class IssueController extends StateNotifier<IssueFormState> {
     state = state.copyWith(itemKey: itemKey, itemName: itemName, error: null);
   }
 
-  void setProject(String value) => state = state.copyWith(project: value, error: null);
+  void setProject(String value) =>
+      state = state.copyWith(project: value, error: null);
 
   void setNote(String value) => state = state.copyWith(note: value);
 
@@ -755,7 +804,9 @@ class IssueController extends StateNotifier<IssueFormState> {
           bagId: bag.id!,
           label: bag.display,
           available: bag.remaining,
-          locationLabel: bag.locationCode.isNotEmpty ? bag.locationCode : bag.locationName,
+          locationLabel: bag.locationCode.isNotEmpty
+              ? bag.locationCode
+              : bag.locationName,
         ),
       ],
       error: null,
@@ -772,8 +823,9 @@ class IssueController extends StateNotifier<IssueFormState> {
     state = state.copyWith(
       lines: state.lines
           .map(
-            (line) =>
-                line.bagId == bagId ? line.copyWith(quantityText: quantityText) : line,
+            (line) => line.bagId == bagId
+                ? line.copyWith(quantityText: quantityText)
+                : line,
           )
           .toList(),
       error: null,
@@ -793,8 +845,10 @@ class IssueController extends StateNotifier<IssueFormState> {
         continue;
       }
       if (line.exceedsAvailable) {
-        problems.add('袋 ${line.label} 只有 ${line.availableLabel}，不能领用 '
-            '${quantity == quantity.roundToDouble() ? quantity.toInt() : quantity}。');
+        problems.add(
+          '袋 ${line.label} 只有 ${line.availableLabel}，不能领用 '
+          '${quantity == quantity.roundToDouble() ? quantity.toInt() : quantity}。',
+        );
         continue;
       }
       lines.add((bagId: line.bagId, quantity: quantity));
@@ -826,7 +880,8 @@ class IssueController extends StateNotifier<IssueFormState> {
         submitting: false,
         succeeded: true,
         result: result,
-        notice: '领料成功：$total 件，项目「$project」。'
+        notice:
+            '领料成功：$total 件，项目「$project」。'
             '操作人由服务器按当前登录账号记录。',
         requestKey: _newRequestKey(),
       );
@@ -898,7 +953,10 @@ class ReturnFormState {
   bool get isBusy => submitting || loadingIssues;
 
   bool get canSubmit =>
-      !isBusy && selectedLine != null && (quantity ?? 0) > 0 && (quantity ?? 0) <= outstanding + 0.000001;
+      !isBusy &&
+      selectedLine != null &&
+      (quantity ?? 0) > 0 &&
+      (quantity ?? 0) <= outstanding + 0.000001;
 
   ReturnFormState copyWith({
     List<IssueRecord>? issues,
@@ -920,19 +978,23 @@ class ReturnFormState {
     return ReturnFormState(
       issues: issues ?? this.issues,
       loadingIssues: loadingIssues ?? this.loadingIssues,
-      issuesError:
-          identical(issuesError, _unset) ? this.issuesError : issuesError as String?,
+      issuesError: identical(issuesError, _unset)
+          ? this.issuesError
+          : issuesError as String?,
       outstandingOnly: outstandingOnly ?? this.outstandingOnly,
       selectedIssue: identical(selectedIssue, _unset)
           ? this.selectedIssue
           : selectedIssue as IssueRecord?,
-      selectedLine:
-          identical(selectedLine, _unset) ? this.selectedLine : selectedLine as IssueLineRecord?,
+      selectedLine: identical(selectedLine, _unset)
+          ? this.selectedLine
+          : selectedLine as IssueLineRecord?,
       quantityText: quantityText ?? this.quantityText,
       note: note ?? this.note,
       submitting: submitting ?? this.submitting,
       error: identical(error, _unset) ? this.error : error as String?,
-      errorCode: identical(errorCode, _unset) ? this.errorCode : errorCode as String?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
       notice: identical(notice, _unset) ? this.notice : notice as String?,
       result: identical(result, _unset) ? this.result : result as ReturnResult?,
       succeeded: succeeded ?? this.succeeded,
@@ -954,10 +1016,10 @@ class ReturnController extends StateNotifier<ReturnFormState> {
     required LabApiClient api,
     required String Function() newRequestKey,
     void Function(String inventoryRevision)? onInventoryChanged,
-  })  : _api = api,
-        _newRequestKey = newRequestKey,
-        _onInventoryChanged = onInventoryChanged,
-        super(ReturnFormState(requestKey: newRequestKey()));
+  }) : _api = api,
+       _newRequestKey = newRequestKey,
+       _onInventoryChanged = onInventoryChanged,
+       super(ReturnFormState(requestKey: newRequestKey()));
 
   final LabApiClient _api;
   final String Function() _newRequestKey;
@@ -990,7 +1052,9 @@ class ReturnController extends StateNotifier<ReturnFormState> {
   void selectIssue(IssueRecord? issue) {
     state = state.copyWith(
       selectedIssue: issue,
-      selectedLine: issue != null && issue.lines.length == 1 ? issue.lines.first : null,
+      selectedLine: issue != null && issue.lines.length == 1
+          ? issue.lines.first
+          : null,
       error: null,
       notice: null,
       succeeded: false,
@@ -1001,7 +1065,8 @@ class ReturnController extends StateNotifier<ReturnFormState> {
     state = state.copyWith(selectedLine: line, error: null);
   }
 
-  void setQuantity(String value) => state = state.copyWith(quantityText: value, error: null);
+  void setQuantity(String value) =>
+      state = state.copyWith(quantityText: value, error: null);
 
   void setNote(String value) => state = state.copyWith(note: value);
 
@@ -1016,9 +1081,7 @@ class ReturnController extends StateNotifier<ReturnFormState> {
     if (quantity == null || quantity <= 0) {
       problems.add('请输入大于 0 的归还数量。');
     } else if (line != null && quantity > line.outstanding + 0.000001) {
-      problems.add(
-        '归还数量不能超过尚未归还数量 ${_format(line.outstanding)}。',
-      );
+      problems.add('归还数量不能超过尚未归还数量 ${_format(line.outstanding)}。');
     }
     if (problems.isNotEmpty) {
       state = state.copyWith(error: problems.join('\n'));
@@ -1034,12 +1097,14 @@ class ReturnController extends StateNotifier<ReturnFormState> {
         note: state.note.trim(),
       );
 
-      final remaining = result.outstandingQuantity ?? (line.outstanding - quantity);
+      final remaining =
+          result.outstandingQuantity ?? (line.outstanding - quantity);
       state = state.copyWith(
         submitting: false,
         succeeded: true,
         result: result,
-        notice: '归还成功：${_format(quantity)} 件，该行尚未归还 ${_format(remaining <= 0 ? 0 : remaining)}。',
+        notice:
+            '归还成功：${_format(quantity)} 件，该行尚未归还 ${_format(remaining <= 0 ? 0 : remaining)}。',
         requestKey: _newRequestKey(),
       );
       _onInventoryChanged?.call(result.inventoryRevision);
@@ -1111,12 +1176,15 @@ class HistoryState {
   }) {
     return HistoryState(
       operations: operations ?? this.operations,
-      nextCursor:
-          identical(nextCursor, _unset) ? this.nextCursor : nextCursor as String?,
+      nextCursor: identical(nextCursor, _unset)
+          ? this.nextCursor
+          : nextCursor as String?,
       loading: loading ?? this.loading,
       loadingMore: loadingMore ?? this.loadingMore,
       error: identical(error, _unset) ? this.error : error as String?,
-      errorCode: identical(errorCode, _unset) ? this.errorCode : errorCode as String?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
       itemKey: identical(itemKey, _unset) ? this.itemKey : itemKey as String?,
       bagId: identical(bagId, _unset) ? this.bagId : bagId as int?,
     );
@@ -1132,9 +1200,9 @@ class HistoryNotifier extends StateNotifier<HistoryState> {
     String? itemKey,
     int? bagId,
     int pageSize = LabApiClient.defaultPageSize,
-  })  : _api = api,
-        _pageSize = pageSize.clamp(1, LabApiClient.maxPageSize),
-        super(HistoryState(itemKey: itemKey, bagId: bagId));
+  }) : _api = api,
+       _pageSize = pageSize.clamp(1, LabApiClient.maxPageSize),
+       super(HistoryState(itemKey: itemKey, bagId: bagId));
 
   final LabApiClient _api;
   final int _pageSize;
@@ -1203,7 +1271,10 @@ class HistoryNotifier extends StateNotifier<HistoryState> {
         loadingMore: false,
       );
     } catch (error) {
-      state = state.copyWith(loadingMore: false, error: describeLabError(error));
+      state = state.copyWith(
+        loadingMore: false,
+        error: describeLabError(error),
+      );
     }
   }
 }
@@ -1213,22 +1284,30 @@ class LocationCreateState {
   const LocationCreateState({
     this.submitting = false,
     this.error,
+    this.errorCode,
     this.created,
   });
 
   final bool submitting;
   final String? error;
+  final String? errorCode;
   final LabStockLocation? created;
 
   LocationCreateState copyWith({
     bool? submitting,
     Object? error = _unset,
+    Object? errorCode = _unset,
     Object? created = _unset,
   }) {
     return LocationCreateState(
       submitting: submitting ?? this.submitting,
       error: identical(error, _unset) ? this.error : error as String?,
-      created: identical(created, _unset) ? this.created : created as LabStockLocation?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
+      created: identical(created, _unset)
+          ? this.created
+          : created as LabStockLocation?,
     );
   }
 
@@ -1239,27 +1318,39 @@ class LocationCreateController extends StateNotifier<LocationCreateState> {
   LocationCreateController({
     required LabApiClient api,
     void Function(String inventoryRevision)? onInventoryChanged,
-  })  : _api = api,
-        _onInventoryChanged = onInventoryChanged,
-        super(const LocationCreateState());
+  }) : _api = api,
+       _onInventoryChanged = onInventoryChanged,
+       super(const LocationCreateState());
 
   final LabApiClient _api;
   final void Function(String inventoryRevision)? _onInventoryChanged;
 
-  Future<LabStockLocation?> create({required String name, int? parentId}) async {
+  Future<LabStockLocation?> create({
+    required String name,
+    int? parentId,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       state = state.copyWith(error: '请输入库位名称。');
       return null;
     }
-    state = state.copyWith(submitting: true, error: null);
+    state = state.copyWith(submitting: true, error: null, errorCode: null);
     try {
-      final location = await _api.createLocation(name: trimmed, parentId: parentId);
+      final location = await _api.createLocation(
+        name: trimmed,
+        parentId: parentId,
+      );
       state = LocationCreateState(created: location);
       _onInventoryChanged?.call('');
       return location;
     } on LabApiException catch (error) {
-      state = state.copyWith(submitting: false, error: error.message);
+      // The code lets the dialog tell an ambiguous transport failure (check the
+      // tree, never create twice) from a real validation refusal.
+      state = state.copyWith(
+        submitting: false,
+        error: error.message,
+        errorCode: error.code,
+      );
       return null;
     } catch (error) {
       state = state.copyWith(submitting: false, error: describeLabError(error));
@@ -1274,64 +1365,199 @@ class LocationCreateController extends StateNotifier<LocationCreateState> {
 
 final receiptControllerProvider =
     StateNotifierProvider<ReceiptController, ReceiptFormState>((ref) {
-  // A scope change rebuilds the controller: a new idempotency key, cleared
-  // inputs, and no leftover "succeeded" state from the previous session.
-  ref.watch(effectiveSessionScopeProvider);
-  return ReceiptController(
-    api: ref.watch(labApiProvider),
-    newRequestKey: ref.watch(requestKeyFactoryProvider),
-    onInventoryChanged: (revision) =>
-        ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
-  );
-});
+      // A scope change rebuilds the controller: a new idempotency key, cleared
+      // inputs, and no leftover "succeeded" state from the previous session.
+      ref.watch(effectiveSessionScopeProvider);
+      return ReceiptController(
+        api: ref.watch(labApiProvider),
+        newRequestKey: ref.watch(requestKeyFactoryProvider),
+        onInventoryChanged: (revision) =>
+            ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
+      );
+    });
 
 final issueControllerProvider =
     StateNotifierProvider<IssueController, IssueFormState>((ref) {
-  ref.watch(effectiveSessionScopeProvider);
-  return IssueController(
-    api: ref.watch(labApiProvider),
-    newRequestKey: ref.watch(requestKeyFactoryProvider),
-    onInventoryChanged: (revision) =>
-        ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
-  );
-});
+      ref.watch(effectiveSessionScopeProvider);
+      return IssueController(
+        api: ref.watch(labApiProvider),
+        newRequestKey: ref.watch(requestKeyFactoryProvider),
+        onInventoryChanged: (revision) =>
+            ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
+      );
+    });
 
 final returnControllerProvider =
     StateNotifierProvider<ReturnController, ReturnFormState>((ref) {
-  ref.watch(effectiveSessionScopeProvider);
-  return ReturnController(
-    api: ref.watch(labApiProvider),
-    newRequestKey: ref.watch(requestKeyFactoryProvider),
-    onInventoryChanged: (revision) =>
-        ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
-  );
-});
+      ref.watch(effectiveSessionScopeProvider);
+      return ReturnController(
+        api: ref.watch(labApiProvider),
+        newRequestKey: ref.watch(requestKeyFactoryProvider),
+        onInventoryChanged: (revision) =>
+            ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
+      );
+    });
 
 /// History for the whole library, or for one item when opened from its detail.
-final historyProvider = StateNotifierProvider.family<HistoryNotifier, HistoryState, String>(
-  (ref, scope) {
-    ref.watch(effectiveSessionScopeProvider);
-    final api = ref.watch(labApiProvider);
-    // A write must refresh the trace feed: the operation the operator just
-    // performed has to appear without a manual reload.
-    final notifier = HistoryNotifier(
-      api: api,
-      itemKey: scope.isEmpty ? null : scope,
-    );
-    ref.listen<DataRevision>(dataRevisionProvider, (previous, next) {
-      if (previous?.sequence == next.sequence) return;
-      unawaited(notifier.refresh());
+final historyProvider =
+    StateNotifierProvider.family<HistoryNotifier, HistoryState, String>((
+      ref,
+      scope,
+    ) {
+      ref.watch(effectiveSessionScopeProvider);
+      final api = ref.watch(labApiProvider);
+      // A write must refresh the trace feed: the operation the operator just
+      // performed has to appear without a manual reload.
+      final notifier = HistoryNotifier(
+        api: api,
+        itemKey: scope.isEmpty ? null : scope,
+      );
+      ref.listen<DataRevision>(dataRevisionProvider, (previous, next) {
+        if (previous?.sequence == next.sequence) return;
+        unawaited(notifier.refresh());
+      });
+      return notifier;
     });
-    return notifier;
-  },
-);
 
 final locationCreateProvider =
     StateNotifierProvider<LocationCreateController, LocationCreateState>((ref) {
-  ref.watch(effectiveSessionScopeProvider);
-  return LocationCreateController(
-    api: ref.watch(labApiProvider),
-    onInventoryChanged: (revision) =>
-        ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
-  );
-});
+      ref.watch(effectiveSessionScopeProvider);
+      return LocationCreateController(
+        api: ref.watch(labApiProvider),
+        onInventoryChanged: (revision) =>
+            ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
+      );
+    });
+
+/// One move of an existing location under a new parent.
+///
+/// Frozen while it is unresolved: the SAME [requestKey] and the SAME target are
+/// reused on retry, so a move that reached Odoo but lost its answer can never
+/// be executed twice. A NEW move (different location or parent) gets a new key.
+class LocationMoveAttempt {
+  const LocationMoveAttempt({
+    required this.locationId,
+    required this.parentId,
+    required this.requestKey,
+  });
+
+  final int locationId;
+  final int? parentId;
+  final String requestKey;
+
+  bool sameAs(int otherLocationId, int? otherParentId) =>
+      locationId == otherLocationId && parentId == otherParentId;
+}
+
+class LocationMoveState {
+  const LocationMoveState({
+    this.submitting = false,
+    this.error,
+    this.errorCode,
+    this.moved,
+    this.attempt,
+  });
+
+  final bool submitting;
+  final String? error;
+  final String? errorCode;
+  final LabStockLocation? moved;
+
+  /// The unresolved attempt, kept until the move succeeds. Its presence is what
+  /// the screen uses to offer 「原样重试」 instead of a fresh move.
+  final LocationMoveAttempt? attempt;
+
+  LocationMoveState copyWith({
+    bool? submitting,
+    Object? error = _unset,
+    Object? errorCode = _unset,
+    Object? moved = _unset,
+    Object? attempt = _unset,
+  }) {
+    return LocationMoveState(
+      submitting: submitting ?? this.submitting,
+      error: identical(error, _unset) ? this.error : error as String?,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
+      moved: identical(moved, _unset) ? this.moved : moved as LabStockLocation?,
+      attempt: identical(attempt, _unset)
+          ? this.attempt
+          : attempt as LocationMoveAttempt?,
+    );
+  }
+
+  static const Object _unset = Object();
+}
+
+class LocationMoveController extends StateNotifier<LocationMoveState> {
+  LocationMoveController({
+    required LabApiClient api,
+    required String Function() newRequestKey,
+    void Function(String inventoryRevision)? onInventoryChanged,
+  }) : _api = api,
+       _newRequestKey = newRequestKey,
+       _onInventoryChanged = onInventoryChanged,
+       super(const LocationMoveState());
+
+  final LabApiClient _api;
+  final String Function() _newRequestKey;
+  final void Function(String inventoryRevision)? _onInventoryChanged;
+
+  /// Moves [locationId] under [parentId] (`null` = top level).
+  ///
+  /// Retrying the same target reuses the frozen key; any other target starts a
+  /// new attempt with a new key.
+  Future<bool> move({required int locationId, required int? parentId}) async {
+    final previous = state.attempt;
+    final attempt = previous != null && previous.sameAs(locationId, parentId)
+        ? previous
+        : LocationMoveAttempt(
+            locationId: locationId,
+            parentId: parentId,
+            requestKey: _newRequestKey(),
+          );
+    state = LocationMoveState(submitting: true, attempt: attempt);
+    try {
+      final moved = await _api.updateLocationParent(
+        locationId: locationId,
+        parentId: parentId,
+        requestKey: attempt.requestKey,
+      );
+      // Success closes the attempt: the next move must get a new key.
+      state = LocationMoveState(moved: moved);
+      _onInventoryChanged?.call('');
+      return true;
+    } on LabApiException catch (error) {
+      // The key is kept: 「原样重试」 must not perform a second move.
+      state = LocationMoveState(
+        error: error.message,
+        errorCode: error.code,
+        attempt: attempt,
+      );
+      return false;
+    } catch (error) {
+      state = LocationMoveState(
+        error: describeLabError(error),
+        attempt: attempt,
+      );
+      return false;
+    }
+  }
+
+  /// Drops the unresolved attempt after the operator verified the real tree.
+  void discardAttempt() {
+    state = const LocationMoveState();
+  }
+}
+
+final locationMoveProvider =
+    StateNotifierProvider<LocationMoveController, LocationMoveState>((ref) {
+      ref.watch(effectiveSessionScopeProvider);
+      return LocationMoveController(
+        api: ref.watch(labApiProvider),
+        newRequestKey: ref.watch(requestKeyFactoryProvider),
+        onInventoryChanged: (revision) =>
+            ref.read(dataRevisionProvider.notifier).bump(inventory: revision),
+      );
+    });

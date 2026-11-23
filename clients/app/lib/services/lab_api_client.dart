@@ -45,13 +45,17 @@ class LabApiRoutes {
   static const String catalogCategories = '/lab/api/catalog/categories';
   static const String catalogFacets = '/lab/api/catalog/facets';
   static const String catalogBind = '/lab/api/catalog/bind';
-  static const String catalogCreateMaterial = '/lab/api/catalog/create_material';
+  static const String catalogCreateMaterial =
+      '/lab/api/catalog/create_material';
 
   // Inventory / workflow.
   static const String inventoryBootstrap = '/lab/api/inventory/bootstrap';
   static const String inventoryLocations = '/lab/api/inventory/locations';
   static const String inventoryBags = '/lab/api/inventory/bags';
-  static const String inventoryLocationCreate = '/lab/api/inventory/location_create';
+  static const String inventoryLocationCreate =
+      '/lab/api/inventory/location_create';
+  static const String inventoryLocationUpdate =
+      '/lab/api/inventory/location_update';
   static const String inventoryResolveCode = '/lab/api/inventory/resolve_code';
   static const String inventoryReceipt = '/lab/api/inventory/receipt';
   static const String pendingList = '/lab/api/inventory/pending/list';
@@ -102,8 +106,7 @@ class LabApiClient {
   Future<Map<String, dynamic>> _invoke(
     String path,
     Map<String, dynamic> params,
-  ) =>
-      _call(path, _prune(params));
+  ) => _call(path, _prune(params));
 
   // ---------------------------------------------------------------------------
   // Unified library (one list, one detail)
@@ -138,14 +141,11 @@ class LabApiClient {
     String? catalogCode,
     bool refresh = false,
   }) async {
-    final data = await _invoke(
-      LabApiRoutes.catalogFetch,
-      <String, dynamic>{
-        'query': query,
-        'catalog_code': catalogCode,
-        'refresh': refresh ? true : null,
-      },
-    );
+    final data = await _invoke(LabApiRoutes.catalogFetch, <String, dynamic>{
+      'query': query,
+      'catalog_code': catalogCode,
+      'refresh': refresh ? true : null,
+    });
     return CatalogFetchStatus.fromJson(data);
   }
 
@@ -176,10 +176,9 @@ class LabApiClient {
         message: '缺少器件标识，无法打开详情。',
       );
     }
-    return _invoke(
-      LabApiRoutes.catalogDetail,
-      <String, dynamic>{'item_key': key},
-    );
+    return _invoke(LabApiRoutes.catalogDetail, <String, dynamic>{
+      'item_key': key,
+    });
   }
 
   /// `/lab/api/catalog/categories` - the navigation tree.
@@ -194,7 +193,10 @@ class LabApiClient {
 
   /// `/lab/api/catalog/facets` - available filter values for the current query.
   Future<CatalogFacets> facets(CatalogQuery query) async {
-    final data = await _invoke(LabApiRoutes.catalogFacets, query.toFacetParams());
+    final data = await _invoke(
+      LabApiRoutes.catalogFacets,
+      query.toFacetParams(),
+    );
     return CatalogFacets.fromJson(data);
   }
 
@@ -264,7 +266,8 @@ class LabApiClient {
   }) async {
     final data = await _invoke(LabApiRoutes.inventoryBags, <String, dynamic>{
       if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
-      if (itemKey != null && itemKey.trim().isNotEmpty) 'item_key': itemKey.trim(),
+      if (itemKey != null && itemKey.trim().isNotEmpty)
+        'item_key': itemKey.trim(),
       if (locationId != null) 'location_id': locationId,
       'has_stock': hasStock,
       'outstanding_only': outstandingOnly,
@@ -277,20 +280,68 @@ class LabApiClient {
     );
   }
 
+  /// `/lab/api/inventory/locations` with `with_tree: true`.
+  ///
+  /// Returns the internal locations AND the `view` folders above them, so the
+  /// client can draw the same hierarchy the Web 仓位管理 shows. A host that
+  /// predates `with_tree` answers with locations only; [LabLocationTree.hierarchy]
+  /// is then false and the screen keeps its flat fallback.
+  Future<LabLocationTree> locationsTree({bool withStats = false}) async {
+    final data = await _invoke(
+      LabApiRoutes.inventoryLocations,
+      <String, dynamic>{if (withStats) 'with_stats': true, 'with_tree': true},
+    );
+    final nodes = asMapList(data['locations'] ?? data['items']);
+    final locations = nodes.map(LabStockLocation.fromJson).toList();
+    final ancestors = asMapList(data['ancestors'])
+        .map(LabStockLocation.fromJson)
+        .toList();
+    return LabLocationTree(
+      locations: locations,
+      ancestors: ancestors,
+      hierarchy: locations.every((row) => row.hierarchyKnown),
+    );
+  }
+
   /// `/lab/api/inventory/location_create` - a new internal location + 库码.
   Future<LabStockLocation> createLocation({
     required String name,
     int? parentId,
   }) async {
-    final data = await _invoke(LabApiRoutes.inventoryLocationCreate, <String, dynamic>{
-      'name': name,
-      'parent_id': parentId,
-    });
+    final data = await _invoke(
+      LabApiRoutes.inventoryLocationCreate,
+      <String, dynamic>{'name': name, 'parent_id': parentId},
+    );
     final location = asMap(data['location']);
     if (location.isEmpty) {
       // Some controllers answer with the location fields at top level.
       return LabStockLocation.fromJson(data);
     }
+    return LabStockLocation.fromJson(location);
+  }
+
+  /// `/lab/api/inventory/location_update` with `update_parent: true`.
+  ///
+  /// [parentId] is `null` for "move to the top level"; the server expects the
+  /// explicit `false` Odoo uses for an empty Many2one, not a missing key.
+  /// [requestKey] is the idempotency key of ONE move: a retry after a timeout
+  /// must reuse it, a different move must not.
+  Future<LabStockLocation> updateLocationParent({
+    required int locationId,
+    required int? parentId,
+    required String requestKey,
+  }) async {
+    final data = await _invoke(
+      LabApiRoutes.inventoryLocationUpdate,
+      <String, dynamic>{
+        'location_id': locationId,
+        'parent_id': parentId ?? false,
+        'update_parent': true,
+        'request_key': requestKey,
+      },
+    );
+    final location = asMap(data['location']);
+    if (location.isEmpty) return LabStockLocation.fromJson(data);
     return LabStockLocation.fromJson(location);
   }
 
@@ -303,10 +354,7 @@ class LabApiClient {
   Future<ResolvedCode> resolveCode(String raw) async {
     final text = raw.trim();
     if (text.isEmpty) {
-      throw const LabApiException(
-        code: 'EMPTY_CODE',
-        message: '请输入或扫描要解析的编码。',
-      );
+      throw const LabApiException(code: 'EMPTY_CODE', message: '请输入或扫描要解析的编码。');
     }
     final data = await _invoke(
       LabApiRoutes.inventoryResolveCode,
@@ -348,9 +396,14 @@ class LabApiClient {
   Future<Map<String, dynamic>> createPending(Map<String, dynamic> submission) =>
       _invoke(LabApiRoutes.pendingCreate, submission);
 
-  Future<void> updatePending(int id, {bool? selected, bool cancel = false}) async {
+  Future<void> updatePending(
+    int id, {
+    bool? selected,
+    bool cancel = false,
+  }) async {
     await _invoke(LabApiRoutes.pendingUpdate, {
-      'pending_id': id, 'action': cancel ? 'cancel' : 'select',
+      'pending_id': id,
+      'action': cancel ? 'cancel' : 'select',
       if (!cancel) 'selected': selected,
     });
   }
@@ -358,8 +411,9 @@ class LabApiClient {
   Future<Map<String, dynamic>> resolvePending(String raw) =>
       _invoke(LabApiRoutes.pendingResolve, {'raw': raw});
 
-  Future<Map<String, dynamic>> confirmPending(Map<String, dynamic> submission) =>
-      _invoke(LabApiRoutes.pendingConfirm, submission);
+  Future<Map<String, dynamic>> confirmPending(
+    Map<String, dynamic> submission,
+  ) => _invoke(LabApiRoutes.pendingConfirm, submission);
 
   /// `/lab/api/inventory/receipt` - create REAL bag stock in a location.
   ///
@@ -407,10 +461,12 @@ class LabApiClient {
       'borrower_id': borrowerId,
       'project': project,
       'lines': lines
-          .map((line) => <String, dynamic>{
-                'bag_id': line.bagId,
-                'quantity': line.quantity,
-              })
+          .map(
+            (line) => <String, dynamic>{
+              'bag_id': line.bagId,
+              'quantity': line.quantity,
+            },
+          )
           .toList(),
       'note': note,
     });

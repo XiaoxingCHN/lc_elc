@@ -2,7 +2,7 @@ name: lab_inventory_client
 description: Flutter cross-platform client for the laboratory component inventory system (Odoo 19 JSON-RPC, no middleware).
 publish_to: 'none'
 
-version: 1.3.5+25
+version: 1.4.0+26
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
